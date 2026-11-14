@@ -1,16 +1,13 @@
 # Scanner documentation
 
-Start with [canonical programme status](programme-status.md) for the published v0.2.1 baseline, verified delivery and explicit semantic coverage limits. The [v0.3 roadmap](v0.3-roadmap.md) is planning only. A bounded scanner/workflow/library/analytics UI overhaul is currently authorized before the owner's long pause; new UI bytes need fresh qualification. Earlier Candidate6/Candidate8 reports are historical receipts, not current blockers or an execution queue.
-
-> Status: current documentation index; v1 remains the native compatibility surface and v2 is explicitly versioned.
-> Last verified: 2026-11-08 (documentation reconciliation; technical contracts remain explicitly versioned)
+> Status: current versioned references; website update delivered and verified
+> Last verified: 2026-11-14
 > Owner: Scanner maintainer
-> Source of truth: [`packages/scanner-core/src/v2/scan-workflow.ts`](../../packages/scanner-core/src/v2/scan-workflow.ts), [`packages/scanner-core/src/v2/admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts), and [`contracts/`](../../contracts/)
+> Source of truth: [scanner core](../../packages/scanner-core/src/v2/scan-workflow.ts), [contracts](../../contracts/), and [programme status](programme-status.md)
 
-The scanner reads an n8n workflow JSON document and reports deterministic, policy-driven findings
-against it — locally, offline, and without ever running the workflow's own code. It is the
-project's core product. This page indexes what it does, how the documents in this folder fit
-together, and what makes it different from pasting a workflow into a general-purpose model.
+Start with [programme status](programme-status.md), the [website update](website-update.md), and the planning-only [v0.3 roadmap](v0.3-roadmap.md). Both hosts have verified delivery and32accepted live cases each. The original formal-coverage targets remain missed; earlier Candidate6/Candidate8 packets are dated history.
+
+The scanner reviews workflow JSON locally after the page and real worker resources load, without executing workflow code. v1 remains the native compatibility surface and v2 is explicitly versioned.
 
 ## Version boundary
 
@@ -93,6 +90,8 @@ are deliberately excluded from.
 | [release-runbook.md](release-runbook.md) | The staged release and rollback procedure — prepared-only, with no release or deployment authorization. |
 | [release-v2-readiness-report.md](release-v2-readiness-report.md) | The dated 2026-09-09 readiness record for the superseded `codex/release-v2` candidate, carrying a dated correction banner. |
 | [`../scanner-false-positive-review.md`](../scanner-false-positive-review.md) | The historical v1 false-positive review against an earlier n8n-templates-derived corpus. Kept separate from `calibration.md`'s newer synthetic corpus. |
+| [website-update.md](website-update.md) | The November14 site artifact, UI changes, unchanged release identities, and verified both-host delivery/readback. |
+
 
 ## Where the code lives
 

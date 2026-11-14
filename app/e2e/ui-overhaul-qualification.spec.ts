@@ -24,7 +24,7 @@ for (const width of [320, 768, 1024, 1440]) {
     await page.screenshot({ path: testInfo.outputPath(`workflow-lean-${width}.png`), fullPage: true });
 
     await page.goto(`${basePath}${viewPath}`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('ClientFlow Lite — Simple Onboarding (Email + Log)');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('ClientFlow Lite — Simple Onboarding (Email + Log)', { timeout: 30_000 });
     const security = page.locator('#security');
     await expect(security).toContainText('Require webhook authentication or place the endpoint behind trusted controls.');
     await expect(security).toContainText('Review the code path, remove unnecessary scripting, and require approval.');

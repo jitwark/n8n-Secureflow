@@ -88,7 +88,9 @@ async function cardProblems(page: Page): Promise<BoundsProblem[]> {
 }
 
 async function openVirtualList(page: Page): Promise<void> {
-  await page.goto(`${basePath}/library/?page=5`, { waitUntil: 'networkidle' });
+  // The page can keep unrelated requests active after the library data is ready.
+  // Wait for the navigation response, then assert the actual list state below.
+  await page.goto(`${basePath}/library/?page=5`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#search-results-list')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('p', { hasText: /^Showing 120 of [\d,]+$/ })).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(500);

@@ -8,10 +8,14 @@ The standalone scanner, website and pipeline are developed in a private working 
 | --- | --- |
 | Release | [v0.2.1](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1), published November 8, 2026 |
 | Product/tag commit | 6313d89097c09faad499f54deeee33c6571109d5 |
-| Qualified Pages delivery commit | 1d9f4ad7dff09fd880c7397feeeecfb2893383ad |
+| Qualified Pages delivery commit for v0.2.1 | 1d9f4ad7dff09fd880c7397feeeecfb2893383ad |
+| Deployed website runtime source | `b325591234dcf7a0118be1f2642540b81c2fc21d` |
+| Site update artifact | [`site-2026-11-08-ui`](https://github.com/jitwark/sfscanner/releases/tag/site-2026-11-08-ui), published November 14, 2026 |
 | Source count at the preceding documentation checkpoint | 2,198 selected source files; 2,199 tracked public files including accepted Action metadata, verified at 8e2a6f10b144d79cc147f09453f202deb0f39193 |
 
-Later main commits can update documentation or the currently authorized UI. They do not replace the immutable npm 0.2.1 tarball or retrospectively qualify new bytes. Use the [release record](https://github.com/jitwark/sfscanner/releases/download/v0.2.1/release-record.json), exact commit and [programme status](docs/scanner/programme-status.md) for the relevant scope. Current file counts are derived from a fresh selected manifest and git inventory, not the historical table above.
+The immutable npm 0.2.1 archive and product/tag identity remain unchanged. The deployed site is bound to the website runtime revision above; later main updates contain documentation and browser-test synchronization changes. Both hosts serve the same verified archive: 15,198 files / 880,793,495 bytes. Each host has 32 accepted live cases, combining initial passes with reviewed targeted reruns; original failures remain retained.
+
+The [delivery record](https://github.com/jitwark/sfscanner/releases/download/site-2026-11-08-ui/delivery-verification.json) preserves archive identity, Pages workflow43612419389, Firebase version4d9e12fc6c14c403 and rollback9ce8cdf3e9602a85. See [programme status](docs/scanner/programme-status.md) for current scope and measured limits.
 
 ## What is deliberately absent
 

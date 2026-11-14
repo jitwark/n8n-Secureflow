@@ -1,6 +1,6 @@
 # n8n SecureFlow 🛡️
 
-> Release status — November 8, 2026: `sfscanner@0.2.1` is published on npm and GitHub. The production website is live on GitHub Pages and Firebase. The qualified build passes 86 production browser checks and 14 live browser cases on each host (8 scanner + 6 catalogue). The original formal-coverage targets remain missed; see [scanner status](docs/scanner/programme-status.md).
+> Release status — November 14, 2026: the website update is deployed and verified on GitHub Pages and Firebase. Both hosts serve the same verified archive: 15,198 files / 880,793,495 bytes. Each host has 32 accepted live cases, combining initial passes with reviewed targeted reruns; original failures remain retained. Published sfscanner@0.2.1 and V4 data identities remain unchanged. See [programme status](docs/scanner/programme-status.md).
 
 **A deterministic security scanner for n8n workflows — and a catalogue of 11,464 public workflows
 that tells you where each one came from, what it touches, and how much of it the scanner could
@@ -11,10 +11,10 @@ leaves your machine.
 
 **Live website:** [GitHub Pages](https://jitwark.github.io/sfscanner/) · [Firebase](https://n8n-enterprise-1.web.app/sfscanner/). Downloads, checksums and the release record are available in [v0.2.1](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1).
 
-**Development state — November 8, 2026:** the owner authorized a final scanner/workflow/library/analytics UI overhaul before a long implementation pause. Both deployed sites remain the qualified baseline until the new UI passes fresh delivery checks. The [current programme status](docs/scanner/programme-status.md) separates verified delivery from remaining coverage gaps; the [v0.3 roadmap](docs/scanner/v0.3-roadmap.md) is planning only and has no implementation ETA.
+**Development state — November 14, 2026:** the scanner/workflow/library/analytics update is implemented and delivered as [site-2026-11-08-ui](https://github.com/jitwark/sfscanner/releases/tag/site-2026-11-08-ui), bound to runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. [Delivery verification](https://github.com/jitwark/sfscanner/releases/download/site-2026-11-08-ui/delivery-verification.json) records both full anonymous readbacks, live acceptance and preserved failed attempts. The [v0.3 roadmap](docs/scanner/v0.3-roadmap.md) remains planning only; the larger semantic-model programme has no completion percentage or ETA.
 
 > Status: v0.2.1 released — V4 dataset, link-only (no workflow bodies redistributed)
-> Last verified: 2026-11-08 (production build, package, hosted CI and live browser checks)
+> Last verified: 2026-11-14 (qualified artifact, app checks, source CI, both-host anonymous bytes and live acceptance)
 > Owner: single maintainer, [@jitwark](https://github.com/jitwark) (see `GOVERNANCE.md`)
 > Source of truth: the qualified dataset manifest and formal-coverage identity in [release-record.json](https://github.com/jitwark/sfscanner/releases/download/v0.2.1/release-record.json), explained in `docs/scanner/programme-status.md`.
 > The release dataset ZIP contains the verified NDJSON, SQLite and Excel exports; private workflow bodies are not distributed.
@@ -57,8 +57,10 @@ Node 22. The package is ESM-only. The MCP server is one tool, `n8n_scan`, over s
 [`packages/scanner-cli/README.md`](packages/scanner-cli/README.md) for the config snippet.
 
 The browser scanner uses the shared engine in a worker on your machine; the site is a static
-export with no server API and no network scanner. The production build passes 86 browser cases;
-each live host also passes eight scanner and six catalogue cases, including the first real scan offline.
+export with no server API and no network scanner. The historical November 8 build 6 passed
+104 production browser checks (48 scanner, 38 catalogue and 18 UI). November14 verification
+confirms both full anonymous readbacks and32accepted live cases per host, across initial
+passing cases and reviewed targeted reruns.
 
 ---
 
@@ -136,12 +138,12 @@ The real export produced `release-2026-11-07-9edb75aa0898` in `public-data-model
 version is independent of scanner version 2.x. Download the qualified
 [dataset ZIP](https://github.com/jitwark/sfscanner/releases/download/v0.2.1/sfscanner-dataset-v4.zip)
 and verify it against [SHA256SUMS](https://github.com/jitwark/sfscanner/releases/download/v0.2.1/SHA256SUMS).
-The repaired bundle passes all five actual reopening
-checks, including exact Excel metadata, cell, formula and truncation validation. A sweep of
-2,935,097 NDJSON string leaves found zero email, token, private-IP or internal-host matches;
-the captured zero-match baseline comparison also passes. These checks qualify the dataset
-formats and configured privacy controls. Site, package and public delivery have their own
-completed checks, recorded in the release record and programme status.
+The repaired bundle passes all five actual reopening checks, including exact Excel metadata,
+cell, formula and truncation validation. The actual NDJSON privacy sweep examined 2,935,097
+string leaves with zero email/token/private-IP/internal-host matches; its captured zero-match
+baseline comparison passes. These checks qualify the dataset formats and configured privacy
+controls. Current site deployment/readback and acceptance evidence is detailed in the programme
+status; package and dataset qualification remain distinct.
 
 Released source manifest SHA-256: `40177ed565aa1babb1004e5124c8a9b455f215ff8777bfb5f80b029401a74479`.
 Released corpus SHA-256: `025e8707c8a9c93d99e6f191e9e23ec73403b7af0e2f419695857e32cd9ab634`.
@@ -218,7 +220,7 @@ docs/        contracts, policies, scanner reference, decisions
 - [`docs/scanner/semantic-catalogue.md`](docs/scanner/semantic-catalogue.md) — modelled node types
 - [`docs/scanner/limitations.md`](docs/scanner/limitations.md) — the honest limits
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — pipeline and site composition
-- [`docs/scanner/programme-status.md`](docs/scanner/programme-status.md) — candidate measurements and release limitations
+- [`docs/scanner/website-update.md`](docs/scanner/website-update.md) — published site artifact and current host delivery/readback/acceptance status
 
 ---
 

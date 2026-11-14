@@ -12,9 +12,16 @@ evidence labels; the private audit records are not part of the public repository
 
 ## [Unreleased]
 
-- A final scanner/results, workflow security-summary, library layout and analytics UI overhaul
-  is authorized and in progress before the owner's long pause. These new UI bytes are not yet
-  qualified or deployed. Semantic-model expansion remains a v0.3 plan only.
+No additional implementation is queued for this website update.
+
+## [site-2026-11-08-ui] — 2026-11-14
+
+- Put scanner decisions, distinct risk/analysis measures and priority actions before detailed evidence; preserve unavailable assessments without invented scores.
+- Added specific per-finding workflow actions and removed the redundant security-summary report link while retaining the canvas handoff. The supplied bookmark and six related entries are verified.
+- Fixed library child overflow and simplified analytics to visuals bound to the November7 snapshot, removing both requested coverage sections.
+- Published the separate site artifact and delivered identical verified bytes to Pages and Firebase: 15,198 files / 880,793,495 bytes; 32 accepted live cases per host across initial passes and reviewed targeted reruns.
+- Retained the failed transport/browser attempts and explicit readiness/transport boundaries. Fresh app qualification:206files/1,525tests; historical build6 production browsers:104cases.
+- Kept npm0.2.1, V4 data, Action and raw scanner contracts unchanged. v0.3 remains plan-only; original formal-coverage targets remain missed.
 
 ## [0.2.1] — 2026-11-08
 
@@ -22,9 +29,8 @@ evidence labels; the private audit records are not part of the public repository
   retained archive, which passes 23 package controls.
 - Published the link-only V4 dataset: 18 NDJSON relations, SQLite schema v3 and 12 Excel sheets,
   with five actual reopening checks passed and no raw workflow bodies redistributed.
-- Deployed the qualified website to GitHub Pages and Firebase. Each host passed a complete
-  anonymous readback of 15,198 application files and 14 live browser cases; the build passed
-  86 production browser cases.
+- **Historical November 8 v0.2.1 build-5 baseline:** both live hosts read back 15,198 files / 866,485,610 bytes; each passed 14 browser cases (8 scanner, 6 catalogue); build 5 passed 86 production browser checks and 1,491 app tests. These are historical baseline counts, not current build-6 results.
+- Published the website under v0.2.1; this historical delivery remains distinct from the separately published site artifact and its currently running host deployments. The immutable v0.2.1 product release identity is unchanged.
 - Clarified scan-status presentation while preserving raw schemas, scoring, grades and exports.
   Completion does not establish safety or full semantic coverage.
 - Retained the measured programme limitations: 112/144,043 reviewed executable instances and

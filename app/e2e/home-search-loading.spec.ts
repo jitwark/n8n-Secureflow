@@ -5,6 +5,9 @@ import { appPath } from './app-paths';
 
 const SEARCH_ARTIFACT = /\/data\/(?:manifest\.json|facets\.json|search-index(?:-extended)?\.json|semantic-index\.json)$/;
 const PRIMARY_INDEX = /\/data\/search-index\.json$/;
+declare global {
+  interface Window { __homeSearchWorkerReady?: boolean }
+}
 const SEARCH_CLIENT_CHUNKS = (() => {
   const manifestPath = resolve(__dirname, '..', '.next', 'react-loadable-manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, { files?: string[] }>;
@@ -15,6 +18,10 @@ const SEARCH_CLIENT_CHUNKS = (() => {
 })();
 
 test('homepage keeps search artifacts cold until focus and reuses the warm load', async ({ page }) => {
+  // Two deliberate cold waits, remote data transfer and worker startup precede
+  // the five-second suggestion assertion. Keep that UI bound independent of
+  // the complete multi-phase case budget, as in the library containment cases.
+  test.setTimeout(120_000);
   const searchRequests: string[] = [];
   const searchClientChunkRequests: string[] = [];
   let primaryIndexRequests = 0;
@@ -22,6 +29,19 @@ test('homepage keeps search artifacts cold until focus and reuses the warm load'
   let releasePrimaryIndex!: () => void;
   const primaryIndexRequested = new Promise<void>((resolve) => { notifyPrimaryIndexRequest = resolve; });
   const primaryIndexGate = new Promise<void>((resolve) => { releasePrimaryIndex = resolve; });
+  // Observe the real worker protocol; do not initialize, replace responses or
+  // prime its cache. A queued query must still produce actual visible results.
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.addEventListener('message', (event) => {
+          if (event.data?.type === 'ready') window.__homeSearchWorkerReady = true;
+        });
+      }
+    };
+  });
   await page.route('**/data/search-index.json', async (route) => {
     primaryIndexRequests += 1;
     notifyPrimaryIndexRequest();
@@ -68,7 +88,13 @@ test('homepage keeps search artifacts cold until focus and reuses the warm load'
     expect(searchRequests.filter((url) => PRIMARY_INDEX.test(new URL(url).pathname))).toHaveLength(1);
     await search.fill('slack');
     await expect(page.getByRole('status')).toHaveText('Loading suggestions…');
+    await page.evaluate(() => { window.__homeSearchWorkerReady = false; });
+    const primaryIndexResponse = page.waitForResponse((response) => PRIMARY_INDEX.test(new URL(response.url()).pathname));
     releasePrimaryIndex();
+    const response = await primaryIndexResponse;
+    expect(await response.finished()).toBeNull();
+    expect(response.ok()).toBe(true);
+    await page.waitForFunction(() => window.__homeSearchWorkerReady === true, undefined, { timeout: 30_000 });
     await expect(page.getByRole('option').first()).toBeVisible();
     expect(primaryIndexRequests).toBe(1);
     expect(searchRequests.filter((url) => PRIMARY_INDEX.test(new URL(url).pathname))).toHaveLength(1);

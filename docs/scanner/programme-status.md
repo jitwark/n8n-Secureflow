@@ -1,13 +1,9 @@
 # Scanner implementation and verification status
 
-> Canonical public scanner and programme status. Last updated: November 8, 2026.
->
-> **Owner boundary — November 8, 2026:** Long pause planned AFTER the newly authorized
-> scanner/workflow/library/analytics overhaul; the prior `0.2.1` release remains the qualified
-> baseline, and the UI overhaul is not yet qualified. There is no automatic resume. Overall
-> programme completion remains `null`; any future completion date is unknown.
+> Canonical public scanner and programme status. Last updated: November14,2026.
+> Website implementation and delivery are complete for the requested UI update. v0.3 semantic-model expansion remains planning only. Overall programme completion percentage and ETA remain null; original formal-coverage targets remain missed.
 
-## Release baseline — November 8, 2026
+## Immutable product release and hosted baseline — November 8, 2026 (historical)
 
 The qualified product release is tag
 [`v0.2.1`](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1), published November 8, 2026,
@@ -19,12 +15,7 @@ from the GitHub owner `jitwark`). Its qualified tarball SHA-256 is
 `0aff150fbbe9422d1106d66b7c245ba27be8f8cbaf7e162212dd3963bfc5afd7`; the anonymous registry
 download matches the qualified archive.
 
-The site is live on [GitHub Pages](https://jitwark.github.io/sfscanner/) and
-[Firebase](https://n8n-enterprise-1.web.app/sfscanner/); the Firebase root redirects with HTTP
-`302` to `/sfscanner/`. Anonymous readback on each host verifies all `15,198` application files
-and `866,485,610` bytes. The accepted production build passes `86` browser cases and `1,491`
-application tests. Each live host passes `14` additional browser cases: `8` scanner and `6`
-catalogue checks.
+The historical build5 site was deployed to [Pages](https://jitwark.github.io/sfscanner/) and [Firebase](https://n8n-enterprise-1.web.app/sfscanner/). That baseline qualified15,198files/866,485,610bytes,86productionbrowsercases,1,491app tests and14livecases per host. The newer website delivery above has its own artifact and acceptance.
 
 The delivery revision `1d9f4ad7dff09fd880c7397feeeecfb2893383ad` passes all `6/6` hosted CI
 jobs in run `42475593007`. The published Action commit
@@ -34,6 +25,16 @@ in run `42424040201`.
 The V4 dataset contains `18` NDJSON relations, SQLite schema version `3` and a `12`-sheet Excel
 workbook. All five actual reopen checks qualified. All `11,464` catalogue records are link-only;
 no raw workflow bodies are distributed.
+
+## Website delivery — verified November14,2026
+
+The separate [site-2026-11-08-ui release](https://github.com/jitwark/sfscanner/releases/tag/site-2026-11-08-ui) is bound to runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. Source CI42495043219 passed all six source/packed-package jobs. Fresh app qualification passed206files/1,525tests with zero skips. Historical build6 production acceptance covers104cases (48scanner,38catalogue,18UI) on the unchanged artifact.
+
+Both hosts serve the same verified archive: 15,198 files / 880,793,495 bytes. Each host has 32 accepted live cases, combining initial passes with reviewed targeted reruns; original failures remain retained. Pages workflow43612419389 passed its full anonymous check. Firebase version4d9e12fc6c14c403 passed its clean full readback; prior version9ce8cdf3e9602a85 is retained for rollback. Its provider inventory has15,200files:15,198application files and the two normal Firebase init files. Root302redirect, configured headers and private-sidecar absence passed.
+
+Archive SHA-256: 10f4cb870f983a24119a493e8f0b0a02e4fcec5928ebc9ff3444d1dce918da12. The [delivery record](https://github.com/jitwark/sfscanner/releases/download/site-2026-11-08-ui/delivery-verification.json) includes accepted case coverage, original failed attempts and transport policy. A first Firebase transfer timed out and remained failed; clean attempt2 passed. Browser synchronization observes actual data/worker readiness while preserving visible results, cold-load cardinality, geometry and five-second post-readiness response checks.
+
+The qualified data remains the November7 snapshot:11,464total,11,245searchable. [Website changes](website-update.md) preserve package, dataset, Action, scoring and raw contracts.
 
 ## Formal coverage baseline — November 7, 2026
 
@@ -129,8 +130,8 @@ coverage. The [v0.3 roadmap](v0.3-roadmap.md) is plan-only; no new models are in
 
 ## Programme completion boundary
 
-The named website, deployment and release scope is complete for the qualified `0.2.1` baseline.
-That is not completion of the original scanner programme.
+The November8 `0.2.1` baseline and the separately verified November14 website update both
+have completed delivery. The original scanner programme retains the measured coverage gaps below.
 
 - The formal reviewed-instance and fully-modelled-workflow targets were missed:
   `112 / 144,043` executable instances and `0 / 9,669` workflows.
@@ -144,21 +145,36 @@ That is not completion of the original scanner programme.
 
 ## Dated history — October 27–29, 2026
 
-The following checkpoint text is retained as historical evidence, not current status.
-Private audit/plan receipts are named for local traceability without public links to excluded
-files; the original dated receipt files remain unchanged.
+The following checkpoint text is retained as historical evidence, not current status. References
+below to supporting material mean the retained local review record; excluded files are not linked
+or named here.
 
-**Latest Candidate8 status-only verification — October29:** report (private receipt: `REPORT.md`), source findings (private receipt: `SOURCE-REVIEW.md`), candidate/requirements (private receipt: `CANDIDATE-REQUIREMENTS.md`), and public delivery (private receipt: `DELIVERY-REVIEW.md`). Candidate8is locally staged; CLI readiness is integrated. Original product/quality acceptance and public delivery remain open. Earlier review banners below are historical. No new plan or prompt.
+**Latest Candidate8 status-only verification — October29:** the retained local review record covers
+the report, source findings, candidate/requirements and public delivery. Candidate8is locally
+staged; CLI readiness is integrated. Original product/quality acceptance and public delivery remain
+open. Earlier review banners below are historical. No new plan or prompt.
 
-**Current October29 review:** report (private receipt: `REPORT.md`), plan (private receipt: `2026-10-29-product-integration-and-delivery.md`), prompt (private receipt: `IMPLEMENTATION-START-PROMPT.md`). Candidate6 completed9maintenance steps and staged locally; fresh live audit is clean. Exact staged-output reopen proof is open because the fixed fixture differs. Unintegrated readiness/privacy modules have reproduced defects. Original B1–B5,48criteria and quality admission remain. Public surfaces have not been updated to this local work. Below is dated October27 evidence, not current-action priority.
+**Current October29 review:** the retained local review record covers the report, plan and prompt.
+Candidate6 completed9maintenance steps and staged locally; fresh live audit is clean. Exact
+staged-output reopen proof is open because the fixed fixture differs. Unintegrated readiness/privacy
+modules have reproduced defects. Original B1–B5,48criteria and quality admission remain. Public
+surfaces have not been updated to this local work. Below is dated October27 evidence, not
+current-action priority.
 
-2026-10-27. This is the current scanner entrypoint; repository status (historical STATUS.md reference) and plan of record (historical PLAN.md reference) govern execution. The canonical master (private receipt: `MASTER-REPORT.md`) retains the dated audit history.
+2026-10-27. This is the current scanner entrypoint; historical repository-status and plan-of-record
+references govern execution. The retained local review record preserves the dated audit history.
 
-- Prior exact-budget and SemVer boundary fixes are retained. The new source receipt now hashes required production/configuration files, fails on missing/unreadable/symlinked paths including intermediate junctions, and validates previous-run identifiers before setup/acquisition. See repair evidence (private receipt: `RECEIPT-REPAIR.md`) and independent review (private receipt: `RECEIPT-FINAL-REVIEW.md`).
-- Filter now declares the single Main output supported by the pinned upstream V1/V2 implementations. Catalogue/CLI digest pins agree. All149receipt-listed file hashes verified; package-local static source closures improved. These remain limited models, not complete field/operation semantics. See semantic repair (private receipt: `SEMANTIC-REPAIR.md`) and fresh review (private receipt: `SEMANTIC-FINAL-REVIEW.md`).
+- Prior exact-budget and SemVer boundary fixes are retained. The new source receipt hashes required
+  production/configuration files, fails on missing/unreadable/symlinked paths including intermediate
+  junctions, and validates previous-run identifiers before setup/acquisition. Repair evidence and
+  independent review remain in the retained local review record.
+- Filter now declares the single Main output supported by the pinned upstream V1/V2 implementations.
+  Catalogue/CLI digest pins agree. All149receipt-listed file hashes verified; package-local static
+  source closures improved. These remain limited models, not complete field/operation semantics.
+  Semantic repair and fresh review remain in the retained local review record.
 - Stored corpus evidence is pre-batch:181782/236378resolver-matched instances(76.90%), with136COMPLETE/11048DEGRADED/195INDETERMINATEamong11379storedCURRENTrows. The187474/236378(79.31%)number is a resolver projection over old inputs. It is not a new rescan or semantic-accuracy result. StoredCURRENTmust be re-adjudicated against the newly changed source/semantics identity.
 - The original95%reviewed executable-instance and90%fully-modelled-workflow targets in the declared built-in supported cohort, authentic quality, resource, browser/CLI parity and release requirements remain open. No whole-scanner percentage or final ETA is established by this review.
-- The real scanner-rescan is terminal: inventory, full regeneration, candidate-only data promotion and public export passed; release gates passed full source size (941 files) and specs (20 packages), then failed at four missing metadata fields in the frozen candidate STATUS.md. The live source metadata is repaired. No build, packed CLI, data commit, stage or final verification ran. This is a local preparation failure; the failed run and outputs are preserved. Fresh isolated candidate: 11,379 CURRENT / 15 NO_RESULT / 3 UNSCANNED / 67 SOURCE_UNAVAILABLE; among CURRENT, 1,225 COMPLETE / 9,959 DEGRADED / 195 INDETERMINATE. Its report measures 187,474 MODELLED / 236,378 observed instances (79.3111%). This is catalogue matching on that candidate, not detection accuracy, original supported-cohort acceptance or active-source data replacement. See the new plan (private receipt: `2026-10-27-final-maintenance-qualification.md`) and start prompt (private receipt: `IMPLEMENTATION-START-PROMPT.md`).
-- Owner-authorized legacy sitemap retirement is recorded in B07-RETIREMENT.json (private receipt: `B07-RETIREMENT.json`). This resolves the local owner decision; it does not prove a deployment or external withdrawal.
+- The real scanner-rescan is terminal: inventory, full regeneration, candidate-only data promotion and public export passed; release gates passed full source size (941 files) and specs (20 packages), then failed at four missing metadata fields in the frozen candidate status document. The live source metadata is repaired. No build, packed CLI, data commit, stage or final verification ran. This is a local preparation failure; the failed run and outputs are preserved. Fresh isolated candidate: 11,379 CURRENT / 15 NO_RESULT / 3 UNSCANNED / 67 SOURCE_UNAVAILABLE; among CURRENT, 1,225 COMPLETE / 9,959 DEGRADED / 195 INDETERMINATE. Its report measures 187,474 MODELLED / 236,378 observed instances (79.3111%). This is catalogue matching on that candidate, not detection accuracy, original supported-cohort acceptance or active-source data replacement. The related plan and start prompt remain in the retained local review record.
+- Owner-authorized legacy sitemap retirement is documented in the retained local review record. This resolves the local owner decision; it does not prove a deployment or external withdrawal.
 
-The narrower product direction is offline pre-import and CI review, followed by explicit target-version compatibility. COMPLETE describes the admitted analysis scope; it does not certify a safe or executable workflow. See ecosystem research (private receipt: `ECOSYSTEM-RESEARCH.md`) for evidence and demand limitations.
+The narrower product direction is offline pre-import and CI review, followed by explicit target-version compatibility. COMPLETE describes the admitted analysis scope; it does not certify a safe or executable workflow. The supporting ecosystem research and demand limitations remain in the retained local review record.
