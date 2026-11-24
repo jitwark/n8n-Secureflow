@@ -97,7 +97,7 @@ export const BUILTIN_SCOPED_SEMANTICS_AUTHORITY_V2 = Object.freeze({
  * ruleset, and semantics authorities, so a re-pin moves every surface together instead of
  * leaving a frozen literal behind on one of them.
  */
-export const CLI_VERSION_V2 = '0.3.0' as const;
+export const CLI_VERSION_V2 = '0.3.1' as const;
 export type CliToolIdentityV2 = Readonly<{ name: 'n8n-scan'; version: string; buildDigest: string }>;
 export const CLI_TOOL_V2: CliToolIdentityV2 = Object.freeze({
   name: 'n8n-scan',

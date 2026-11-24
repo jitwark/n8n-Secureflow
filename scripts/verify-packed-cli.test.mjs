@@ -57,19 +57,19 @@ describe('packed sfscanner tarball contract', () => {
     const check = report.checks.find((item) => item.id === 'licensing-consistency');
     expect(check.status).toBe('pass');
     expect(check.detail).toContain("MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms");
-    expect(check.detail).toContain('https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md');
+    expect(check.detail).toContain('https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md');
     expect(check.detail).toContain('README-policy-link=external canonical policy URL');
     expect(check.detail).not.toContain('README-link-target-exists-in-package');
     expect(check.detail).not.toContain('owner/legal decision pending');
     expect(check.detail).toContain('README-commercial-restriction=none');
   });
-  it('rejects the retired private-repository policy URL', () => {
+  it('rejects the retired repository policy URL', () => {
     const assess = packedVerifier.assessPackagedLicensing;
     const readme = `# sfscanner
 
 > CLI
 > MCP
-> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md.`;
+> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md.`;
     const result = assess({ manifest: { license: 'MIT' }, license: 'MIT License', notices: 'MIT', readme });
     expect(result.status).toBe('fail');
     expect(result.policyLinkPresent).toBe(false);
@@ -87,7 +87,7 @@ describe('packed sfscanner tarball contract', () => {
 
 > CLI
 > MCP
-> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md.
+> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md.
 ${restriction}`;
     const result = assess({ manifest: { license: 'MIT' }, license: 'MIT License', notices: 'MIT', readme });
     expect(result.status).toBe('fail');

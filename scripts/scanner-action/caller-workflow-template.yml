@@ -40,7 +40,7 @@ jobs:
         # Synthetic placeholder for the controller-frozen Action commit. A
         # well-formed but unapproved SHA is refused by the validator, and the
         # owner/repo slug must stay in step with the published Action path.
-        uses: jitwark/sfscanner/.github/actions/scan@0123456789abcdef0123456789abcdef01234567
+        uses: jitwark/n8n-Secureflow/.github/actions/scan@0123456789abcdef0123456789abcdef01234567
         with:
           path: workflows
           fail-on: high

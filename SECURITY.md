@@ -28,7 +28,7 @@ rights decision; a link-only record points to its upstream source and is not pro
 ## Reporting a vulnerability
 
 **Preferred: GitHub Private Vulnerability Reporting**, on the "Security" tab of
-[`jitwark/sfscanner`](https://github.com/jitwark/sfscanner) → "Report a vulnerability."
+[`jitwark/n8n-Secureflow`](https://github.com/jitwark/n8n-Secureflow) → "Report a vulnerability."
 It keeps the report private to the maintainer by default and threads the conversation next to the
 code, which is the least error-prone way to report something sensitive on GitHub. (This is the
 recommended channel; if it is ever found to not be enabled on the repository, use the email

@@ -24,7 +24,7 @@ export function ScannerOfflineStrip() {
           </h2>
           <p className="text-sm leading-6 text-ink-muted">
             The same deterministic v0.3 engine ships as a lightweight <strong className="text-ink">1.08 MiB</strong>{' '}
-            npm package (<code className="font-mono text-xs text-ink">sfscanner@0.3.0</code>) with zero network calls.
+            npm package (<code className="font-mono text-xs text-ink">sfscanner@0.3.1</code>) with zero network calls.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ sfscanner scan workflow.json
 
 # Pack tarball for air-gapped transfer
 npm pack sfscanner
-npm install -g ./sfscanner-0.3.0.tgz`}</code>
+npm install -g ./sfscanner-0.3.1.tgz`}</code>
           </pre>
           {repositoryUrl ? (
             <p className="text-2xs text-ink-muted">

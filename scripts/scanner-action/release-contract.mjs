@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const ACTION_REPOSITORY = 'jitwark/sfscanner';
+export const ACTION_REPOSITORY = 'jitwark/n8n-Secureflow';
 export const ACTION_PATH = '.github/actions/scan';
 export const ACTION_POLICY_SCHEMA = 'secureflow-action-release-policy-v1';
 export const ACTION_RECEIPT_SCHEMA = 'secureflow-action-release-receipt-v1';

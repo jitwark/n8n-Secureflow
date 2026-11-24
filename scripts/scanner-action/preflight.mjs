@@ -65,7 +65,7 @@ export function loadBundledRelease() {
   const result = runPreflight({
     policyPath: path.join(directory, 'release-policy.json'),
     receiptPath,
-    actionRepository: 'jitwark/sfscanner',
+    actionRepository: 'jitwark/n8n-Secureflow',
   });
   return result.ok ? Object.freeze({ ...result, receiptPath }) : result;
 }

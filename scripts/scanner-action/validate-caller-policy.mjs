@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 
-export const DEFAULT_ACTION_PATH = 'jitwark/sfscanner/.github/actions/scan';
+export const DEFAULT_ACTION_PATH = 'jitwark/n8n-Secureflow/.github/actions/scan';
 export const APPROVED_ACTION_PATHS = new Set([DEFAULT_ACTION_PATH.toLowerCase()]);
 const MAX_WORKFLOW_BYTES = 256 * 1024;
 const MAX_WALK_DEPTH = 32;

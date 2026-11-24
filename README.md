@@ -1,69 +1,68 @@
-# SecureFlow Hub 🛡️
+# n8n-Secureflow 🛡️
 
 [![npm version](https://img.shields.io/npm/v/sfscanner.svg)](https://www.npmjs.com/package/sfscanner)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![Offline Deterministic](https://img.shields.io/badge/scanner-100%25%20offline%20%26%20deterministic-0f766e.svg)](docs/scanner/threat-model.md)
 
-**`sfscanner` — a deterministic, offline security scanner for n8n workflows.** It ships three ways:
-an analysis core, a CLI and MCP server you can run in a terminal or hand to an AI agent, and a static
-workflow hub that catalogues what 18,320 scanned templates actually contain. The workflow you scan
-never leaves your machine, and no scan makes a network request.
+**`sfscanner` — a deterministic, 100% offline security scanner and interactive community workflow hub for n8n.**
+Audit any n8n workflow JSON before you import or deploy it — in your browser, terminal, CI/CD pipeline, or AI coding agent — with zero uploads, zero accounts, and zero telemetry.
 
-> Status: v0.3.0 lean closure — three shipped products; legacy data exports retired
-> Last verified: 2026-11-24 (corpus scan, static export budget, packed CLI, doc and source gates)
+> Status: v0.3.1 — live `standard@3.0.0` catalogue, auto-loaded workflow canvases, and `sfscanner` on npm
+> Last verified: 2026-11-24 (corpus rescan, static export budget, packed CLI contract, doc and source gates)
 > Owner: single maintainer, [@jitwark](https://github.com/jitwark) (see `GOVERNANCE.md`)
-> Source of truth: `app/src/catalogue/v03-corpus-metrics.json` for every corpus figure, `docs/perf/budgets.json` for every size figure, and `docs/scanner/generated/` for the rule, limit, diagnostic and CLI reference.
+> Source of truth: `app/src/catalogue/v03-corpus-metrics.json` for corpus benchmark figures, `data/analytics.json` for catalogue analytics, `docs/perf/budgets.json` for size budgets, and `docs/scanner/generated/` for generated rule/CLI references.
 
-**🌐 Live site & browser scanner:** [GitHub Pages](https://jitwark.github.io/sfscanner/) · [Firebase](https://n8n-enterprise-1.web.app/sfscanner/) · [npm (`sfscanner`)](https://www.npmjs.com/package/sfscanner)
+**🌐 Live Website & Browser Scanner:** [jitwark.github.io/n8n-Secureflow](https://jitwark.github.io/n8n-Secureflow/) · **📦 npm Package:** [npmjs.com/package/sfscanner](https://www.npmjs.com/package/sfscanner)
 
 ---
 
-## ✨ What this is
+## 🌐 Explore the Website & Workflow Hub
 
-| Product | Package | Shape |
+You don't need to install anything to benefit from n8n-Secureflow. Visit **[jitwark.github.io/n8n-Secureflow](https://jitwark.github.io/n8n-Secureflow/)** for:
+
+- **🔎 Instant Community Library (`/library/`):** Browse **11,245 searchable** community n8n workflows (`11,464` catalogued, strictly link-only) with fast direct-first search and filters for **integration** (OpenAI, Gmail, Slack, Google Sheets, Postgres, etc.), **trigger type**, **complexity**, and **live `standard@3.0.0` security grade**.
+- **🗺️ Auto-Loaded Interactive Workflow Canvas (`/w/view/?id=...`):** Open any workflow page to inspect its live node-and-edge graph immediately — zoom, pan, fit-to-screen, jump to the trigger, toggle sticky notes, and click any node to inspect its connections without importing anything into n8n.
+- **📝 Plain-English Workflow Pages:** Every workflow page gives normal users a readable summary of what the automation does, its integrations, complexity, and live `standard@3.0.0` security findings with clear **Why it matters** and **How to fix it** guidance, plus a verified permalink back to the original upstream source.
+- **🛡️ Zero-Upload Browser Scanner (`/scanner/`):** Paste or drag-and-drop your own n8n workflow JSON to run the full `v0.3` engine locally inside a browser Web Worker — your workflow never leaves your device.
+- **📊 Live Corpus Analytics (`/analytics/`):** Explore real breakdowns of triggers, top integrations, workflow size distributions, and live `standard@3.0.0` security risk grades across the entire catalogue.
+- **⚡ Lightweight & Private:** Pure static site (**33.36 MiB** across 755 files using SHA-256-verified `.gzbin` buckets), dark/light themes, mobile-ready, zero cookies, and zero tracking.
+
+---
+
+## ✨ Three Products, One Shared Engine
+
+| Product | Package | What You Get |
 | --- | --- | --- |
-| 🧠 Analysis core | `@hub/scanner-core` | Deterministic engine, versioned profiles, no Node built-ins. Projected into all three call sites, so the CLI, the MCP server and the browser worker run the *same* code. |
-| ⌨️ CLI + MCP | `sfscanner` | Bins `sfscanner` and `sfscanner-mcp`. **1.07 MiB** unpacked. |
-| 🌐 Static hub | `@hub/app` | Next.js static export: **32.16 MiB across 755 files** against a 35 MiB ceiling. |
-
-Three properties are enforced by gates rather than promised by prose:
-
-- 🔍 **Deterministic.** Same bytes in, same bytes out. No model in the loop, no `Date.now()` in a
-  stage body, no randomised ordering feeding a hash.
-- 🔒 **Offline by construction.** No HTTP, DNS, sockets, telemetry, or remote imports. Only the
-  embedded built-in rules, catalogue and limits are admitted; external rule packs are refused.
-- 🧾 **Honest about coverage.** A result is `COMPLETE`, `DEGRADED` or `INDETERMINATE`, and an
-  indeterminate result carries no grade rather than a reassuring one.
+| 🧠 Analysis core | `@hub/scanner-core` | Pure TypeScript deterministic engine with zero Node built-ins — identical results in browser, CLI, CI, and MCP. |
+| ⌨️ CLI + MCP | `sfscanner` | `sfscanner` & `sfscanner-mcp` binaries on npm. **1.08 MiB** unpacked, 0 moderate+ audit vulnerabilities. |
+| 🌐 Static hub | `@hub/app` | Fast Next.js static export (**33.36 MiB** across 755 files against a 35 MiB ceiling) with browser scanner + interactive canvases. |
 
 ---
 
-## ⚡ Quickstart
+## ⚡ Quickstart (CLI, CI & AI Agents)
 
 ```bash
-# scan one workflow, human-readable
+# Scan one workflow locally with grouped, human-readable traces and fixes
 npx sfscanner scan workflow.json
 
-# the stricter profile and a machine-readable format
-npx sfscanner scan workflow.json --profile strict --format json
+# Run the stricter release-gate profile and emit JSON or Markdown (great for PR comments)
+npx sfscanner scan workflow.json --profile strict --format markdown
 
-# a directory, SARIF for GitHub code scanning
+# Scan a directory and output SARIF 2.1.0 for GitHub Code Scanning
 npx sfscanner --schema v2 scan .n8n --format sarif > results.sarif
 
-# triage: only HIGH and above, only findings you can rely on
-npx sfscanner scan ./workflows --min-severity HIGH --min-confidence MEDIUM
+# Triage large folders: filter by severity/confidence or suppress accepted baseline findings
+npx sfscanner --schema v2 scan ./workflows --min-severity HIGH --min-confidence MEDIUM --baseline prior-scan.json
 
-# suppress findings you have already accepted
-npx sfscanner scan ./workflows --baseline prior-scan.json
-
-# read the rules from the binary, not from a page
+# Inspect all built-in rules directly from the binary
 npx sfscanner rules --format table
+npx sfscanner explain UNAUTHENTICATED_TRIGGER_TO_SINK
 ```
 
-Node 20 or newer; the package is ESM-only. Published formats are `pretty`, `markdown`, `table`,
-`json`, `ndjson` and `sarif`.
+Node 20+ (ESM-only). Supported formats: `pretty` (default on TTY), `markdown`, `table`, `json`, `ndjson`, and `sarif`.
 
-### 🤖 From an AI agent
+### 🤖 Use Offline from an AI Coding Agent (MCP)
 
 ```json
 {
@@ -76,9 +75,35 @@ Node 20 or newer; the package is ESM-only. Published formats are `pretty`, `mark
 }
 ```
 
-One tool, `n8n_scan`, over stdio. `<npm-root>` is `npm root -g`. It refuses stdin (the transport owns
-it) and answers invalid arguments with `-32602` rather than guessing. Full interface:
-[`packages/scanner-cli/README.md`](packages/scanner-cli/README.md).
+Exposes `n8n_scan` over stdio so AI agents can audit local workflow JSON files before importing or editing them. Full CLI & MCP reference: [`packages/scanner-cli/README.md`](packages/scanner-cli/README.md).
+
+---
+
+## 🛡️ Why SecureFlow — What It Catches (and Its Honest Scope)
+
+Most n8n security reviews either miss multi-node attack paths or rely on slow, non-deterministic LLM guesses that leak your private workflows to third-party APIs. **n8n-Secureflow solves both problems:**
+
+### ✅ Key Capabilities & Real-World Perks
+
+- **🔗 Cross-Node Taint & Attack-Path Tracing:** Follows untrusted input from webhooks, forms, chat, email, and external triggers all the way into privileged sinks (`Execute Command`, SQL queries, dynamic HTTP URLs/headers, file writes, Code nodes, and AI prompts) — reporting the exact hop-by-hop trace (e.g., `Webhook -> Set -> Exec`).
+- **🚨 Unauthenticated Trigger-to-Sink Detection:** Automatically flags public webhooks, forms, or chat triggers that can invoke shell commands, SQL, code execution, or AI agent tools without authentication or a human-approval gate (`UNAUTHENTICATED_TRIGGER_TO_SINK`).
+- **🤖 Modern AI Agent & LLM Guardrails:** Catches ungated AI agent tools (`AI_AGENT_UNGATED_TOOL`), prompt injection paths (`TAINTED_AI_PROMPT`), and unrestricted AI HTTP egress (`AGENT_EGRESS_UNRESTRICTED`).
+- **🧪 Deep Expression, JavaScript & Python Inspection:** Parses n8n `{{ ... }}` expressions, JS AST, and Python CST to detect sandbox escapes (`EXPRESSION_SANDBOX_ESCAPE`), direct `$env` / `$secrets` leaks (`EXPRESSION_ENV_EXPOSURE`), and dynamic execution (`eval`, `Function`, `exec`, `os.environ`).
+- **📈 Monotonic, Trustworthy Grading:** Adding a severe finding can never accidentally lower a workflow's risk score, and any `CRITICAL` finding guarantees a `CRITICAL` grade.
+- **🔇 Zero False `DEGRADED` Noise:** Unmodeled community/long-tail nodes are reported cleanly as coverage facts instead of breaking the scan — eliminating **15,477** false `DEGRADED` warnings from v0.2.
+- **🔒 100% Offline, Deterministic & Actionable:** Same bytes in, same bytes out. Every finding carries a CWE tag, confidence level, exact node location, plain-English **Why**, and concrete **Fix** steps — with zero network requests and zero credential leaks.
+- **🧰 Built for Real Workflows:** Supports `--baseline` suppression, `--approved-domain` allowlists, atomic `--output` writes, SARIF 2.1.0 for GitHub Code Scanning, and `sfscanner-mcp` for AI agents.
+
+Browse all 21 rules in [`docs/scanner/generated/rules.md`](docs/scanner/generated/rules.md).
+
+### 🧭 Honest Static-Analysis Scope
+
+Because `sfscanner` is deliberately **offline and static**, three boundaries apply by design:
+- **Advisory triage, not a runtime proof:** It never executes workflows and cannot see your live n8n instance's credential scopes, VPN/reverse-proxy firewall, or runtime RBAC.
+- **Offline namespace checks only:** `UNKNOWN_NODE_PACKAGE` flags non-official namespaces rather than querying a live reputation feed.
+- **Read-only by design:** No auto-rewriting of your workflows, no telemetry, and no external rule packs.
+
+Full details live in [`docs/scanner/limitations.md`](docs/scanner/limitations.md) and [`docs/scanner/threat-model.md`](docs/scanner/threat-model.md).
 
 ---
 
@@ -86,47 +111,29 @@ it) and answers invalid arguments with `-32602` rather than guessing. Full inter
 
 | Profile | Status | What it does |
 | --- | --- | --- |
-| `standard@3.0.0` | **default** | Full rule set: structural policies, taint flows, graph semantics, expression, JavaScript and Python analysis, with monotonic severity scoring. |
-| `strict@3.0.0` | admitted, alias `ci` | The same rules under stricter scoring. Use it as a release gate. |
-| `beta-default@2.0.0` | admitted | The v2 structural baseline, retained for parity and comparison. |
-| `beta-hardened@2.0.0` | admitted, report-only | Advisory analyzers with `REPORT_ONLY` mappings. The findings are visible and filterable but are **not admitted** into the risk score, so a grade is identical to `beta-default`. |
-
-`npx sfscanner profiles --format table` prints this from the binary.
+| `standard@3.0.0` | **default** | Full 21-rule suite: structural policies, taint flows, graph semantics, expression, JavaScript, Python, and AI agent analysis with monotonic scoring. |
+| `strict@3.0.0` | admitted, alias `ci` | Same 21 rules under stricter scoring thresholds — ideal for CI release gates. |
+| `beta-default@2.0.0` | admitted | v2 structural baseline retained for parity and comparison. |
+| `beta-hardened@2.0.0` | admitted, report-only | Advisory analyzers with `REPORT_ONLY` mappings — findings are visible and filterable but are **not admitted** into the risk score. |
 
 ---
 
-## 📊 The v0.3 corpus scan, measured
+## 📊 Real-World Findings: v0.3 Corpus Benchmark
 
-Every figure below is read from `app/src/catalogue/v03-corpus-metrics.json`, which records one
-`standard@3.0.0` pass over the deduplicated master corpus. These describe that scan — not the older
-hosted pages, and not a safety verdict about anyone's automation.
+Measured from `app/src/catalogue/v03-corpus-metrics.json` (`standard@3.0.0` across the 18,320-template deduplicated master corpus):
 
 | Measured | Value |
 | --- | ---: |
 | Templates scanned | 18,320 |
 | Nodes analysed | 298,708 |
 | `COMPLETE` analysis | 15,220 (83.08%) |
-| `DEGRADED` analysis | 1,285 |
-| `INDETERMINATE` analysis | 1,798 |
-| Failed scans (reported, not hidden) | 17 |
-| Degraded *solely* because a trigger was unmodeled | **0**, down from 15,477 |
-| Findings raised | 63,064 |
-| Templates with at least one finding | 14,037 |
-| Templates graded High or Critical | 7,210 |
-| Median score / p90 score | 28 / 100 |
+| `DEGRADED` analysis | 1,285 (7.01%) |
+| `INDETERMINATE` analysis | 1,798 (9.81%) |
+| Degraded *solely* for an unmodeled trigger | **0** (down from 15,477) |
+| Total findings raised | 63,064 across 14,037 templates |
+| Templates graded High or Critical | 7,210 (39.36%) |
 
-The zero in that table is the headline. Under the v2 baseline, 15,477 templates were pushed to
-`DEGRADED` simply because the catalogue did not model the trigger node they used — a coverage gap
-reported as an analysis failure. v0.3 records it as a coverage fact with aggregate effect `NONE`
-instead, so `DEGRADED` now means what it should: optional work was actually lost. That is why the
-degraded count is worth reading.
-
-The scanned corpus and the shipped catalogue are two different populations, and conflating them is
-how a documentation figure goes wrong: the scan reads the 18,320-file deduplicated master, while the
-hub publishes the 11,464 entries whose provenance and rights could be established. Neither number is
-the other, and neither measures the other.
-
-### 🎯 Where the findings are
+### 🎯 Top Rules Triggered
 
 | Rule | Severity | Templates affected |
 | --- | --- | ---: |
@@ -137,113 +144,37 @@ the other, and neither measures the other.
 | `EXPRESSION_ENV_EXPOSURE` | HIGH | 2,202 |
 | `TAINTED_REQUEST_URL` | HIGH | 2,174 |
 
-Three of the six are taint or graph findings, which is the substantive v0.3 change: the scanner now
-follows untrusted input from a webhook or form trigger to the sink it reaches, instead of matching
-node types in isolation. Taint flows in total affect 4,366 templates (23.83%).
+### 📚 Shipped Catalogue Population
 
-### 📚 The catalogue it ships
-
-The static hub carries 11,464 catalogued workflows: **11,464 link-only**, 11,069 official, 0
-redistributable. Workflow bodies are never republished — the site serves metadata, provenance and a
-reference. Details: [`docs/LICENSING.md`](docs/LICENSING.md).
+The static hub publishes **11,464** verified entries (**11,245 searchable**, **11,464 link-only**, **11,069 official**, **0 redistributable**). No workflow JSON bodies are hosted or redistributed — every entry links back to its upstream source ([`docs/LICENSING.md`](docs/LICENSING.md)).
 
 ---
 
-## 📦 What changed in v0.3
+## 🗂️ Repository Layout & Quality Gates
 
-- **Retired, not repaired:** the five public data export lines (Excel, SQLite, PostgreSQL, CSV and NDJSON), plus
-  the 18-relation dataset ceremony and the formal 95%/90% node-modelling admission programme. Separate
-  export pipelines that each needed their own qualification path were costing more than they returned.
-- **Scanner core upgraded:** `standard@3.0.0` is the default and `strict@3.0.0` (`ci`) its stricter
-  sibling. Scoring is monotonic, and unmodeled node types no longer degrade an analysis.
-- **Export redesigned:** the per-entry `/w/<slug>/` detail route was removed in favour of a single
-  client-resolved `/w/view/?id=...` route, with detail payloads, charts and previews packed into 132
-  `.gzbin` buckets. The export is 32.16 MiB across 755 files, including 50 HTML documents, against a
-  35 MiB budget. The budget is now `files: 1500` rather than `files: 18000`, so a return to
-  per-entry pages would fail the gate instead of passing it silently.
-- **Supply chain:** Next.js 16.4.6, with `npm audit --audit-level=moderate` reporting 0
-  vulnerabilities.
-
-See [`CHANGELOG.md`](CHANGELOG.md) for the full entry.
-
----
-
-## 🧠 What it checks — and what it does not
-
-21 rules across structural policies, taint integrity, graph semantics, expression security, agentic
-control and JavaScript/Python analysis. Each carries a severity, a confidence and a CWE tag. The
-generated reference is the authority, not any table in a README:
-[`docs/scanner/generated/rules.md`](docs/scanner/generated/rules.md).
-
-What it does **not** do:
-
-- It is not a safety guarantee. A clean result means no catalogued evidence was found in the portion
-  the profile could analyse — never that a workflow is safe to run.
-- It never executes a workflow, expression, code node or command. A finding is a static-shape claim.
-- It cannot see an n8n instance's credential store, its version, its deployment settings, or whether
-  a shared credential is over-scoped. A single-workflow scanner structurally cannot.
-- It does not check community-node reputation or maintain a known-malicious list; it has no network
-  access to consult one.
-- `UNKNOWN_NODE_PACKAGE` is a namespace check, not a reputation check.
-- No auto-fix, no upload, no telemetry.
-
-The honest limits are maintained in [`docs/scanner/limitations.md`](docs/scanner/limitations.md), and
-the trust boundaries in [`docs/scanner/threat-model.md`](docs/scanner/threat-model.md).
-
----
-
-## 🗂️ Repository layout
-
-```
-app/         the Next.js static hub: browser scanner, search worker, catalogue pages
-packages/    scanner-core (the engine) and scanner-cli (the sfscanner + sfscanner-mcp package)
-contracts/   versioned result, evidence, limits and diagnostic contracts
+```text
+app/         Next.js static hub: browser scanner, search worker, auto-loaded canvas, catalogue pages
+packages/    scanner-core (pure engine) and scanner-cli (sfscanner + sfscanner-mcp npm package)
+contracts/   versioned result, evidence, limits, and diagnostic contracts
 pipeline/    acquire → rights → scan → derive → export
-data/        the packaged catalogue: stats, analytics, shards, indexes, manifest
-scripts/     build steps, quality gates, generators, verification
+data/        packaged catalogue: stats, analytics, shards, indexes, manifest
+scripts/     build pipeline, quality gates, generators, packed CLI verification
 docs/        architecture, scanner reference, policies, decisions
 ```
 
-The static hub is `output: 'export'`: there is no server, no API route, no session and no database.
-The browser scanner runs the same engine in a worker on your machine.
-
----
-
-## ✅ Quality gates
-
-Behavior that this README claims is checked by committed scripts, not by review:
-
+Key verification gates:
 ```text
 node scripts/check-cli-docs.mjs                  CLI documentation parity
 node scripts/check-scanner-doc-claims.mjs        shipped-doc claim screening
 node scripts/check-scanner-source-claims.mjs     doc links and generated-reference parity
 node scripts/check-scanner-v2-docs.mjs           generated reference digests
-node scripts/check-export-budget.mjs             export size budget
-node scripts/check-doc-consistency.mjs           prose figures against the data
+node scripts/check-export-budget.mjs             static export size budget (< 35 MiB)
+node scripts/check-doc-consistency.mjs           prose figures against committed data
+node scripts/verify-packed-cli.mjs               packed npm tarball & offline isolation contract
 ```
-
-The export budget lives in [`docs/perf/budgets.json`](docs/perf/budgets.json) with its measurement
-date and reasoning beside each number.
-
----
-
-## 📚 Deep docs
-
-- [`docs/scanner/architecture-v2.md`](docs/scanner/architecture-v2.md) — how versioned scanning works
-- [`docs/scanner/cli-v2.md`](docs/scanner/cli-v2.md) — CLI admission, limits, exit codes
-- [`docs/scanner/generated/cli.md`](docs/scanner/generated/cli.md) — generated option and limit reference
-- [`docs/scanner/semantic-catalogue.md`](docs/scanner/semantic-catalogue.md) — modelled node types
-- [`docs/scanner/limitations.md`](docs/scanner/limitations.md) — the honest limits
-- [`docs/scanner/programme-status.md`](docs/scanner/programme-status.md) — delivery and coverage state
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — pipeline and site composition
-- [`docs/scanner/release-runbook.md`](docs/scanner/release-runbook.md) — release procedure and non-claims
 
 ---
 
 ## ⚖️ Licence
 
-MIT for the code and scanner tooling. The catalogue's contents are not the project's to relicense:
-bodies are never redistributed, and the dataset terms are stated in
-[`docs/LICENSING.md`](docs/LICENSING.md). If you are a workflow author and want an entry changed or
-removed, see the contact and rights policies in [`SECURITY.md`](SECURITY.md) and
-[`docs/LICENSING.md`](docs/LICENSING.md).
+MIT for the code and scanner tooling. The catalogue dataset carries separate Personal / Non-Commercial terms and never redistributes workflow bodies — see [`docs/LICENSING.md`](docs/LICENSING.md). Workflow authors requesting corrections or removals can use the [Removal requests page](https://jitwark.github.io/n8n-Secureflow/takedown/) or [`SECURITY.md`](SECURITY.md).

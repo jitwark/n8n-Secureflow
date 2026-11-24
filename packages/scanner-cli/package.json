@@ -1,6 +1,6 @@
 {
   "name": "sfscanner",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Deterministic offline security & dataflow scanner for n8n workflows (CLI, MCP, GitHub Action)",
   "keywords": [
     "n8n",
@@ -12,9 +12,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jitwark/sfscanner.git"
+    "url": "git+https://github.com/jitwark/n8n-Secureflow.git"
   },
-  "homepage": "https://github.com/jitwark/sfscanner#readme",
+  "homepage": "https://github.com/jitwark/n8n-Secureflow#readme",
   "license": "MIT",
   "private": false,
   "type": "module",

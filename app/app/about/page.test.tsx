@@ -17,7 +17,7 @@ describe('AboutPage', () => {
     render(<AboutPage />);
 
     const ghLinks = screen.getAllByRole('link', { name: /github/i });
-    expect(ghLinks.some((link) => link.getAttribute('href') === 'https://github.com/jitwark/sfscanner')).toBe(true);
+    expect(ghLinks.some((link) => link.getAttribute('href') === 'https://github.com/jitwark/n8n-Secureflow')).toBe(true);
     expect(screen.getByRole('link', { name: /npm: sfscanner/i }).getAttribute('href'))
       .toBe('https://www.npmjs.com/package/sfscanner');
     expect(screen.getByRole('heading', { name: /Takedown & Removal Requests/i })).toBeTruthy();

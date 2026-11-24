@@ -1,53 +1,50 @@
 # sfscanner 🔍
 
 [![npm version](https://img.shields.io/npm/v/sfscanner.svg)](https://www.npmjs.com/package/sfscanner)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jitwark/sfscanner/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jitwark/n8n-Secureflow/blob/main/LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
-[![Package Size](https://img.shields.io/badge/unpacked-1.07%20MiB-0f766e.svg)](https://www.npmjs.com/package/sfscanner)
+[![Package Size](https://img.shields.io/badge/unpacked-1.08%20MiB-0f766e.svg)](https://www.npmjs.com/package/sfscanner)
 
-**Deterministic, offline security scanning for n8n workflows** — `pretty`, `markdown`, `table`, `json`, `ndjson`, or SARIF 2.1.0. Zero network calls, **1.07 MiB** unpacked, and your workflow JSON never leaves your machine.
+> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md.
 
-> **Licensing:** MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms; see https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md.
+**Deterministic, 100% offline security & dataflow scanner for n8n workflows** — `pretty`, `markdown`, `table`, `json`, `ndjson`, or SARIF 2.1.0. Zero network calls, **1.08 MiB** unpacked, and your workflow JSON never leaves your machine.
 
-> Released `sfscanner@0.3.0`. All four profiles — `standard@3.0.0` (default), `strict@3.0.0` (alias `ci`), `beta-default@2.0.0`, and `beta-hardened@2.0.0` — are admitted and selectable. Supply-chain opt-in reports canonical advisory state and unknown coverage when no snapshot is admitted. See the [CLI guide](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/cli-v2.md) for supported contracts and limits.
+> Released `sfscanner@0.3.1`. All four profiles — `standard@3.0.0` (default), `strict@3.0.0` (alias `ci`), `beta-default@2.0.0`, and `beta-hardened@2.0.0` — are admitted and selectable. Supply-chain opt-in reports canonical advisory state and unknown coverage when no snapshot is admitted. See the [CLI guide](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/cli-v2.md) for supported contracts and limits.
+
 ```bash
 npx sfscanner scan my-workflow.json
 ```
 
-> This package is the scanner. The workflow **catalogue** — 11,464 public n8n workflows, their
-> provenance and how much of each one the scanner could actually read — lives on the website:
-> <https://jitwark.github.io/sfscanner/>.
+> **🌐 Live Website & Browser Scanner:** Browse 11,464 community n8n workflows with interactive visual canvases, live `standard@3.0.0` security grades, and a zero-upload browser scanner at **<https://jitwark.github.io/n8n-Secureflow/>** · **GitHub:** <https://github.com/jitwark/n8n-Secureflow>
 
 ---
 
 ## ⚡ Quickstart
 
 ```bash
-# one file, human-readable
+# One file, grouped human-readable traces and fixes
 npx sfscanner scan workflow.json
 npx sfscanner scan workflow.json --format markdown
 
-# a directory, SARIF for GitHub code scanning
+# A directory, SARIF 2.1.0 for GitHub Code Scanning
 npx sfscanner --schema v2 scan ./workflows --format sarif > results.sarif
 
-# the stricter profile: same rules, tighter scoring
+# Stricter CI profile: same 21 rules, tighter scoring
 npx sfscanner scan workflow.json --profile strict
 
-# pipe a workflow straight from a clipboard or curl
+# Pipe a workflow straight from clipboard or stdin
 cat workflow.json | npx sfscanner scan -
 
-# triage a large result set
+# Triage large result sets or suppress accepted baseline findings
 npx sfscanner scan ./workflows --format json --min-severity HIGH --min-confidence MEDIUM
-
-# suppress findings you have already accepted
 npx sfscanner scan ./workflows --baseline prior-scan.json
 
-# see the rules, then read one in full
+# Inspect rules directly from the offline binary
 npx sfscanner rules --format table
 npx sfscanner explain N8N_EXECUTE_COMMAND
 ```
 
-Node **20** or newer. The CLI is ESM-only and no CommonJS artifact is shipped; `require('sfscanner')` is not supported. `--schema v2` is optional and selects the same grammar the default route already uses — include it when a recorded invocation should state its grammar rather than inherit it.
+Node **20** or newer. The CLI is ESM-only and no CommonJS artifact is shipped (`require('sfscanner')` is not supported). `--schema v2` is optional and selects the same versioned grammar the default route uses.
 
 ---
 
@@ -55,20 +52,18 @@ Node **20** or newer. The CLI is ESM-only and no CommonJS artifact is shipped; `
 
 | Profile | Status | What it does |
 | --- | --- | --- |
-| `standard@3.0.0` | **default** | Full rule set: structural policies, taint flows, graph semantics, expression, JavaScript and Python analysis. Monotonic severity scoring. |
-| `strict@3.0.0` | admitted, alias `ci` | The same rules under stricter scoring. Use it for a release gate. |
-| `beta-default@2.0.0` | admitted | The v2 structural baseline, retained for parity and comparison. |
-| `beta-hardened@2.0.0` | admitted, report-only | The advisory analyzers with `REPORT_ONLY` mappings: findings are visible and filterable but do not change a grade. |
+| `standard@3.0.0` | **default** | Full 21-rule suite: structural policies, cross-node taint flows, graph semantics, expression, JavaScript, Python, and AI agent analysis with monotonic severity scoring. |
+| `strict@3.0.0` | admitted, alias `ci` | Same rules under stricter scoring thresholds — built for CI release gates. |
+| `beta-default@2.0.0` | admitted | v2 structural baseline retained for parity and comparison. |
+| `beta-hardened@2.0.0` | admitted, report-only | Advisory analyzers with `REPORT_ONLY` mappings: findings are visible and filterable without changing the legacy grade. |
 
-Run `npx sfscanner profiles --format table` to read this from the binary rather than from this page.
+Run `npx sfscanner profiles --format table` to read this directly from the binary.
 
 ---
 
-## 🔎 What it actually checks
+## 🔎 What It Catches (21 Deterministic Rules)
 
-21 rules across four capabilities. Every row carries a severity, a confidence and a CWE: these are
-deterministic pattern, dataflow and configuration matches, **not** a safety guarantee, and not a
-verdict about whether a workflow is safe to run.
+Every finding carries a severity, confidence, CWE tag, node location, taint trace (where applicable), plain-English **Why**, and concrete **Fix** guidance:
 
 | Rule | Severity | Confidence | CWE |
 | --- | --- | --- | --- |
@@ -94,42 +89,26 @@ verdict about whether a workflow is safe to run.
 | `N8N_CODE_NODE` | LOW | HIGH | CWE-94 |
 | `UNKNOWN_NODE_PACKAGE` | LOW | MEDIUM | CWE-1357 |
 
-The generated reference is the authority, not this table:
-[`docs/scanner/generated/rules.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/generated/rules.md).
-
-**What "clean" means.** A `COMPLETE` result with no findings means the selected profile found no
-catalogued evidence in the portion of the workflow it could analyze — not that the workflow is safe.
-An unmodeled node type is reported as a catalogue-coverage fact with aggregate effect `NONE`, so it
-no longer degrades the analysis: in the v0.3 corpus scan, **0** workflows were degraded solely
-because an unmodeled trigger was present, down from 15,477 under `beta-default@2.0.0`.
+Full generated authority: [`docs/scanner/generated/rules.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/generated/rules.md).
 
 ---
 
-## 📤 Output and exit codes
+## 📤 Output, Exit Codes & GitHub Actions
 
-Formats: `pretty` (default on a TTY), `markdown`, `table`, `json`, `ndjson`, `sarif`. JSON is the
-default for non-TTY and for metadata commands. SARIF is 2.1.0 with CWE tags and stable finding
-fingerprints, so GitHub, GitLab and VS Code can read it directly.
+Formats: `pretty` (default on TTY), `markdown`, `table`, `json` (default for non-TTY), `ndjson`, `sarif`.
 
 | Exit | Meaning |
 | :---: | --- |
-| `0` | Clean — nothing met the `--fail-on` threshold. |
+| `0` | Clean — nothing met `--fail-on`. |
 | `1` | Findings at or above `--fail-on`, or a degraded result under `--require-complete`. |
-| `2` | Usage, configuration, or admission error — no machine envelope is emitted. |
-| `3` | Malformed input, a failed/timed-out input, or an `INDETERMINATE` result — unless a finding at/above `--fail-on` already decided exit 1. |
-| `4` | Internal error or a memory ceiling. |
+| `2` | Usage, configuration, or admission error. |
+| `3` | Malformed, failed, timed-out, or `INDETERMINATE` input. |
+| `4` | Internal error or memory ceiling. |
 | `130` | Interrupted or cancelled. |
 
-`--fail-on <CRITICAL|HIGH|MEDIUM|LOW|INFO|NONE>` (Default: `INFO`; `NONE` exits 0 on findings).
-`--min-severity`, `--min-confidence` and `--baseline` filter what is *reported* without changing the
-threshold that decides the exit code — the two are deliberately separate questions.
+`--fail-on <CRITICAL|HIGH|MEDIUM|LOW|INFO|NONE>` (Default: `INFO`; `NONE` exits 0 on findings). `--min-severity`, `--min-confidence`, and `--baseline` filter reported findings without changing `--fail-on`. Optional `--include-readiness` adds offline preflight checks to `json`, `ndjson`, or `table`. `--output` writes atomically via a same-directory temp file.
 
-Optional readiness assessment: `--include-readiness` (default `false`) extends `json`, `ndjson`, or `table` output with offline preflight checks (completeness status, declared credentials, integrations, and subworkflows). SARIF format combined with `--include-readiness` is rejected.
-
-`--output` writes through a same-directory temporary file and atomically replaces the destination; a
-failed write or a cancellation preserves the prior file.
-
-### ⚙️ GitHub Actions (SARIF code scanning)
+### ⚙️ GitHub Actions (SARIF Code Scanning)
 
 ```yaml
 - name: Scan n8n workflows
@@ -143,11 +122,9 @@ failed write or a cancellation preserves the prior file.
 
 ---
 
-## 🤖 MCP server
+## 🤖 Offline MCP Server (`sfscanner-mcp`)
 
-The package ships `sfscanner-mcp` — a stdio JSON-RPC MCP server with **one** tool, `n8n_scan`. It
-scans local workflow files with the same engine and returns the same structured output, so an agent
-can read a workflow before it imports it.
+Ships `sfscanner-mcp`, a stdio JSON-RPC MCP server exposing `n8n_scan` so AI coding agents can scan local workflows before importing them:
 
 ```json
 {
@@ -160,44 +137,20 @@ can read a workflow before it imports it.
 }
 ```
 
-`<npm-root>` is `npm root -g`. The single tool takes `inputs` (local paths; stdin `-` is refused
-because the transport owns stdin), plus optional `format`, `failOn`, `profile`, `include`, `exclude`.
-Invalid arguments answer JSON-RPC `-32602` without running a scan.
+`<npm-root>` is `npm root -g`. Accepts local file/directory `inputs` (stdin `-` is refused) plus optional `format`, `failOn`, `profile`, `include`, `exclude`. Invalid arguments return JSON-RPC `-32602`.
 
 ---
 
-## 🛡️ Limits, honestly
+## 🛡️ Built-In Offline Boundaries
 
-- **Offline by construction.** No HTTP, DNS, socket, telemetry, or remote import. `--rules`,
-  `--catalogue` and `--limits` accept only the embedded builtin authority; external rule packs are
-  not admitted, and `--allow-unsigned-development-rules` is refused because it has nothing it could
-  admit.
-- Inputs are bounded: 1,536,000 bytes per file by default, 5,000 nodes, 10,000 edges, 10,000
-  parameter leaves, a 30 s worker deadline, and a validated `--limits` document can tighten or raise
-  the byte ceiling.
-- The scan runs in a worker; if the worker cannot be terminated the item is reported `FAILED` rather
-  than "probably fine".
-- No analyzer executes the workflow. Findings are static-shape claims: evidence that a pattern
-  exists, never proof that a branch runs or that an exploit succeeds.
-- Node types the scanner does not model are reported as **unknown**, not as safe. Version ranges are
-  matched as catalogued; there is no nearest-neighbour guess.
+- **Zero network:** No HTTP, DNS, sockets, telemetry, or remote imports. `--rules`, `--catalogue`, and `--limits` accept only the embedded built-in authority (`--allow-unsigned-development-rules` is refused).
+- **Bounded resources:** 1,536,000 bytes/file default, 5,000 nodes, 10,000 edges, 30s worker deadline.
+- **Static & advisory:** Never executes workflow code; unmodeled node types are reported honestly as coverage facts rather than falsely degrading the scan.
 
 ---
 
-## 📚 Documentation
+## 📚 Documentation & Licence
 
-- [`docs/scanner/cli-v2.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/cli-v2.md) — v2/v3 admission rules and Windows example
-- [`docs/scanner/generated/cli.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/generated/cli.md) — generated option, limit and exit reference
-- [`docs/scanner/limitations.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/limitations.md) — what the scanner does not do
-- [`docs/scanner/threat-model.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/threat-model.md) — trust boundaries
-- [`docs/scanner/rule-reference.md`](https://github.com/jitwark/sfscanner/blob/main/docs/scanner/rule-reference.md) — every rule and remediation
-- [`docs/LICENSING.md`](https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md) — licence terms
+- [`docs/scanner/cli-v2.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/cli-v2.md) · [`docs/scanner/generated/cli.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/generated/cli.md) · [`docs/scanner/limitations.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/limitations.md) · [`docs/scanner/threat-model.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/scanner/threat-model.md) · [`docs/LICENSING.md`](https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md)
 
----
-
-## ⚖️ Licence
-
-MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal /
-Non-Commercial terms; see https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md.
-The dataset is not shipped in this package. A finding tells you what to read before importing a
-workflow; it does not make one safe.
+MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms and is not shipped in this package.

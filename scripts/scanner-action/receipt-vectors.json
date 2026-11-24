@@ -3,16 +3,16 @@
   "policy": {
     "schemaVersion": "secureflow-action-release-policy-v1",
     "status": "ACCEPTED",
-    "actionRepository": "jitwark/sfscanner",
+    "actionRepository": "jitwark/n8n-Secureflow",
     "actionPath": ".github/actions/scan",
-    "scannerRepository": "jitwark/sfscanner",
+    "scannerRepository": "jitwark/n8n-Secureflow",
     "releaseReceiptSha256": "2222222222222222222222222222222222222222222222222222222222222222"
   },
   "receipt": {
     "schemaVersion": "secureflow-action-release-receipt-v1",
     "status": "ACCEPTED",
     "releaseId": "synthetic-q08-action-v1",
-    "scannerRepository": "jitwark/sfscanner",
+    "scannerRepository": "jitwark/n8n-Secureflow",
     "scannerRef": "3333333333333333333333333333333333333333",
     "sourceTreeSha256": "4444444444444444444444444444444444444444444444444444444444444444",
     "lockfileSha256": "5555555555555555555555555555555555555555555555555555555555555555",

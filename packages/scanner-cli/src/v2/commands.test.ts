@@ -59,7 +59,7 @@ describe('v2 non-scan commands', () => {
 
   it('emits version and valid configuration metadata without reading source content', () => {
     expect(versionDocumentV2()).toMatchObject({
-      schemaVersion: 'n8n-scan-version-v2', name: 'n8n-scan', cliVersion: '0.3.0',
+      schemaVersion: 'n8n-scan-version-v2', name: 'n8n-scan', cliVersion: '0.3.1',
       configSchema: 'n8n-scan-config-v2', mode: 'offline',
     });
     const valid = validateConfigDocumentV2({ schemaVersion: 'n8n-scan-config-v2' });

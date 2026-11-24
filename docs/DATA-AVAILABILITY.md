@@ -6,9 +6,9 @@ Status: published link-only V4 dataset, verified November 8, 2026. The current U
 
 The selected public repository contains scanner/site/pipeline source, contracts, examples, tests and release tooling. It deliberately excludes private generated corpus inputs, native evidence and raw workflow bodies. Source-only CI runs source gates and source tests; a source checkout alone is not a complete catalogue build input.
 
-The [v0.2.1 release](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1) separately publishes the qualified dataset ZIP, checksums, licences and release record. Its public-data-model-v4 bundle includes 18 NDJSON relations, SQLite schema v3 and a 12-sheet Excel workbook. All five actual cross-format reopening checks pass. Verify the downloaded files against SHA256SUMS and the manifests inside the bundle.
+The [v0.2.1 release](https://github.com/jitwark/n8n-Secureflow/releases/tag/v0.2.1) separately publishes the qualified dataset ZIP, checksums, licences and release record. Its public-data-model-v4 bundle includes 18 NDJSON relations, SQLite schema v3 and a 12-sheet Excel workbook. All five actual cross-format reopening checks pass. Verify the downloaded files against SHA256SUMS and the manifests inside the bundle.
 
-Both [Pages](https://jitwark.github.io/sfscanner/) and [Firebase](https://n8n-enterprise-1.web.app/sfscanner/) serve the qualified static catalogue baseline. New UI bytes are not qualified merely because the old site is live; see [programme status](scanner/programme-status.md).
+Both [Pages](https://jitwark.github.io/n8n-Secureflow/) and [Firebase](https://jitwark.github.io/n8n-Secureflow/) serve the qualified static catalogue baseline. New UI bytes are not qualified merely because the old site is live; see [programme status](scanner/programme-status.md).
 
 ## Rights and evidence boundaries
 

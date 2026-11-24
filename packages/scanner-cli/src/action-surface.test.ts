@@ -103,8 +103,8 @@ describe('the prepared scanner Action surface', () => {
     }
   });
   it('keeps the unpublished Action reference fail-closed without caller source authority', () => {
-    const reference = exampleWorkflow.match(/uses:\s*(jitwark\/sfscanner\/[^\s@]+)@([0-9a-f]{40})\b/u);
-    expect(reference?.[1]).toBe('jitwark/sfscanner/.github/actions/scan');
+    const reference = exampleWorkflow.match(/uses:\s*(jitwark\/n8n-Secureflow\/[^\s@]+)@([0-9a-f]{40})\b/u);
+    expect(reference?.[1]).toBe('jitwark/n8n-Secureflow/.github/actions/scan');
     expect(reference?.[2]).toMatch(/^[0-9a-f]{40}$/u);
     expect(exampleWorkflow).toContain('exact published Action-distribution commit');
     expect(exampleWorkflow).not.toMatch(/^\s+scanner-(?:ref|repository):/mu);

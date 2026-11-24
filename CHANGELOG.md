@@ -4,7 +4,7 @@ All notable changes to n8n SecureFlow — the scanner, the CLI, the catalogue si
 pipeline that builds it.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-The published release in this repository is [v0.3.0](https://github.com/jitwark/sfscanner/releases/tag/v0.3.0).
+The published release in this repository is [v0.3.0](https://github.com/jitwark/n8n-Secureflow/releases/tag/v0.3.0).
 See [programme status](docs/scanner/programme-status.md) for verified delivery and coverage limits.
 
 Entries are grouped by observable behavior. Historical audit IDs are retained as

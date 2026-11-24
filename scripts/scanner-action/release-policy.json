@@ -1,8 +1,8 @@
 {
   "schemaVersion": "secureflow-action-release-policy-v1",
   "status": "PENDING_FINAL_CANDIDATE",
-  "actionRepository": "jitwark/sfscanner",
+  "actionRepository": "jitwark/n8n-Secureflow",
   "actionPath": ".github/actions/scan",
-  "scannerRepository": "jitwark/sfscanner",
+  "scannerRepository": "jitwark/n8n-Secureflow",
   "releaseReceiptSha256": null
 }

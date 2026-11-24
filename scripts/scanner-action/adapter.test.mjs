@@ -7,7 +7,7 @@ import { buildArtifactSnapshot, buildSourceSnapshot, inspectCheckedSource, verif
 import { collectArtifactEntries, hashRegularFile } from './artifact-digest.mjs';
 import { artifactSetSha256, sha256Bytes } from './release-contract.mjs';
 
-const REPOSITORY = 'jitwark/sfscanner';
+const REPOSITORY = 'jitwark/n8n-Secureflow';
 const roots = [];
 const releaseFixture = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'receipt-vectors.json'), 'utf8'));
 const actionModules = ['adapter.mjs', 'artifact-digest.mjs', 'preflight.mjs', 'release-contract.mjs'];

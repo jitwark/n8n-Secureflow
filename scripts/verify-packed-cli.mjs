@@ -48,7 +48,9 @@ function npm(args, cwd) {
 function sha256(file) { return createHash('sha256').update(readFileSync(file)).digest('hex'); }
 function json(file) { return JSON.parse(readFileSync(file, 'utf8')); }
 export function assessPackagedLicensing({ manifest, license, notices, readme }) {
-  const headline = readme.split('\n')[4]?.trim() ?? '', policyLinkPresent = readme.includes('https://github.com/jitwark/sfscanner/blob/main/docs/LICENSING.md');
+  const lines = readme.split('\n');
+  const headline = (lines.slice(0, 15).find((line) => line.includes('**Licensing:**')) ?? lines[4] ?? '').trim();
+  const policyLinkPresent = readme.includes('https://github.com/jitwark/n8n-Secureflow/blob/main/docs/LICENSING.md');
   const hasCommercialRestriction = /(?:commercial\s+enterprise\s+license|enterprise\s+commercial\s+license|commercial\s+deployments?\s+require|individual\s+non-commercial\s+use)/iu.test(readme);
   const consistent = manifest.license === 'MIT' && /^MIT License/u.test(license) && /MIT/iu.test(notices)
     && headline.includes("MIT for this package's code and scanner tooling. The catalogue dataset has separate Personal / Non-Commercial terms") && policyLinkPresent && !hasCommercialRestriction;

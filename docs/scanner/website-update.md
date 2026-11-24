@@ -5,7 +5,7 @@
 > Owner: single maintainer, @jitwark
 > Source of truth: [canonical programme status](programme-status.md)
 
-The separate [site-2026-11-08-ui release](https://github.com/jitwark/sfscanner/releases/tag/site-2026-11-08-ui) was published November14 from runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. Both hosts serve the identical retained artifact. Full anonymous readback passed for15,198files/880,793,495bytes on each host;32distinct live cases per host are accepted across initial passes and reviewed targeted reruns. Original failures are preserved in the [delivery record](https://github.com/jitwark/sfscanner/releases/download/site-2026-11-08-ui/delivery-verification.json).
+The separate [site-2026-11-08-ui release](https://github.com/jitwark/n8n-Secureflow/releases/tag/site-2026-11-08-ui) was published November14 from runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. Both hosts serve the identical retained artifact. Full anonymous readback passed for15,198files/880,793,495bytes on each host;32distinct live cases per host are accepted across initial passes and reviewed targeted reruns. Original failures are preserved in the [delivery record](https://github.com/jitwark/n8n-Secureflow/releases/download/site-2026-11-08-ui/delivery-verification.json).
 
 Pages workflow43612419389 completed successfully. Firebase version4d9e12fc6c14c403 passed its clean full content check and provider inventory; prior9ce8cdf3e9602a85 is the rollback version. The two additional provider paths are Firebase's normal initialization files. Header, root redirect and private-sidecar controls passed.
 

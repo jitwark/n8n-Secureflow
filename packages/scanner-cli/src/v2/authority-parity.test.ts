@@ -178,7 +178,7 @@ describe('machine identity parity', () => {
       ruleset: BUILTIN_RULESET_AUTHORITY_V2.digest, semantics: BUILTIN_SEMANTICS_AUTHORITY_V2.digest,
       scopedSemantics: cliScoped,
     })).digest('hex');
-    expect(envelopeTool).toEqual({ name: 'n8n-scan', version: '0.3.0', buildDigest: expectedDigest });
+    expect(envelopeTool).toEqual({ name: 'n8n-scan', version: '0.3.1', buildDigest: expectedDigest });
 
     const explained = explainDocumentV2('N8N_EXECUTE_COMMAND');
     expect(explained.ok).toBe(true);

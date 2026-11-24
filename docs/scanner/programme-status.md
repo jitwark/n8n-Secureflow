@@ -16,7 +16,7 @@ This is internal qualification only. Published npm `0.2.1`, hosted UI/site, V4 d
 ## Immutable product release and hosted baseline — November 8, 2026 (historical)
 
 The qualified product release is tag
-[`v0.2.1`](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1), published November 8, 2026,
+[`v0.2.1`](https://github.com/jitwark/n8n-Secureflow/releases/tag/v0.2.1), published November 8, 2026,
 at product commit `6313d89097c09faad499f54deeee33c6571109d5`. The public documentation head
 verified for this release is `8e2a6f10b144d79cc147f09453f202deb0f39193`.
 
@@ -25,7 +25,7 @@ from the GitHub owner `jitwark`). Its qualified tarball SHA-256 is
 `0aff150fbbe9422d1106d66b7c245ba27be8f8cbaf7e162212dd3963bfc5afd7`; the anonymous registry
 download matches the qualified archive.
 
-The historical build5 site was deployed to [Pages](https://jitwark.github.io/sfscanner/) and [Firebase](https://n8n-enterprise-1.web.app/sfscanner/). That baseline qualified15,198files/866,485,610bytes,86productionbrowsercases,1,491app tests and14livecases per host. The newer website delivery above has its own artifact and acceptance.
+The historical build5 site was deployed to [Pages](https://jitwark.github.io/n8n-Secureflow/) and [Firebase](https://jitwark.github.io/n8n-Secureflow/). That baseline qualified15,198files/866,485,610bytes,86productionbrowsercases,1,491app tests and14livecases per host. The newer website delivery above has its own artifact and acceptance.
 
 The delivery revision `1d9f4ad7dff09fd880c7397feeeecfb2893383ad` passes all `6/6` hosted CI
 jobs in run `42475593007`. The published Action commit
@@ -38,11 +38,11 @@ no raw workflow bodies are distributed.
 
 ## Website delivery — verified November14,2026
 
-The separate [site-2026-11-08-ui release](https://github.com/jitwark/sfscanner/releases/tag/site-2026-11-08-ui) is bound to runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. Source CI42495043219 passed all six source/packed-package jobs. Fresh app qualification passed206files/1,525tests with zero skips. Historical build6 production acceptance covers104cases (48scanner,38catalogue,18UI) on the unchanged artifact.
+The separate [site-2026-11-08-ui release](https://github.com/jitwark/n8n-Secureflow/releases/tag/site-2026-11-08-ui) is bound to runtime source b325591234dcf7a0118be1f2642540b81c2fc21d. Source CI42495043219 passed all six source/packed-package jobs. Fresh app qualification passed206files/1,525tests with zero skips. Historical build6 production acceptance covers104cases (48scanner,38catalogue,18UI) on the unchanged artifact.
 
 Both hosts serve the same verified archive: 15,198 files / 880,793,495 bytes. Each host has 32 accepted live cases, combining initial passes with reviewed targeted reruns; original failures remain retained. Pages workflow43612419389 passed its full anonymous check. Firebase version4d9e12fc6c14c403 passed its clean full readback; prior version9ce8cdf3e9602a85 is retained for rollback. Its provider inventory has15,200files:15,198application files and the two normal Firebase init files. Root302redirect, configured headers and private-sidecar absence passed.
 
-Archive SHA-256: 10f4cb870f983a24119a493e8f0b0a02e4fcec5928ebc9ff3444d1dce918da12. The [delivery record](https://github.com/jitwark/sfscanner/releases/download/site-2026-11-08-ui/delivery-verification.json) includes accepted case coverage, original failed attempts and transport policy. A first Firebase transfer timed out and remained failed; clean attempt2 passed. Browser synchronization observes actual data/worker readiness while preserving visible results, cold-load cardinality, geometry and five-second post-readiness response checks.
+Archive SHA-256: 10f4cb870f983a24119a493e8f0b0a02e4fcec5928ebc9ff3444d1dce918da12. The [delivery record](https://github.com/jitwark/n8n-Secureflow/releases/download/site-2026-11-08-ui/delivery-verification.json) includes accepted case coverage, original failed attempts and transport policy. A first Firebase transfer timed out and remained failed; clean attempt2 passed. Browser synchronization observes actual data/worker readiness while preserving visible results, cold-load cardinality, geometry and five-second post-readiness response checks.
 
 The qualified data remains the November7 snapshot:11,464total,11,245searchable. [Website changes](website-update.md) preserve package, dataset, Action, scoring and raw contracts.
 

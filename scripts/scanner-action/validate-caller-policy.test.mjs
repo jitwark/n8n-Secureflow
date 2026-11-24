@@ -79,7 +79,7 @@ describe('caller workflow template', () => {
 
   it('is checked against the default configured Action path', () => {
     expect(fixtures.actionPath).toBe(DEFAULT_ACTION_PATH);
-    expect(DEFAULT_ACTION_PATH).toBe('jitwark/sfscanner/.github/actions/scan');
+    expect(DEFAULT_ACTION_PATH).toBe('jitwark/n8n-Secureflow/.github/actions/scan');
     expect(validateCallerPolicy(templateYaml, { approvedActionSha: fixtures.approvedActionSha }).status).toBe('PASS');
   });
 
