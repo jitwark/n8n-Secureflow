@@ -5,7 +5,6 @@ import path from 'node:path';
 const basePath = (process.env.PLAYWRIGHT_BASE_PATH ?? process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 const related = '9a366a688a57c198,418dbcd24b4f3257,b0a8e7757835f64c,23989dded507086a,36a59699dc15cd56,3d67918986ec8b61';
 const viewPath = `/w/view/?id=26006871febf2139&related=${related}`;
-const leanPath = '/w/clientflow-lite-simple-onboarding-email-log-26006871/';
 
 for (const width of [320, 768, 1024, 1440]) {
   test(`workflow summary and reported bookmark remain useful at ${width}px`, async ({ page }, testInfo) => {
@@ -15,14 +14,6 @@ for (const width of [320, 768, 1024, 1440]) {
     page.on('response', response => {
       if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
     });
-    await page.goto(`${basePath}${leanPath}`);
-    const leanSummary = page.locator('section#security');
-    await expect(leanSummary.getByRole('heading', { name: 'Security summary' })).toBeVisible();
-    await expect(leanSummary).toContainText('Require webhook authentication or place the endpoint behind trusted controls.');
-    await expect(leanSummary).toContainText('Review the code path, remove unnecessary scripting, and require approval.');
-    await expect(leanSummary.getByRole('link')).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath(`workflow-lean-${width}.png`), fullPage: true });
-
     await page.goto(`${basePath}${viewPath}`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('ClientFlow Lite — Simple Onboarding (Email + Log)', { timeout: 30_000 });
     const security = page.locator('#security');
@@ -64,7 +55,7 @@ for (const width of [320, 768, 1024, 1440]) {
 }
 
 for (const theme of ['dark', 'light'] as const) {
-  for (const width of [320, 1440]) {
+  for (const width of [320, 375, 1440]) {
     test(`scanner decision and unavailable states are legible in ${theme} at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${basePath}/scanner/`);
@@ -74,10 +65,13 @@ for (const theme of ['dark', 'light'] as const) {
       await page.screenshot({ path: testInfo.outputPath(`scanner-input-${theme}-${width}.png`), fullPage: true });
       await page.getByRole('textbox', { name: 'Workflow JSON', exact: true }).fill(fs.readFileSync(path.join(__dirname, 'fixtures', 'clean.json'), 'utf8'));
       await page.getByRole('button', { name: 'Scan workflow', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15_000 });
       const decision = page.locator('[aria-labelledby="scanner-decision-heading"]');
       await expect(decision.getByText('Risk grade', { exact: true })).toBeVisible();
       await expect(decision.getByText('Risk score', { exact: true })).toBeVisible();
       await expect(decision.getByText('Analysis coverage', { exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      await page.locator('#scanner-technical-details > summary').click();
       await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2, exact: true })).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath(`scanner-result-${theme}-${width}.png`), fullPage: true });
       await decision.screenshot({ path: testInfo.outputPath(`scanner-decision-${theme}-${width}.png`) });

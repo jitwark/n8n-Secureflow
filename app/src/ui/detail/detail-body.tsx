@@ -21,6 +21,7 @@ type DetailBodyProps = {
   entry: Entry;
   preview?: SvgPreviewArtifact | null;
   loadPreview?: boolean;
+  packedChartAvailable?: boolean;
   related?: Entry[];
   staticDownloadHref?: string;
   initialLayout?: WorkflowLayoutMode;
@@ -30,6 +31,7 @@ export function DetailBody({
   entry,
   preview = null,
   loadPreview = false,
+  packedChartAvailable = false,
   related = [],
   staticDownloadHref,
   initialLayout = 'default',
@@ -53,6 +55,7 @@ export function DetailBody({
         <LayoutWorkbench
           entry={entry}
           preview={preview}
+          packedChartAvailable={packedChartAvailable}
           related={related}
           staticDownloadHref={staticDownloadHref}
         />
@@ -61,7 +64,7 @@ export function DetailBody({
   }
 
   const publishStructuredDescription = Boolean(entry.descriptionContent) && isDescriptionContentPublishable(entry);
-  const publishPlainDescription = entry.descriptionSource === 'upstream';
+  const publishPlainDescription = entry.descriptionSource === 'upstream' || (isDescriptionContentPublishable(entry) && Boolean(entry.description));
   const sections: DetailSection[] = [
     { id: 'before-you-run', label: 'Before you run' },
     { id: 'workflow-canvas', label: 'Canvas' },
@@ -88,7 +91,7 @@ export function DetailBody({
             <h2 id="chart-heading" className="font-display text-2xl font-semibold text-ink">
               Workflow canvas
             </h2>
-            <ChartLoader entry={entry} preview={preview} loadPreview={loadPreview} />
+            <ChartLoader entry={entry} preview={preview} loadPreview={loadPreview} packedChartAvailable={packedChartAvailable} />
           </section>
           <div id="security" className="scroll-mt-24 rounded-panel border border-hairline bg-panel p-4 sm:p-6 lg:col-span-2">
             <Findings entry={entry} />

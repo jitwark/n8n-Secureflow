@@ -1,5 +1,6 @@
 import { canonicalizeJson } from '../canonical-json';
 import { createAdmittedRuleView } from '../v2/admitted-registry';
+import { resolveAdmittedProfileManifest } from '../capabilities/profile-manifest';
 import { admittedRuleV2 } from '../rules-v2/rule-authority';
 import type { AdmittedRuleV2 } from '../capabilities/scheduler';
 
@@ -44,8 +45,9 @@ function suppliedEntries(rules: object): readonly (readonly [unknown, unknown])[
   try { return [...entries.call(rules)]; } catch { return unsafeMap(); }
 }
 
-export function admittedFindingRulesV2(supplied: unknown): ReadonlyMap<string, AdmittedRuleV2> {
-  const admitted = createAdmittedRuleView().rules;
+export function admittedFindingRulesV2(supplied: unknown, profile?: unknown): ReadonlyMap<string, AdmittedRuleV2> {
+  const manifest = resolveAdmittedProfileManifest(profile);
+  const admitted = createAdmittedRuleView(manifest).rules;
   if (supplied === undefined) return admitted;
   if (supplied === null || typeof supplied !== 'object' || Array.isArray(supplied)) return unsafeMap();
   const candidates = suppliedEntries(supplied);

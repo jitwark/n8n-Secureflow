@@ -39,8 +39,26 @@ export function ResultCard({ item, isHighlighted = false, activeDescendantId }: 
   const { id, slug, title, summary, grade, nodeCount = 0 } = item;
 
   const trigger = toNormalizedTag('trigger', item.triggers[0] ?? 'unknown', 0).label;
-  const displayIntegrations = item.integrations.slice(0, 4);
-  const remainingCount = item.integrations.length - displayIntegrations.length;
+  const slicedIntegrations = item.integrations.slice(0, 4);
+  const integrationPills = slicedIntegrations.reduce<Array<{ slug: string; label: string }>>((acc, chip) => {
+    const tag = toNormalizedTag('integration', chip, 0);
+    const labelKey = tag.label.trim().toLowerCase();
+    if (!acc.some((existing) => existing.label.toLowerCase() === labelKey || existing.slug === tag.slug)) {
+      acc.push({ slug: tag.slug, label: tag.label });
+    }
+    return acc;
+  }, []);
+  const remainingCount = item.integrations.length - slicedIntegrations.length;
+  const seenPillKeys = new Set(integrationPills.flatMap((pill) => [pill.label.toLowerCase(), pill.slug]));
+  const tagPills = item.tags.reduce<Array<{ slug: string; label: string }>>((acc, rawTag) => {
+    const tag = toNormalizedTag('intent', rawTag, 0);
+    const labelKey = tag.label.trim().toLowerCase();
+    if (seenPillKeys.has(labelKey) || seenPillKeys.has(tag.slug)) return acc;
+    seenPillKeys.add(labelKey);
+    seenPillKeys.add(tag.slug);
+    acc.push({ slug: tag.slug, label: tag.label });
+    return acc;
+  }, []);
   const isLinkOnly = item.rights === 'link_only';
   // Next's Link applies its configured basePath; a raw anchor needs sitePath.
   // Only the 250 Next-rendered pages have the RSC payload its router fetches,
@@ -69,7 +87,7 @@ export function ResultCard({ item, isHighlighted = false, activeDescendantId }: 
     >
       <div className="min-w-0 flex-1">
         {routable
-          ? <Link href={targetHref as Route} title={title} className={titleClassName}>{titleContent}</Link>
+          ? <Link href={targetHref as Route} prefetch={false} title={title} className={titleClassName}>{titleContent}</Link>
           : <a href={targetHref} title={title} className={titleClassName}>{titleContent}</a>}
 
         <p className="mt-0.5 line-clamp-2 max-w-3xl text-xs leading-5 text-ink-muted">
@@ -77,12 +95,12 @@ export function ResultCard({ item, isHighlighted = false, activeDescendantId }: 
         </p>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-1">
-          {displayIntegrations.map((chip) => (
-            <Chip key={chip} label={toNormalizedTag('integration', chip, 0).label} />
+          {integrationPills.map((chip) => (
+            <Chip key={`int:${chip.slug}`} label={chip.label} />
           ))}
           {remainingCount > 0 && <Chip label={`+${remainingCount}`} muted />}
-          {item.tags.map((tag) => (
-            <Chip key={tag} label={toNormalizedTag('intent', tag, 0).label} muted />
+          {tagPills.map((tag) => (
+            <Chip key={`tag:${tag.slug}`} label={tag.label} muted />
           ))}
         </div>
       </div>

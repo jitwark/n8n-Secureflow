@@ -1,7 +1,7 @@
 # Scanner threat model
 
-> Status: current v1 threat model; explicit v2 boundary documented
-> Last verified: 2026-10-17
+> Status: current threat model; explicit v2/v3 boundary documented
+> Last verified: 2026-11-24
 > Owner: Scanner maintainer
 > Source of truth: [`packages/scanner-core/src/v2/scan-workflow.ts`](../../packages/scanner-core/src/v2/scan-workflow.ts), [`packages/scanner-core/src/v2/admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts), [`contracts/scanner-limits-v2.ts`](../../contracts/scanner-limits-v2.ts), and the native-v1 sources and incident sources listed below
 
@@ -25,26 +25,26 @@ The runtime identifiers are:
 | Scanner | `scanner-beta-1` | Policy and analyzer implementation version |
 | Result schema | `scanner-result-v1` | Serialized result contract |
 | Limits | `scanner-limits-v1` | Shared browser/pipeline input limits |
-| Profiles | `beta-default`, `beta-hardened` | Default scored checks versus additional advisory analysis |
+| Profiles | `standard`, `strict`, `beta-default`, `beta-hardened` | Default scored checks, the stricter scoring variant, and two retained beta profiles |
 
-## Explicit v2 boundary (without rewriting v1 history)
+## Explicit v2/v3 boundary (without rewriting v1 history)
 
 The scope, incident record, assets, trust boundaries, and scoring details below remain the native
-v1 threat model unless a section explicitly says v2. Native v1 keeps `scanner-beta-1`,
+v1 threat model unless a section explicitly says v2 or v3. Native v1 keeps `scanner-beta-1`,
 `scanner-result-v1`, `scanner-limits-v1`, and its existing profile behavior.
 
-The explicit v2 path admits only `secureflow-scanner@2.0.0` with `beta-default@2.0.0` and the
-built-in authority assembled by [`admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts).
-It preserves the same offline, static, bounded, no-submitted-code-execution boundary while adding
-source-preserving admission, closed safe facts, and strong `UNKNOWN`/`DEGRADED`/`INDETERMINATE`
-outcomes. `beta-hardened@2.0.0` is defined but not admitted on v2; native v1 hardened analysis is
-not removed.
+The explicit versioned path admits `standard@3.0.0` (default) and `strict@3.0.0` (alias `ci`),
+alongside the retained `beta-default@2.0.0` and `beta-hardened@2.0.0`. It preserves the same offline,
+static, bounded, no-submitted-code-execution boundary while adding source-preserving admission,
+closed safe facts, and strong `UNKNOWN`/`DEGRADED`/`INDETERMINATE` outcomes. All four profiles are
+admitted and selectable: `sfscanner --schema v2 profiles` lists each one with `Admitted: yes`, so an
+operator sees the real admission state instead of inferring it.
 
-V2 does not infer host vulnerabilities, n8n version, credential-store contents, deployment settings,
-or runtime behavior. It does not authorize public identity, rights, deployment, publication, MCP
-behavior, Ed25519 signature verification, or key rotation. Those remain separate owner-gated or
-deferred procedures. A v2 result with required missing evidence has no assessment rather than a
-reassuring grade.
+Versioned scanning does not infer host vulnerabilities, n8n version, credential-store contents,
+deployment settings, or runtime behavior. It does not authorize public identity, rights, deployment,
+publication, MCP behavior, Ed25519 signature verification, or key rotation. Those remain separate
+owner-gated or deferred procedures. A versioned result with required missing evidence has no
+assessment rather than a reassuring grade.
 
 ## Why this matters now — the 2026 n8n incident record
 
@@ -146,12 +146,20 @@ The scanner does not claim to cover:
 
 ## Completeness, effects, and scoring
 
-`beta-default` runs the seven legacy policies. Normalization retains bounded node source spans for
-finding locations, but no JavaScript, Python, taint, or other code-source analyzer runs in that
-profile. `beta-hardened` defines those advisory analyzers and the ten `REPORT_ONLY` policy mappings,
-but the profile is not admitted or selectable, so the analyzers do not run in the shipped path and
-report-only findings are not displayed. If the profile is admitted later, its findings remain
-report-only and would not change the risk score or grade. The complete mapping is in [policy-inventory.md](policy-inventory.md).
+`beta-default@2.0.0` runs the seven legacy policies. Normalization retains bounded node source spans
+for finding locations, but no JavaScript, Python, taint, or other code-source analyzer runs in that
+profile. `beta-hardened@2.0.0` defines those advisory analyzers and the `REPORT_ONLY` policy mappings
+and is admitted and selectable in v0.3; its findings are **not admitted** into the risk score or grade,
+so selecting it widens visibility rather than changing a verdict. Report-only findings stay visible
+and filterable, and a workflow's grade is identical under `beta-default` and `beta-hardened`.
+
+`standard@3.0.0` (default) and `strict@3.0.0` (alias `ci`) run the full v0.3 rule set over the
+caller-declared budget. Their scoring is monotonic — adding a finding can never lower the score —
+and an unmodeled node type is recorded as a catalogue-coverage fact rather than as `DEGRADED`
+analysis. The v0.3 corpus scan measured **0** workflows whose only degradation cause was an
+unmodeled trigger, down from 15,477 in the `beta-default@2.0.0` baseline. `DEGRADED` is now
+reserved for genuinely lost optional work, which is what makes it worth reading. The complete
+mapping is in [policy-inventory.md](policy-inventory.md).
 
 Only findings catalogued as `LEGACY_SCORE` enter the risk assessment. The first finding for a policy
 uses its severity weight (`CRITICAL` 55, `HIGH` 35, `MEDIUM` 18, `LOW` 6, `INFO` 1); additional

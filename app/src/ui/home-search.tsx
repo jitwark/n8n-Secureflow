@@ -57,7 +57,8 @@ export function HomeSearch() {
     }
   };
   const visibleResults = query.trim() ? results : [];
-  const libraryHref = sitePath(`/library/?q=${encodeURIComponent(query.trim())}`);
+  const rawLibraryHref = `/library/?q=${encodeURIComponent(query.trim())}`;
+  const libraryHref = sitePath(rawLibraryHref);
 
   const handleQueryChange = (value: string) => {
     searchGeneration.current += 1;
@@ -107,7 +108,7 @@ export function HomeSearch() {
   const isSuggestionsLoading = Boolean(query.trim()) && suggestionsLoading;
 
   return (
-    <div onFocusCapture={prefetchLibrary} className="relative">
+    <div onFocusCapture={prefetchLibrary} className="relative z-30">
       <SearchBox
         value={query}
         onChange={handleQueryChange}
@@ -138,7 +139,7 @@ export function HomeSearch() {
         }}
       />
       {(visibleResults.length > 0 || suggestionError || isSuggestionsLoading) && (
-        <div className="absolute left-0 right-0 top-[52px] z-[60] overflow-hidden rounded-control border border-hairline bg-panel">
+        <div className="absolute left-0 right-0 top-[52px] z-[70] overflow-hidden rounded-control border border-hairline bg-panel">
           {isSuggestionsLoading ? (
             <div role="status" aria-live="polite" className="px-4 py-3 text-sm text-ink-muted">
               Loading suggestions…
@@ -157,6 +158,7 @@ export function HomeSearch() {
                   role="option"
                   aria-selected={selected}
                   href={targetHref}
+                  onMouseDown={(event) => event.preventDefault()}
                   className={`flex min-h-11 flex-col justify-center border-b border-hairline px-4 py-2.5 hover:bg-raised focus-visible:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-border active:bg-raised active:text-accent-text ${selected ? 'bg-raised' : ''}`}
                 >
                   <span className="block truncate text-sm font-medium text-ink">{result.title}</span>
@@ -165,7 +167,17 @@ export function HomeSearch() {
               );
                 })}
               </div>
-              <a href={libraryHref} className="flex min-h-11 items-center border-t border-hairline px-4 py-3 font-mono text-xs text-accent-text hover:bg-raised focus-visible:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-border active:bg-raised active:text-accent-text">
+              <a
+                href={libraryHref}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                  event.preventDefault();
+                  router.push(rawLibraryHref as Route);
+                }}
+                className="relative z-10 flex min-h-11 items-center border-t border-hairline bg-panel px-4 py-3 font-mono text-xs font-semibold text-accent-text hover:bg-raised focus-visible:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-border active:bg-raised active:text-accent-text"
+              >
                 View all results
               </a>
             </>

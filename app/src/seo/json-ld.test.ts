@@ -155,13 +155,13 @@ describe('hubJsonLd', () => {
 
   it('does not emit structured-data links for entries that are not exported', () => {
     const ld = hubJsonLd('tag', 'simple', [
-      { title: 'Exported', slug: 'exported', isIndexable: true },
-      { title: 'View shell', slug: 'view-shell', isIndexable: false },
+      { id: 'id-exp', title: 'Exported', slug: 'exported', isIndexable: true },
+      { id: 'id-view', title: 'View shell', slug: 'view-shell', isIndexable: false },
     ]) as Record<string, unknown>;
     const graph = ld['@graph'] as Array<Record<string, unknown>>;
     const elements = graph[1].itemListElement as Array<Record<string, unknown>>;
     expect(elements).toHaveLength(1);
-    expect(elements[0].url).toContain('/w/exported/');
+    expect(elements[0].url).toContain('/w/view/?id=id-exp');
   });
 });
 

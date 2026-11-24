@@ -4,8 +4,10 @@ import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'rea
 import { AlertCircle, Globe, Lock, PencilLine, Shield, Upload } from 'lucide-react';
 import { MAX_WORKFLOW_BYTES, MAX_WORKFLOW_BYTES_LABEL, exceedsWorkflowByteLimit, parseApprovedDomains } from './scanner-input-validation';
 import { SAFE_SAMPLE_WORKFLOW } from './safe-sample-workflow';
+import { DEFAULT_SCAN_PROFILE, type ScanProfile } from './scan-profiles';
+import { ProfileSelector } from './profile-selector';
 export { MAX_WORKFLOW_BYTES, MAX_WORKFLOW_BYTES_LABEL } from './scanner-input-validation';
-export type ScanProfile = 'beta-default';
+export type { ScanProfile } from './scan-profiles';
 export type ScanRequest = { json: string; profile: ScanProfile; approvedDomains: string[] };
 
 /**
@@ -38,6 +40,7 @@ export function ScannerInput({ isScanning, hasResult = false, onScan, onDraftCha
   onDraftChange?: () => void;
 }) {
   const [jsonText, setJsonText] = useState('');
+  const [profile, setProfile] = useState<ScanProfile>(DEFAULT_SCAN_PROFILE);
   const [domainsText, setDomainsText] = useState('');
   const [showDomains, setShowDomains] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -86,7 +89,7 @@ export function ScannerInput({ isScanning, hasResult = false, onScan, onDraftCha
     setInputError(null); setIsEditing(false);
     onScan({
       json,
-      profile: 'beta-default',
+      profile,
       approvedDomains: parsed.domains,
     });
   }
@@ -137,10 +140,14 @@ export function ScannerInput({ isScanning, hasResult = false, onScan, onDraftCha
           <h2 className="font-display text-lg font-semibold text-ink">Scan a workflow</h2>
           <p className="mt-1 text-sm text-ink-muted">Paste JSON or drop a workflow JSON file exported from n8n.</p>
         </div>
-        <div className="max-w-full rounded-control border border-accent-border/50 bg-accent-dim px-3 py-2" aria-label="Selected scanner profile: Default scan">
-          <p className="font-mono text-xs font-semibold text-accent-text">Default scan</p>
-          <p className="mt-0.5 text-2xs text-ink-muted">Structure + built-in policies · static review</p>
-        </div>
+        <ProfileSelector
+          value={profile}
+          disabled={isScanning}
+          onChange={(nextProfile) => {
+            onDraftChange?.();
+            setProfile(nextProfile);
+          }}
+        />
       </div>
 
       <div className="mt-4 flex items-start gap-2 rounded-control border border-hairline bg-raised/40 p-3 text-xs leading-5 text-ink-muted" role="note">

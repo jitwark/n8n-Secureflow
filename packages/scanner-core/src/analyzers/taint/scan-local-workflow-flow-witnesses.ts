@@ -116,12 +116,7 @@ export function compileWorkflowFlowWitnesses(input: CompileWorkflowFlowWitnesses
       diagnostics: Object.freeze([createDiagnostic('GRAPH_ANALYSIS_DEGRADED', 'structural-policies', false, undefined,
         { omitted: model.omittedLowerBound })]) });
   }
-  if (model.status === 'UNKNOWN') {
-    return Object.freeze({ status: 'UNKNOWN', facts: Object.freeze([]), traces: Object.freeze([]),
-      diagnostics: Object.freeze([createDiagnostic('GRAPH_ANALYSIS_DEGRADED', 'structural-policies', false, undefined,
-        { observed: 1, omitted: 0 })]) });
-  }
-  if (model.status === 'NOT_APPLICABLE') {
+  if (model.status === 'UNKNOWN' || model.status === 'NOT_APPLICABLE') {
     return finish(complete(), deriveFlowCoverageV1({ kind: 'NOT_APPLICABLE' }, workflowCharge), workflowCharge, semanticSha256);
   }
   const remainingOps = Math.max(0, maxOperations - operations);

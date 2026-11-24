@@ -86,7 +86,6 @@ function robotsTxt(siteUrl) {
   const routePrefix = BASE_PATH || '';
   return `User-agent: *
 Disallow: ${routePrefix}/library/?*
-Disallow: ${routePrefix}/w/view*
 Disallow: ${routePrefix}/*?*
 
 Sitemap: ${siteUrl}/sitemap.xml
@@ -118,8 +117,6 @@ function main() {
 
   const today = new Date().toISOString().split('T')[0];
   const routes = collectRoutes(OUT_DIR).sort();
-  const commitDates = readCommitDates();
-
   const workflowRoutes = routes.filter((route) => route.startsWith('/w/'));
   const otherRoutes = routes.filter((route) => !route.startsWith('/w/'));
 
@@ -129,18 +126,21 @@ function main() {
   files['sitemap-pages.xml'] = urlSet(otherRoutes.map((loc) => ({ loc, lastmod: today })), siteUrl);
   children.push('sitemap-pages.xml');
 
-  const shardCount = Math.max(1, Math.ceil(workflowRoutes.length / WORKFLOW_SHARD_SIZE));
-  for (let shard = 0; shard < shardCount; shard++) {
-    const name = `sitemap-workflows-${shard + 1}.xml`;
-    const slice = workflowRoutes.slice(
-      shard * WORKFLOW_SHARD_SIZE,
-      (shard + 1) * WORKFLOW_SHARD_SIZE,
-    );
-    files[name] = urlSet(
-      slice.map((loc) => ({ loc, lastmod: commitDates.get(loc.slice(3, -1)) ?? null })),
-      siteUrl,
-    );
-    children.push(name);
+  const shardCount = Math.ceil(workflowRoutes.length / WORKFLOW_SHARD_SIZE);
+  if (shardCount > 0) {
+    const commitDates = readCommitDates();
+    for (let shard = 0; shard < shardCount; shard++) {
+      const name = `sitemap-workflows-${shard + 1}.xml`;
+      const slice = workflowRoutes.slice(
+        shard * WORKFLOW_SHARD_SIZE,
+        (shard + 1) * WORKFLOW_SHARD_SIZE,
+      );
+      files[name] = urlSet(
+        slice.map((loc) => ({ loc, lastmod: commitDates.get(loc.slice(3, -1)) ?? null })),
+        siteUrl,
+      );
+      children.push(name);
+    }
   }
 
   files['sitemap.xml'] =
@@ -153,6 +153,9 @@ function main() {
       .join('\n') +
     `\n</sitemapindex>\n`;
 
+  for (const old of fs.readdirSync(OUT_DIR)) {
+    if (/^sitemap-workflows-\d+\.xml$/i.test(old)) fs.unlinkSync(path.join(OUT_DIR, old));
+  }
   for (const [name, xml] of Object.entries(files)) {
     fs.writeFileSync(path.join(OUT_DIR, name), xml, 'utf8');
   }

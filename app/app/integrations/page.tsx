@@ -49,6 +49,7 @@ export default function IntegrationsIndexPage() {
           >
             <Link
               href={`/integrations/${hub.slug}/`}
+              prefetch={false}
               className="flex items-center justify-between group"
             >
               <span className="font-medium text-ink group-hover:text-accent-text transition-colors">
@@ -58,7 +59,7 @@ export default function IntegrationsIndexPage() {
                 {hub.totalEntries}
               </span>
             </Link>
-            {hub.totalPages > 1 && (
+            {pageNumbers(hub).length > 1 && (
               <nav aria-label={`${hub.title} pages`} className="flex flex-wrap gap-1">
                 {pageNumbers(hub).map((page) => (
                   <Link
@@ -68,6 +69,7 @@ export default function IntegrationsIndexPage() {
                         ? `/integrations/${hub.slug}/`
                         : `/integrations/${hub.slug}/${page}/`
                     }
+                    prefetch={false}
                     className="rounded border border-hairline px-2 py-1 text-xs text-ink-muted hover:border-accent-border hover:text-accent-text"
                   >
                     {page}

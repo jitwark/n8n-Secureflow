@@ -10,6 +10,9 @@ const encode = (text: string) => new TextEncoder().encode(text);
 const gmail = (parameters: unknown = { operation: 'send' }, extra: Record<string, unknown> = {}) => ({
   type: 'n8n-nodes-base.gmail', typeVersion: 2.2, parameters, ...extra,
 });
+const noOp = (parameters: unknown = {}, extra: Record<string, unknown> = {}) => ({
+  type: 'n8n-nodes-base.noOp', typeVersion: 1, parameters, ...extra,
+});
 const body = (nodes: readonly unknown[]) => encode(JSON.stringify({ nodes, connections: {} }));
 function fixture(documents: readonly (readonly [string, Uint8Array | null, CorpusV2InputReceipt['status']?])[]) {
   const rows: CorpusV2InputReceipt[] = documents.map(([entryId, bytes, status]) => ({ entryId, identityKind: 'OFFICIAL_TEMPLATE',
@@ -71,6 +74,26 @@ describe('private formal reviewed coverage', () => {
     expect(result.counts.fullyModelledWorkflows).toBe(reviewed);
   });
 
+  it('counts only admitted NoOp nodes in formal review and preserves Gmail scope', () => {
+    const f = fixture([
+      ['admitted-noop', body([noOp({ nested: { resource: 'ignored', operation: 'ignored' } })])],
+      ['selector-refusal', body([noOp({ operation: 'run' })])],
+      ['unsupported-version', body([noOp({}, { typeVersion: 2 })])],
+      ['disabled-noop', body([noOp({}, { disabled: true })])],
+      ['gmail', body([gmail()])],
+    ]);
+    expect(f.samples.map(({ entryId, executableInstances, reviewedExecutableInstances, disabledNodes, exclusion }) => ({
+      entryId, executableInstances, reviewedExecutableInstances, disabledNodes, exclusion,
+    }))).toEqual([
+      { entryId: 'admitted-noop', executableInstances: 1, reviewedExecutableInstances: 1, disabledNodes: 0, exclusion: null },
+      { entryId: 'selector-refusal', executableInstances: 1, reviewedExecutableInstances: 0, disabledNodes: 0, exclusion: null },
+      { entryId: 'unsupported-version', executableInstances: 1, reviewedExecutableInstances: 0, disabledNodes: 0, exclusion: null },
+      { entryId: 'disabled-noop', executableInstances: 0, reviewedExecutableInstances: 0, disabledNodes: 1, exclusion: 'NO_EXECUTABLE_NODE' },
+      { entryId: 'gmail', executableInstances: 1, reviewedExecutableInstances: 1, disabledNodes: 0, exclusion: null },
+    ]);
+    expect(f.result().counts).toMatchObject({ executableInstances: 4, reviewedExecutableInstances: 2, fullyModelledWorkflows: 2 });
+  });
+
   it('retains duplicate/unreadable selectors and invalid versions as uncovered executable instances', () => {
     const duplicate = encode('{"nodes":[{"type":"n8n-nodes-base.gmail","typeVersion":2.2,"parameters":{"operation":"send","operation":"get"}}],"connections":{}}');
     const result = fixture([['duplicate', duplicate], ['invalid-version', body([gmail(undefined, { typeVersion: 'unknown' })])]]).result();
@@ -101,10 +124,10 @@ describe('private formal reviewed coverage', () => {
     expect(result.wholeCorpus.disabledNodes).toBe(1);
   });
 
-  it('excludes only the exact source-backed inert version; unsupported notes and NoOp stay executable/uncovered', () => {
+  it('excludes only the exact source-backed inert version and counts admitted NoOp semantics', () => {
     const result = fixture([['inert', body([gmail(), { type: 'n8n-nodes-base.stickyNote', typeVersion: 1 }])],
       ['unsupported', body([{ type: 'n8n-nodes-base.stickyNote', typeVersion: 2 }, { type: 'n8n-nodes-base.noOp', typeVersion: 1 }])]]).result();
-    expect(result.counts).toMatchObject({ reviewedInertNodes: 1, executableInstances: 3, reviewedExecutableInstances: 1, fullyModelledWorkflows: 1 });
+    expect(result.counts).toMatchObject({ reviewedInertNodes: 1, executableInstances: 3, reviewedExecutableInstances: 2, fullyModelledWorkflows: 1 });
     const empty = fixture([['empty', body([])], ['note-only', body([{ type: 'n8n-nodes-base.stickyNote', typeVersion: 1 }])]]).result();
     expect(empty.rates.reviewedExecutableInstances.ratio).toBeNull();
     expect(empty.rates.fullyModelledWorkflows.ratio).toBeNull();

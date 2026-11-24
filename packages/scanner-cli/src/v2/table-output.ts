@@ -2,8 +2,11 @@ import { coverageOmissionsV2 } from '@hub/scanner-core/report/sarif-v2/output';
 import type { BatchResultV2 } from './batch-runner';
 import { projectBatchV2, type ProjectedBatchV2, type ProjectionFormatV2, type ProjectionOptionsV2 } from './json-output';
 import { PREFLIGHT_DISCLAIMER_V1 } from './preflight-readiness';
+import { describeCoveragePlainEnglish, sanitizeHumanText, sortFindingsDeterministic, subjectLocation } from './pretty-output';
+import { getRuleProseV3 } from './rule-prose-v3';
 
 type Row = readonly [string, string, string, string, string, string];
+type FindingRow = readonly [string, string, string, string, string];
 type Item = ProjectedBatchV2['items'][number];
 const MAX_LISTED_PREREQUISITES = 4;
 
@@ -19,13 +22,41 @@ export function renderTableV2(batch: BatchResultV2, options: ProjectionOptionsV2
     const status = item.error.kind === 'CANCELLED' ? 'CANCELLED' : item.error.kind === 'INCOMPLETE' ? 'INCOMPLETE' : item.error.kind === 'INTERNAL' ? 'INTERNAL' : 'ERROR';
     return [item.input, status, '-', '-', '-', item.error.code];
   });
-  const escaped = [headers, ...rows].map((row) => row.map(escapeCell));
-  const widths = headers.map((_header, column) => Math.max(...escaped.map((row) => row[column]!.length)));
-  const line = (row: readonly string[]): string => row.map((value, column) => column === row.length - 1 ? value : value.padEnd(widths[column]!)).join('  ');
-  const divider = widths.map((width) => '-'.repeat(width)).join('  ');
-  const table = `${line(escaped[0]!)}\n${divider}${rows.length ? `\n${rows.map((_row, index) => line(escaped[index + 1]!)).join('\n')}` : ''}`;
+  const sections: string[] = [formatFixedTable(headers, rows, (value) => escapeCell(value))];
+  const findingsSection = renderFindingsSection(projected.items);
+  if (findingsSection !== '') sections.push(findingsSection);
   const readiness = renderReadiness(projected.items);
-  return readiness === '' ? `${table}\n` : `${table}\n\n${readiness}\n`;
+  if (readiness !== '') sections.push(readiness);
+  return `${sections.join('\n\n')}\n`;
+}
+
+function formatFixedTable(
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+  sanitizeCell: (value: string) => string,
+): string {
+  const escaped = [headers, ...rows].map((row) => row.map(sanitizeCell));
+  const widths = headers.map((_header, column) => Math.max(...escaped.map((row) => row[column]!.length)));
+  const line = (row: readonly string[]): string => row.map((value, column) => (column === row.length - 1 ? value : value.padEnd(widths[column]!))).join('  ');
+  const divider = widths.map((width) => '-'.repeat(width)).join('  ');
+  return `${line(escaped[0]!)}\n${divider}${rows.length ? `\n${rows.map((_row, index) => line(escaped[index + 1]!)).join('\n')}` : ''}`;
+}
+
+function renderFindingsSection(items: readonly Item[]): string {
+  const successful = items.filter((item): item is Extract<Item, { ok: true }> => item.ok);
+  if (!successful.some((item) => item.result.findings.length > 0)) return '';
+  const findingHeaders: FindingRow = ['Severity', 'Confidence', 'Rule', 'Node', 'Summary'];
+  const findingRows: FindingRow[] = [];
+  const coverageLines: string[] = [];
+  for (const item of successful) {
+    coverageLines.push(items.length === 1 ? describeCoveragePlainEnglish(item.result) : `${sanitizeHumanText(item.input)}: ${describeCoveragePlainEnglish(item.result)}`);
+    for (const finding of sortFindingsDeterministic(item.result.findings)) {
+      const prose = getRuleProseV3(finding.ruleId);
+      findingRows.push([finding.severity, finding.confidence, finding.ruleId, subjectLocation(finding.subject).label, prose.title]);
+    }
+  }
+  const findingsTable = formatFixedTable(findingHeaders, findingRows, (value) => sanitizeHumanText(value));
+  return `Findings\n${findingsTable}\n\n${coverageLines.join('\n')}`;
 }
 
 /** Declared offline prerequisites only: nothing here proves a credential works, a package is installed or a workflow runs. */

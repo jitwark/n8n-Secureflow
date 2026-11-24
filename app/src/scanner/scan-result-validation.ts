@@ -79,7 +79,7 @@ function summaryMatchesFindings(value: Record<string, unknown>): boolean {
 
 /** Validates the structured result crossing from the scanner worker to the UI. */
 export function parseScanWorkflowResult(value: unknown): ScanWorkflowResult | null {
-  const raw = object(value); if (!raw || !validScannerResultSchema(raw.schemaVersion) || raw.scannerVersion !== SCANNER_VERSION || !choice(raw.policyProfile, ['beta-default', 'beta-hardened']) || !choice(raw.analysisStatus, ['COMPLETE', 'DEGRADED', 'INDETERMINATE'])) return null;
+  const raw = object(value); if (!raw || !validScannerResultSchema(raw.schemaVersion) || raw.scannerVersion !== SCANNER_VERSION || !choice(raw.policyProfile, ['standard', 'strict', 'beta-default', 'beta-hardened']) || !choice(raw.analysisStatus, ['COMPLETE', 'DEGRADED', 'INDETERMINATE'])) return null;
   if (!Array.isArray(raw.analysisDiagnostics) || raw.analysisDiagnostics.length > MAX_ITEMS || !raw.analysisDiagnostics.every(validDiagnostic) || !validWorkflow(raw.workflow) || !validFunctionSummary(raw.functionSummary) || !Array.isArray(raw.integrations) || raw.integrations.length > MAX_ITEMS || !raw.integrations.every(validIntegration) || !Array.isArray(raw.findings) || raw.findings.length > MAX_ITEMS || !raw.findings.every(validFinding)) return null;
   if (raw.riskAssessment !== undefined && !validRisk(raw.riskAssessment)) return null;
   if (raw.humanSummary !== undefined && !validHumanSummary(raw.humanSummary)) return null;

@@ -49,7 +49,7 @@ const NEXT_PREREQUISITE_JSON = JSON.stringify({
 });
 
 function acceptedScan(json: string): ScanWorkflowResult {
-  const outcome = scanWorkflowV2({ bytes: Uint8Array.from(new TextEncoder().encode(json)), profile: { id: 'beta-default', version: '2.0.0' } });
+  const outcome = scanWorkflowV2({ bytes: Uint8Array.from(new TextEncoder().encode(json)), profile: { id: 'standard', version: '3.0.0' } });
   if (!outcome.ok) throw new Error(outcome.code);
   return toScannerReportModelV2(outcome.result);
 }
@@ -81,7 +81,7 @@ describe('ScannerClient request ownership', () => {
     fireEvent.change(screen.getByLabelText('Workflow JSON'), { target: { value: `${PREREQUISITE_JSON} ` } });
     expect(screen.queryByRole('region', { name: 'Prerequisites and provenance' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Decision and next step' })).toBeTruthy();
-    expect(vi.mocked(runScanV2).mock.calls[0]![0]).toMatchObject({ json: PREREQUISITE_JSON, profile: 'beta-default' });
+    expect(vi.mocked(runScanV2).mock.calls[0]![0]).toMatchObject({ json: PREREQUISITE_JSON, profile: 'standard' });
     expect(Object.keys(vi.mocked(runScanV2).mock.calls[0]![0]).sort()).toEqual([
       'approvedDomains', 'json', 'onProgress', 'profile', 'signal',
     ]);

@@ -82,4 +82,58 @@ describe('scanner-core Python analyzer', () => {
     const source = 'import subprocess as sp\nsp.Popen(command)';
     expect(JSON.stringify(analyzeCode(source))).toBe(JSON.stringify(analyzeCode(source)));
   });
+
+  it('detects os.environ, os.getenv, and from-os imports as ENVIRONMENT_ACCESS', () => {
+    const cases: Array<[string, string[]]> = [
+      ["import os\nx = os.environ['SECRET']", ['environ']],
+      ["import os\nv = os.environ.get('SECRET')", ['environ']],
+      ["import os\nk = os.getenv('API_KEY')", ['getenv']],
+      ["import os as posix\nposix.environ['SECRET']\nposix.getenv('API_KEY')", ['environ', 'getenv']],
+      ["from os import getenv\ngetenv('API_KEY')", ['getenv']],
+      ["from os import getenv as g\ng('API_KEY')", ['getenv']],
+      ["from os import environ\nv = environ.get('SECRET')\nx = environ['TOKEN']", ['environ', 'environ']],
+      ["from os import environ as e\nv = e.get('SECRET')\nx = e['TOKEN']", ['environ', 'environ']],
+      ['from os import environ\ndata = dict(environ)', ['environ']],
+      ["import os\ngetattr(os, 'getenv')('API_KEY')", ['getenv']],
+    ];
+    for (const [source, members] of cases) {
+      const result = analyzeCode(source);
+      expect(result.findings.map((finding) => finding.evidence.indicator), source)
+        .toEqual(members.map(() => 'ENVIRONMENT_ACCESS'));
+      expect(result.findings.map((finding) => finding.evidence.member), source).toEqual(members);
+      expect(result.findings.every((finding) => finding.policyId === 'PYTHON_DYNAMIC_EXECUTION'), source).toBe(true);
+      expect(result.diagnostics, source).toEqual([]);
+    }
+  });
+
+  it('does not false-positive on shadowed env names, kwargs, aliases, or strings', () => {
+    const safeCases = [
+      "def getenv(k):\n  return k\ngetenv('API_KEY')",
+      "environ = {}\nenviron['SECRET']\nenviron.get('SECRET')",
+      'from os import environ\nfoo(environ=123)',
+      "from os import environ\ndef f(environ):\n  return environ['SECRET']\nfn = lambda environ: environ.get('SECRET')",
+      "from other import getenv, environ\ngetenv('API_KEY')\nenviron['SECRET']",
+      "import safe as os\nos.environ['SECRET']\nos.getenv('API_KEY')",
+      "'os.environ'\n\"os.getenv('API_KEY')\"\n# environ['SECRET']",
+      'from os import environ',
+      "from os import environ\nfor environ in items:\n  environ.get('SECRET')",
+      "from os import environ\nwith ctx as environ:\n  environ['SECRET']",
+    ];
+    for (const source of safeCases) {
+      expect(analyzeCode(source), source).toEqual({ findings: [], diagnostics: [] });
+    }
+  });
+
+  it('detects Python environment access in LangChain Code Tool nodes deterministically', () => {
+    const toolNode = {
+      id: 'tool-py', name: 'Tool', type: '@n8n/n8n-nodes-langchain.toolCode', typeVersion: 1.3,
+      parameters: { language: 'python', pythonCode: "from os import getenv as g\ng('API_KEY')" },
+    };
+    const first = analyzeNodes([toolNode]);
+    const second = analyzeNodes([toolNode]);
+    expect(first.findings.map((finding) => finding.evidence)).toEqual([
+      expect.objectContaining({ indicator: 'ENVIRONMENT_ACCESS', member: 'getenv' }),
+    ]);
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
 });

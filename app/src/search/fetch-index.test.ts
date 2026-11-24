@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
@@ -162,5 +163,34 @@ describe('fetchExtendedIndex release binding', () => {
     resetManifestCache();
     stubFetch([{ path: 'search-index-extended.json', byteSize: extendedIndex.length, sha256: hash(extendedIndex) }]);
     await expect(fetchExtendedIndex()).resolves.toEqual({ ok: true, json: extendedIndex });
+  });
+
+  it('fetches, verifies raw compressed bytes, and decompresses search-index-extended.json.gzbin', async () => {
+    const gz = new Uint8Array(gzipSync(Buffer.from(extendedIndex, 'utf8')));
+    const gzSha = bytesToHex(sha256(gz));
+    const requested: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.includes('manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: 'manifest-v1',
+            generatedAt: '2026-08-30T00:00:00.000Z',
+            totalEntries: 0,
+            catalogueShards: {},
+            artifacts: [{ path: 'search-index-extended.json.gzbin', byteSize: gz.byteLength, sha256: gzSha }],
+          }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        arrayBuffer: async () => gz.slice().buffer,
+      } as unknown as Response;
+    });
+
+    await expect(fetchExtendedIndex()).resolves.toEqual({ ok: true, json: extendedIndex });
+    expect(requested.some((url) => url.endsWith('/data/search-index-extended.json.gzbin'))).toBe(true);
   });
 });

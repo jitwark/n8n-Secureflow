@@ -50,7 +50,7 @@ confidence. Report-only findings do not change the risk grade.
 | Profile | Policy count |
 | --- | ---: |
 | `beta-default` | 7 |
-| `beta-hardened` | 17 |
+| `beta-hardened` | 21 |
 
 | Profiles | Policy ID | Effect | Default severity | Default confidence | Precision |
 | --- | --- | --- | --- | --- | --- |
@@ -71,6 +71,10 @@ confidence. Report-only findings do not change the risk grade.
 | Hardened | `TAINTED_REQUEST_HEADER` | `REPORT_ONLY` | MEDIUM | MEDIUM | MEDIUM |
 | Hardened | `TAINTED_AI_PROMPT` | `REPORT_ONLY` | MEDIUM | LOW | LOW |
 | Hardened | `AI_AGENT_UNGATED_TOOL` | `REPORT_ONLY` | MEDIUM | LOW | LOW |
+| Hardened | `EXPRESSION_SANDBOX_ESCAPE` | `REPORT_ONLY` | CRITICAL | HIGH | HIGH |
+| Hardened | `EXPRESSION_ENV_EXPOSURE` | `REPORT_ONLY` | HIGH | HIGH | HIGH |
+| Hardened | `AGENT_EGRESS_UNRESTRICTED` | `REPORT_ONLY` | HIGH | MEDIUM | MEDIUM |
+| Hardened | `UNAUTHENTICATED_TRIGGER_TO_SINK` | `REPORT_ONLY` | CRITICAL | HIGH | HIGH |
 
 ## Completeness and diagnostics
 

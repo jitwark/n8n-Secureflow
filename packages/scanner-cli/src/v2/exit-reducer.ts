@@ -1,11 +1,11 @@
 import type { BatchItemV2, BatchResultV2 } from './batch-runner';
-import type { ScanSeverityV2 } from './contracts';
+import type { ScanFailOnV2, ScanSeverityV2 } from './contracts';
 
 export type ExitReasonV2 = 'UNDER_THRESHOLD' | 'FINDING_THRESHOLD' | 'REQUIRE_COMPLETE' | 'ITEM_FAILURE' | 'USAGE' | 'INTERNAL' | 'CANCELLED';
 export type ExitCodeV2 = 0 | 1 | 2 | 3 | 4 | 130;
 export type ExitReductionV2 = Readonly<{ reason: ExitReasonV2; code: ExitCodeV2 }>;
-export type ExitReducerOptionsV2 = Readonly<{ failOn?: ScanSeverityV2; requireComplete?: boolean; interrupted?: boolean; outputFailed?: boolean }>;
-export type ExitReducerInputV2 = Readonly<{ batch: BatchResultV2; failOn?: ScanSeverityV2; requireComplete?: boolean; interrupted?: boolean; outputFailed?: boolean }>;
+export type ExitReducerOptionsV2 = Readonly<{ failOn?: ScanFailOnV2; requireComplete?: boolean; interrupted?: boolean; outputFailed?: boolean }>;
+export type ExitReducerInputV2 = Readonly<{ batch: BatchResultV2; failOn?: ScanFailOnV2; requireComplete?: boolean; interrupted?: boolean; outputFailed?: boolean }>;
 
 const EXITS: Readonly<Record<ExitReasonV2, ExitReductionV2>> = Object.freeze({
   UNDER_THRESHOLD: Object.freeze({ reason: 'UNDER_THRESHOLD', code: 0 }),
@@ -35,7 +35,7 @@ function reduceExitV2Unsafe(value: unknown, supplied?: ExitReducerOptionsV2): Ex
   if (options.interrupted === true) return EXITS.CANCELLED;
   if (hasCancellation(value)) return EXITS.CANCELLED;
   if (options.outputFailed === true) return EXITS.INTERNAL;
-  if (options.failOn !== undefined && !Object.prototype.hasOwnProperty.call(SEVERITY, options.failOn)) return EXITS.USAGE;
+  if (options.failOn !== undefined && options.failOn !== 'NONE' && !Object.prototype.hasOwnProperty.call(SEVERITY, options.failOn)) return EXITS.USAGE;
   if (options.requireComplete !== undefined && typeof options.requireComplete !== 'boolean') return EXITS.USAGE;
 
   if (!isRecord(batch) || typeof batch.ok !== 'boolean') return EXITS.USAGE;
@@ -67,7 +67,7 @@ function reduceExitV2Unsafe(value: unknown, supplied?: ExitReducerOptionsV2): Ex
     if (analysis?.status === 'INDETERMINATE') itemFailure = true;
     else if (analysis?.status === 'DEGRADED') degraded = true;
     else if (analysis?.status !== 'COMPLETE') itemFailure = true;
-    if (Array.isArray(scan.findings)) {
+    if (Array.isArray(scan.findings) && options.failOn !== 'NONE') {
       const failOn = options.failOn ?? 'INFO';
       const minimum = SEVERITY[failOn];
       for (const finding of scan.findings) {
@@ -87,7 +87,7 @@ function reduceExitV2Unsafe(value: unknown, supplied?: ExitReducerOptionsV2): Ex
 function readInput(value: unknown, supplied?: ExitReducerOptionsV2): { batch: unknown; options: ExitReducerOptionsV2 } | undefined {
   if (isRecord(value) && 'batch' in value) {
     const input = value as Record<string, unknown>;
-    return { batch: input.batch, options: { failOn: input.failOn as ScanSeverityV2 | undefined, requireComplete: input.requireComplete as boolean | undefined, interrupted: input.interrupted as boolean | undefined, outputFailed: input.outputFailed as boolean | undefined } };
+    return { batch: input.batch, options: { failOn: input.failOn as ScanFailOnV2 | undefined, requireComplete: input.requireComplete as boolean | undefined, interrupted: input.interrupted as boolean | undefined, outputFailed: input.outputFailed as boolean | undefined } };
   }
   return supplied === undefined || isRecord(supplied) ? { batch: value, options: supplied ?? {} } : undefined;
 }

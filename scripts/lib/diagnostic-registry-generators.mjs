@@ -93,7 +93,7 @@ export const DIAGNOSTIC_CODES_V2: readonly DiagnosticCodeV2[] = Object.freeze(
 );
 
 const categorySet: Readonly<Record<DiagnosticCategoryV2, true>> = ${domainRecord(CATEGORIES)};
-const effectSet: Readonly<Record<DiagnosticAggregateEffectModeV2, true>> = ${domainRecord(['NONE', ...EFFECT_MODES])};
+const effectSet: Readonly<Record<DiagnosticAggregateEffectModeV2, true>> = ${domainRecord([...new Set(['NONE', ...EFFECT_MODES])])};
 const projectionSet: Readonly<Record<DiagnosticV1ProjectionV2, true>> = ${domainRecord(PROJECTIONS)};
 const byCode = new Map<string, DiagnosticRegistryEntryV2>(DIAGNOSTIC_REGISTRY.map((entry) => [entry.code, entry]));
 

@@ -154,7 +154,7 @@ async function typecheckConsumer(consumer: string): Promise<Run> {
     "import type { PublicRunOptionsV2, PublicRunResultV2, PublicScanCommandV2 } from 'sfscanner';",
     'const options: PublicRunOptionsV2 = { signal: AbortSignal.abort() };',
     'declare const command: PublicScanCommandV2;',
-    "const canonicalProfile: 'beta-default' = command.profile;",
+    "const canonicalProfile: 'standard' | 'strict' | 'beta-default' | 'beta-hardened' = command.profile;",
     'const pending: Promise<PublicRunResultV2> = runCliV2(command, options);',
     'void pending; void canonicalProfile; void parseCliArguments; void getHelpV2; void emitMetadataCommandResultV2;',
     'void p; void r; void h; void e;',
@@ -220,12 +220,14 @@ describe('installed sfscanner package', () => {
     expect(packed.installed).toEqual(packed.published);
     expect(packed.subpaths).toEqual(Object.keys(CONSUMED_EXPORTS));
     const declared = packed.published?.files ?? [];
-    const allowed = (file: string): boolean => file === 'package.json' || declared.some((entry) => file === entry || file.startsWith(`${entry}/`));
+    const positiveDeclared = declared.filter((entry) => !entry.startsWith('!'));
+    const allowed = (file: string): boolean => file === 'package.json' || positiveDeclared.some((entry) => file === entry || file.startsWith(`${entry}/`));
     expect(packed.files.filter((file) => !allowed(file))).toEqual([]);
+    expect(packed.files.filter((file) => file.endsWith('.map'))).toEqual([]);
     expect(packed.files.filter((file) => /\.tsx?$/u.test(file) && !file.endsWith('.d.ts'))).toEqual([]);
     // The other direction: a declared entry that names nothing is an advertisement the
     // tarball does not honour, and npm packs it away silently rather than failing.
-    const unshipped = declared.filter((entry) => !packed.files.some((file) => file === entry || file.startsWith(`${entry}/`)));
+    const unshipped = positiveDeclared.filter((entry) => !packed.files.some((file) => file === entry || file.startsWith(`${entry}/`)));
     expect(unshipped).toEqual([]);
   });
 
@@ -330,9 +332,27 @@ describe('installed sfscanner package', () => {
     const bare = shim(PACKAGE_NAME, ['--schema', 'v2', 'scan', 'clean.json', '--profile', 'beta-default', '--format', 'json']);
     expect(bare.status).toBe(0);
     expect(JSON.parse(bare.stdout)).toEqual(document);
+    const standardDefault = shim(PACKAGE_NAME, ['scan', 'clean.json', '--format', 'json']);
+    expect(standardDefault.status).toBe(0);
+    expect(JSON.parse(standardDefault.stdout)).toMatchObject({
+      invocation: { profile: 'standard' },
+      results: [{ result: { profile: { id: 'standard', version: '3.0.0' } } }],
+    });
+    const ciStrict = shim(PACKAGE_NAME, ['scan', 'clean.json', '--profile', 'ci', '--format', 'json']);
+    expect(ciStrict.status).toBe(0);
+    expect(JSON.parse(ciStrict.stdout)).toMatchObject({
+      invocation: { profile: 'strict' },
+      results: [{ result: { profile: { id: 'strict', version: '3.0.0' } } }],
+    });
     const hardened = shim(PACKAGE_NAME, ['--schema', 'v2', 'scan', 'clean.json', '--profile', 'beta-hardened', '--format', 'json']);
-    expect(hardened.status).toBe(2);
-    expect(hardened.stderr).toContain('Profile is not admitted.');
+    expect(hardened.status).toBe(0);
+    expect(JSON.parse(hardened.stdout)).toMatchObject({
+      invocation: { profile: 'beta-hardened' },
+      results: [{ result: { profile: { id: 'beta-hardened', version: '2.0.0' } } }],
+    });
+    const rejected = shim(PACKAGE_NAME, ['--schema', 'v2', 'scan', 'clean.json', '--profile', 'unknown-profile', '--format', 'json']);
+    expect(rejected.status).toBe(2);
+    expect(rejected.stderr).toContain('Profile is not admitted.');
   });
 
   it('fails the same probe when a subpath is advertised but absent from the tarball', async () => {

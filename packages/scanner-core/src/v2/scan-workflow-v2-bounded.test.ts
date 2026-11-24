@@ -30,7 +30,7 @@ describe('C02 flow-witness scanner integration', () => {
     expect(result.result.traces).toEqual([]);
   });
 
-  it('scans an unknown node type and degrades gracefully with SEMANTIC_CATALOGUE_MISS', () => {
+  it('scans an unknown node type as COMPLETE with advisory SEMANTIC_CATALOGUE_MISS', () => {
     const workflow = {
       nodes: [
         { id: 'start', name: 'Start', type: 'n8n-nodes-base.manualTrigger', typeVersion: 1, position: [100, 200], parameters: {} },
@@ -45,9 +45,11 @@ describe('C02 flow-witness scanner integration', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // Unknown node type causes degraded analysis
-    expect(result.result.analysis.status).toBe('DEGRADED');
-    expect(result.result.analysis.diagnostics.some((d) => d.code === 'SEMANTIC_CATALOGUE_MISS')).toBe(true);
+    // Unknown node type emits advisory NONE diagnostics without degrading analysis status
+    expect(result.result.analysis.status).toBe('COMPLETE');
+    expect(result.result.analysis.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true,
+    }));
   });
 
   it('scans identically regardless of node renaming when types and topology match', () => {

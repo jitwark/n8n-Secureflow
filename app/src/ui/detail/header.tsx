@@ -1,4 +1,4 @@
-import type { Entry } from '@hub/contracts';
+import { normalizeDiscoverySlug, type Entry } from '@hub/contracts';
 import { Breadcrumbs, type BreadcrumbItem } from '../breadcrumbs';
 import { LicenceBadge } from '../primitives/badge';
 import { GradePill } from '../primitives/pill';
@@ -85,7 +85,7 @@ function safeExternalHref(value: string | undefined | null): string | null {
 
 function defaultBreadcrumbs(entry: Entry): BreadcrumbItem[] {
   const primary = entry.structure.integrations[0] ?? 'Workflows';
-  const slug = primary.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const slug = normalizeDiscoverySlug(primary);
   return [
     { label: 'Home', href: '/' },
     { label: 'Integrations', href: '/integrations/' },

@@ -3,7 +3,7 @@
 > Status: admitted-core authoring contract; custom-pack admission and scoring are authorised work that is not yet built
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer
-> Source of truth: [`admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts), [`pack-schema.ts`](../../packages/scanner-core/src/rules-v2/pack-schema.ts), [`interpreter.ts`](../../packages/scanner-core/src/rules-v2/interpreter.ts), [`safe-fact-registry.ts`](../../packages/scanner-core/src/facts/safe-fact-registry.ts), and the [rule-pack contract](../../openspec/changes/world-class-scanner-cli/rule-pack-contract.md)
+> Source of truth: [`admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts), [`pack-schema.ts`](../../packages/scanner-core/src/rules-v2/pack-schema.ts), [`interpreter.ts`](../../packages/scanner-core/src/rules-v2/interpreter.ts), and [`safe-fact-registry.ts`](../../packages/scanner-core/src/facts/safe-fact-registry.ts)
 
 This page describes the closed rule language and the review path for a future admitted pack. It does
 not make a custom pack or a hardened profile available.

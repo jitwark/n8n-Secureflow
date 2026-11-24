@@ -23,4 +23,15 @@ describe('generateNodeFlowchartSvg', () => {
     expect(svg).toContain('<rect');
     expect(svg).toContain('role="img"');
   });
+
+  it('excludes sticky notes from active node count in the SVG title', () => {
+    const mockNodes: SvgPreviewListItem[] = [
+      { id: '1', name: 'Webhook', type: 'n8n-nodes-base.webhook', category: 'trigger' },
+      { id: '2', name: 'Note', type: 'n8n-nodes-base.stickyNote', category: 'other' },
+    ];
+    const svg = generateNodeFlowchartSvg(mockNodes);
+    expect(svg).toContain('1 active node');
+    expect(svg).toContain('1 sticky note');
+    expect(svg).not.toContain('n8n-nodes-base.stickyNote');
+  });
 });

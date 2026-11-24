@@ -3,6 +3,7 @@ import { parseWorkflowJson } from '@hub/scanner-core/workflow';
 import { scanWorkflowV2, type ScanWorkflowV2FailureCode } from '@hub/scanner-core/v2';
 import { validateScannerResultV2, type ScannerResultV2 } from '@hub/contracts/scanner-v2-result';
 import { scanWorkflow, type ScanWorkflowResult } from './engine';
+import { isScanProfile, resolveLegacyProfileId, resolveV2ProfileRef, type ScanProfile } from './scan-profiles';
 import { mapTooComplexReason, tryCountRawNodes, type ScanErrorDetails, type TooComplexReason } from './scan-worker-error-mapping';
 export type { ScanErrorDetails } from './scan-worker-error-mapping';
 export type ScanErrorCode =
@@ -19,14 +20,14 @@ export type ScanWorkerRequest =
       kind: 'scan';
       id: string;
       json: string;
-      profile: 'beta-default' | 'beta-hardened';
+      profile: ScanProfile;
       approvedDomains?: string[];
     }
   | {
       kind: 'scan-v2';
       id: string;
       json: string;
-      profile: 'beta-default';
+      profile: ScanProfile;
       approvedDomains?: string[];
     };
 
@@ -73,13 +74,13 @@ function isWorkerRequest(value: unknown): value is ScanWorkerRequest {
   return closedRecord(record, ['kind', 'id', 'json', 'profile', 'approvedDomains'], ['kind', 'id', 'json', 'profile'])
     && typeof record.id === 'string'
     && typeof record.json === 'string'
-    && (record.kind === 'scan-v2' ? record.profile === 'beta-default' : record.profile === 'beta-default' || record.profile === 'beta-hardened')
+    && isScanProfile(record.profile)
     && stringArray(record.approvedDomains);
 }
 function handleScanRequest(
   id: string,
   json: string,
-  profile: 'beta-default' | 'beta-hardened',
+  profile: ScanProfile,
   approvedDomains?: string[],
 ): void {
   try {
@@ -132,7 +133,7 @@ function handleScanRequest(
     // An empty allowlist disables the unapproved-domain policy entirely, so only
     // forward a list the user actually supplied.
     const result = scanWorkflow(parsed.workflow, {
-      policyProfile: profile,
+      policyProfile: resolveLegacyProfileId(profile),
       ...(approvedDomains && approvedDomains.length > 0 ? { approvedDomains } : {}),
     });
 
@@ -184,7 +185,12 @@ function nodeLimitRejection(json: string, bytes: Uint8Array): string | undefined
   return nodes.length > MAX_NODES ? `Workflow exceeds the ${MAX_NODES}-node complexity limit.` : undefined;
 }
 
-function handleScanV2Request(id: string, json: string, approvedDomains?: string[]): void {
+function handleScanV2Request(
+  id: string,
+  json: string,
+  profile: ScanProfile,
+  approvedDomains?: string[],
+): void {
   try {
     // Cheap guard first; the one encode below serves both the exact cap check
     // and the engine, so no second ≤1.5 MB allocation is introduced.
@@ -199,7 +205,7 @@ function handleScanV2Request(id: string, json: string, approvedDomains?: string[
     }
     const result = scanWorkflowV2({
       bytes,
-      profile: { id: 'beta-default', version: '2.0.0' },
+      profile: resolveV2ProfileRef(profile),
       ...(approvedDomains === undefined ? {} : { approvedDomains }),
     });
     if (!result.ok) {
@@ -238,6 +244,6 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
   if (data.kind === 'scan') {
     handleScanRequest(data.id, data.json, data.profile, data.approvedDomains);
   } else {
-    handleScanV2Request(data.id, data.json, data.approvedDomains);
+    handleScanV2Request(data.id, data.json, data.profile, data.approvedDomains);
   }
 });

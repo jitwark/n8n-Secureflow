@@ -55,12 +55,28 @@ const CHECKS: Check[] = [
     act: 'Check the package still exists and is maintained before you rely on it. This is the most common reason an imported workflow shows an unrecognised node.',
   },
   {
-    name: 'Custom code node',
-    fires: 'The workflow contains a Code or legacy Function node.',
-    severities: ['LOW'],
+    name: 'Custom code node (JS AST & Python CST)',
+    fires: 'The workflow contains a Code/Function node or uses dynamic execution, child-process, or network primitives in JavaScript or Python.',
+    severities: ['HIGH', 'LOW'],
     means:
-      'Custom code is anatomy, not automatically a vulnerability. It is graded LOW deliberately. The hardened profile defines risky-code checks, but it is not admitted, so the shipped scan does not report them.',
-    act: 'Read the code — it is short in most workflows. The shipped profile does not execute or parse it, so review it yourself until the hardened profile is admitted.',
+      'LOW flags any custom Code node for awareness. HIGH fires when the static JavaScript AST or Python CST parser detects dynamic code evaluation, subprocess execution, or sensitive runtime access.',
+    act: 'Replace dynamic execution with reviewed static logic and narrow integrations instead of running untrusted expressions inside custom code.',
+  },
+  {
+    name: 'Expression sandbox & environment exposure',
+    fires: 'An n8n {{ ... }} expression escapes into constructor/eval/process chains or reads $env / $secrets / process.env.',
+    severities: ['CRITICAL', 'HIGH'],
+    means:
+      'Sandbox escapes can execute arbitrary code in the worker; direct environment variable reads in expressions bypass managed n8n Credentials.',
+    act: 'Remove dynamic evaluation or constructor traversal from expressions and move secrets into managed n8n Credentials.',
+  },
+  {
+    name: 'Taint flow & AI agent egress',
+    fires: 'Untrusted trigger or webhook input reaches a shell, SQL, file, code, URL, or header sink, or an unauthenticated/ungated AI agent holds external tools.',
+    severities: ['CRITICAL', 'HIGH', 'MEDIUM'],
+    means:
+      'Traceable field-flow paths show where external data flows into privileged sinks without sanitization or human approval gates.',
+    act: 'Require trigger authentication, place Wait/approval gates on agent and sink paths, and parameterize commands, queries, and URLs.',
   },
   {
     name: 'Unexpected outbound domain',
@@ -74,15 +90,14 @@ const CHECKS: Check[] = [
 
 export function ScannerChecks() {
   return (
-    <section aria-labelledby="checks-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-6">
+    <section aria-labelledby="checks-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-6">
       <h2 id="checks-heading" className="font-display text-lg font-semibold text-ink">
         What the scanner checks
       </h2>
       <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-        Seven structural checks are scored by default, all deterministic: the same workflow always
-        produces the same report. The hardened profile defines advisory code, value-flow, and
-        AI-agent checks, but it is not admitted and does not run in the shipped scanner. No model
-        decides the security grade, and workflow content is not sent by the scanner worker.
+        All checks in v0.3 Standard and Strict profiles are 100% deterministic and run client-side in a
+        Web Worker: structural policies, JavaScript AST, Python CST, expression escape and env exposure,
+        taint flow, and AI agent egress. Zero workflow content ever leaves your browser.
       </p>
 
       <ul className="mt-5 flex flex-col gap-4">

@@ -7,7 +7,9 @@ const packageJson = JSON.parse(readFileSync(fileURLToPath(new URL('../package.js
 describe('published sfscanner metadata', () => {
   it('exposes the requested package identity and binaries', () => {
     expect(packageJson.name).toBe('sfscanner');
-    expect(packageJson.description).toBe('SecureFlow Scanner — Deterministic, offline security & dataflow analyzer for n8n workflows');
+    expect(packageJson.version).toBe('0.3.0');
+    expect(packageJson.description).toBe('Deterministic offline security & dataflow scanner for n8n workflows (CLI, MCP, GitHub Action)');
+    expect(packageJson.engines).toEqual({ node: '>=20.0.0' });
     expect(packageJson.private).toBe(false);
     // The manifest keeps the bin targets as its author wrote them (no `./` prefix); npm normalizes the
     // optional `./` to one form when it packs, so the source punctuation is npm's to own (E3-report.md).

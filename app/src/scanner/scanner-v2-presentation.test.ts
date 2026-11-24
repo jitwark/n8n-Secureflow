@@ -343,4 +343,53 @@ describe('toScannerReportModelV2', () => {
     expect(model.v2.target.communityPackages).toEqual([{ name: 'secret-token-utils' }]);
     expect(model.humanSummary?.plainLanguageOverview).toContain('secret-token-utils');
   });
+
+  it('projects standard@3.0.0 scans with v0.3 rules, taint findings, and monotonic CRITICAL grade', () => {
+    const webhookExec = JSON.stringify({
+      name: 'Webhook RCE',
+      nodes: [
+        { id: 'w1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 1, parameters: { path: 'run', httpMethod: 'POST' } },
+        { id: 'e1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: '={{ $json.body.cmd }}' } },
+      ],
+      connections: { Webhook: { main: [[{ node: 'Exec', type: 'main', index: 0 }]] } },
+    });
+    const res = scanWorkflowV2({ bytes: new TextEncoder().encode(webhookExec), profile: { id: 'standard', version: '3.0.0' } });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.code);
+
+    const model = toScannerReportModelV2(res.result);
+    expect(model.policyProfile).toBe('standard');
+    expect(model.analysisStatus).toBe('COMPLETE');
+    expect(model.assessment?.grade).toBe('CRITICAL');
+    expect(model.riskAssessment?.grade).toBe('CRITICAL');
+    expect(model.findings.map((f) => f.policyId)).toEqual(
+      expect.arrayContaining(['N8N_EXECUTE_COMMAND', 'TAINTED_COMMAND', 'UNAUTHENTICATED_TRIGGER_TO_SINK']),
+    );
+    expect(model.humanSummary?.recommendedActions.length).toBeGreaterThan(0);
+
+    const exprAndAi = JSON.stringify({
+      name: 'v0.3 rules',
+      nodes: [
+        { id: 's1', name: 'Escape', type: 'n8n-nodes-base.set', typeVersion: 3, parameters: { a: "={{ (function(){ return this.process.mainModule.require('child_process').execSync('id') })() }}", b: '={{ $env.AWS_SECRET_ACCESS_KEY }}' } },
+        { id: 'py', name: 'Py', type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { language: 'python', pythonCode: "import os\nval = os.getenv('SECRET')" } },
+        { id: 'a1', name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 1, parameters: {} },
+        { id: 't1', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', typeVersion: 1, parameters: { url: '={{ $json.url }}' } },
+      ],
+      connections: { Tool: { ai_tool: [[{ node: 'Agent', type: 'ai_tool', index: 0 }]] } },
+    });
+    const res2 = scanWorkflowV2({ bytes: new TextEncoder().encode(exprAndAi), profile: { id: 'standard', version: '3.0.0' } });
+    expect(res2.ok).toBe(true);
+    if (!res2.ok) throw new Error(res2.code);
+
+    const model2 = toScannerReportModelV2(res2.result);
+    expect(model2.findings.map((f) => f.policyId)).toEqual(
+      expect.arrayContaining([
+        'EXPRESSION_SANDBOX_ESCAPE',
+        'EXPRESSION_ENV_EXPOSURE',
+        'PYTHON_DYNAMIC_EXECUTION',
+        'AGENT_EGRESS_UNRESTRICTED',
+      ]),
+    );
+    expect(JSON.stringify(model2)).not.toContain('AWS_SECRET_ACCESS_KEY');
+  });
 });

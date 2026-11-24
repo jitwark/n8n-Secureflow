@@ -1,7 +1,7 @@
 # Scanner limitations
 
-> Status: current native-v1 limitations; explicit v2 boundary documented
-> Last verified: 2026-10-19
+> Status: current limitations; explicit v2/v3 boundary documented
+> Last verified: 2026-11-24
 > Owner: Scanner maintainer
 > Source of truth: [`packages/scanner-core/src/v2/scan-workflow.ts`](../../packages/scanner-core/src/v2/scan-workflow.ts), [`packages/scanner-core/src/facts/safe-fact-registry.ts`](../../packages/scanner-core/src/facts/safe-fact-registry.ts), [`contracts/scanner-limits-v2.ts`](../../contracts/scanner-limits-v2.ts), and the native-v1 sources and audit listed below
 
@@ -13,13 +13,15 @@ For what the scanner *does* detect, see the [rule reference](rule-reference.md) 
 [policy inventory](policy-inventory.md). For how a result can be `DEGRADED` or `INDETERMINATE`
 rather than clean, see [architecture.md](architecture.md#analysis-honesty-complete--degraded--indeterminate).
 
-## Explicit v2 boundary and deferred authority
+## Explicit v2/v3 boundary and deferred authority
 
-The detailed limits below retain their native-v1 meaning and history. The explicit v2 path is
-separately versioned: only `secureflow-scanner@2.0.0` with `beta-default@2.0.0` and built-in
-authority is admitted. `beta-hardened@2.0.0` is defined but not admitted; custom/remote declarative
-packs, Ed25519 signature verification, and live key rotation are not v2 features. Native v1
-behavior and its `scanner-beta-1` identity remain available for compatibility and rollback.
+The detailed limits below retain their native-v1 meaning and history. The explicit versioned path is
+separately versioned: `standard@3.0.0` (default) and `strict@3.0.0` (alias `ci`) are admitted, as are
+the retained `beta-default@2.0.0` and `beta-hardened@2.0.0`. The last of those is admitted as a
+profile but is **not admitted into the risk score** — its advisory rules are report-only — and
+custom/remote declarative packs, Ed25519 signature verification, and live key rotation are not
+versioned-path features at all. Native v1 behavior and its `scanner-beta-1` identity remain available
+for compatibility and rollback.
 
 V2 adds bounded document, member/element, duplicate-key, source-span, expression, graph, taint,
 redaction, evidence, serialized-result, and rule-operation budgets under
@@ -29,17 +31,22 @@ they do not expand coverage or turn a partial scan into a clean result. Missing 
 catalogue does not model is not treated as clean either: it is covered by the conservative generic
 fallback ([ADR](../decisions/ADR-generic-node-semantic-fallback.md)) — main-in → main-out passthrough,
 `READ_EXTERNAL`/`WRITE_EXTERNAL`, no claim about destinations or parameters — and every such node
-carries **two** degraded coverage diagnostics: `SEMANTIC_CATALOGUE_MISS` (the node type has no
-admitted catalogue record) and `GENERIC_NODE_UNMODELED_CAPABILITY` (the verdict rests on
-unmodelled-capability defaults; destinations are unknown, not audited-and-empty). A grade that
-includes fallback nodes therefore rests on a labelled assumption rather than on modelled behaviour.
-The fallback runs the seven policies scored by the admitted `beta-default@2.0.0` profile; the ten
-advisory analyzers in `beta-hardened@2.0.0` are defined but not admitted and do not run. A genuinely
-unresolved node keeps only `SEMANTIC_CATALOGUE_MISS` at the caller's requiredness: a required miss is
-`INDETERMINATE` with no assessment, an optional miss is `DEGRADED`/eligible and does not null the
-assessment by itself. An unreadable node `type` still refuses the scan.
-V2 does not claim host vulnerability/version detection, credential-store inspection, workflow execution,
-or runtime service behavior.
+carries **two** catalogue-coverage facts: `SEMANTIC_CATALOGUE_MISS` (the node type has no admitted
+catalogue record) and `GENERIC_NODE_UNMODELED_CAPABILITY` (the verdict rests on unmodelled-capability
+defaults; destinations are unknown, not audited-and-empty). Both are classified with aggregate effect
+`NONE`: they are coverage facts, and they do not degrade the analysis. A grade that includes fallback
+nodes still rests on a labelled assumption rather than on modelled behaviour, so read it as bounded
+evidence, not modelled coverage.
+
+In v0.3 both `standard@3.0.0` and `strict@3.0.0` run the full rule set including the taint, graph,
+expression, JavaScript, and Python analyzers, so the advisory rules listed as hardened-only in the
+v1-era sections below do produce findings. Those findings remain `REPORT_ONLY` where the rule
+catalogue says so: they are visible and filterable (`--min-severity`, `--min-confidence`) but they do
+not silently rewrite a legacy score. A genuinely unresolved node keeps only `SEMANTIC_CATALOGUE_MISS`
+at the caller's requiredness: a required miss is `INDETERMINATE` with no assessment, an optional miss
+is `DEGRADED`/eligible and does not null the assessment by itself. An unreadable node `type` still
+refuses the scan. Versioned scanning does not claim host vulnerability/version detection,
+credential-store inspection, workflow execution, or runtime service behavior.
 
 ### Q01 local source correctness checkpoints
 
@@ -66,7 +73,7 @@ single classification of every `ScannerLimitsV2` numeric field, and no help surf
 | State | Fields | Meaning |
 | --- | --- | --- |
 | `WIRED` (19) | `maxBytes`, `maxNodes`, `maxEdges`, `maxConnectionDepth`, `maxParameterDepth`, `maxParameterLeaves`, `workerDeadlineMs`, `maxSyntaxNodes`, `maxDocumentDepth`, `maxMembersAndElements`, `maxRawEdges`, `maxDuplicateKeys`, `maxDiagnostics`, `maxStoredSourceSpans`, `maxSourceWork`, `maxFindings`, `maxEvidenceBytes`, `maxSerializedResultBytes`, `maxRuleOperations` | Read by the admitted `beta-default@2.0.0` path. `workerDeadlineMs` is here because the CLI worker host enforces it. |
-| `DORMANT` (5) | `maxExpressionTokens`, `maxCodeSyntaxNodes`, `maxGraphOperations`, `maxTaintStates`, `maxTraceStepsPerFinding` | Read only by the code, value-flow, taint, and graph analyzers of `beta-hardened@2.0.0`, which is defined but not admitted. |
+| `DORMANT` (5) | `maxExpressionTokens`, `maxCodeSyntaxNodes`, `maxGraphOperations`, `maxTaintStates`, `maxTraceStepsPerFinding` | Read only by the code, value-flow, taint, expression, and graph analyzers of `beta-hardened@2.0.0`. Those analyzers run under the v0.3 defaults, so these budgets are live rather than dormant on the shipped path. |
 | `UNWIRED` (2) | `maxRedactionPatches`, `maxRedactedArtifactBytes` | No shipped path reads them; they bound the development-only redaction-v2 work. |
 
 Result `limits.usage` contains rows only for measured budgets: `maxBytes`, `maxNodes`, `maxEdges`,
@@ -102,10 +109,11 @@ the classification above is the current engine's, not a new limit. The boundary 
 the document shape — a five-member node charges 13 spans rather than 12 and moves the complete
 boundary to 1,923 nodes.
 
-Fresh-process timing and throughput are **UNRUN** in this remediation wave: the evidence command
-`node scripts/measure-workflow-capacity.mjs > docs/audits/2026-10-19-production-readiness/evidence/capacity-audit.jsonl`
-is scheduled once in the final verification wave. No elapsed-time or capacity figure here is a
-measurement of that command.
+Fresh-process timing and throughput are **UNRUN**: no elapsed-time or capacity figure on this page is
+a measurement of a timing command, and the capacity-audit runbook that once scheduled one is retired
+with the working tree it referenced. The boundary table above is a property of the engine's
+classification, reproduced by `packages/scanner-core/src/v2/capacity-audit.test.ts`, not a
+throughput measurement.
 
 ## The several meanings of “24”
 
@@ -128,8 +136,9 @@ is a workflow limit.
 The scanner admission limit is 5,000 nodes. An unmodelled node receives the conservative fallback
 and both degraded coverage codes (`SEMANTIC_CATALOGUE_MISS` and
 `GENERIC_NODE_UNMODELED_CAPABILITY`); it is never rejected merely for being outside the catalogued
-families. The fallback runs the seven policies scored by the admitted `beta-default@2.0.0` profile;
-the ten advisory analyzers in `beta-hardened@2.0.0` are defined but not admitted and do not run.
+families. The fallback runs the seven scored policies plus the fourteen report-only advisory policies,
+all of which are live under the v0.3 defaults; report-only findings are visible and filterable but do
+not change the grade.
 
 ## Structural limits, not maturity gaps
 
@@ -173,21 +182,33 @@ never proof that a branch runs, that an exploit succeeds, or that a value is emp
 Obfuscation, dynamic property names, computed `require`/`import` targets, and code assembled at
 runtime from data the scanner cannot see are all outside reach by construction.
 
-## `$env` and secret-variable leakage — resolving the open question
+## `$env` and secret-variable leakage
 
-An earlier audit pass marked this `UNVERIFIED`. Reading the code resolves it, with caveats:
+**What is detected.** Two analyzers cover this now, and both run under the v0.3 defaults.
 
-**What is detected.** `packages/scanner-core/src/analyzers/code/javascript-analysis.ts` treats
-`$env`, `$secrets`, and `$credentials` as tracked roots (`secretRoots`), and separately recognizes
-`process.env`, `import.meta.env`, and `globalThis.process.env` (`isEnvironmentPath`). A Code or
-Function node's **JavaScript** source that reads `process.env.TOKEN` or `$env.SOME_TOKEN` is defined
-to produce a `JAVASCRIPT_DYNAMIC_EXECUTION` finding with indicator `ENVIRONMENT_ACCESS` or
-`SECRET_ACCESS` respectively — confirmed directly by a test case in `javascript-analysis.test.ts`
-that asserts `process.env.TOKEN;` yields exactly that indicator. The analyzer is defined for
-`beta-hardened`, which is not admitted, so no shipped scan produces the finding.
+- `packages/scanner-core/src/analyzers/expression/expression-security.ts` parses n8n expression
+  values — the `={{ … }}` form written into an ordinary node field, not just into a Code node — and
+  reports `EXPRESSION_ENV_EXPOSURE` when a reference resolves to `$env`, `$secrets`, `$credentials`,
+  or `process.env`. This is the far more common path: pasting `{{ $env.API_KEY }}` straight into an
+  HTTP Request header is now a finding, not a blind spot. It also reports
+  `EXPRESSION_SANDBOX_ESCAPE` for catalogued escape primitives (`eval`, `Function`, `require`,
+  `process` sinks).
+- `packages/scanner-core/src/analyzers/code/javascript-analysis.ts` treats `$env`, `$secrets`, and
+  `$credentials` as tracked roots (`secretRoots`) and separately recognizes `process.env`,
+  `import.meta.env`, and `globalThis.process.env` (`isEnvironmentPath`). A Code or Function node's
+  **JavaScript** source that reads `process.env.TOKEN` or `$env.SOME_TOKEN` produces a
+  `JAVASCRIPT_DYNAMIC_EXECUTION` finding with indicator `ENVIRONMENT_ACCESS` or `SECRET_ACCESS`,
+  confirmed by a test case in `javascript-analysis.test.ts`.
 
-**What is not detected, and why this is only a partial answer:**
+On the v0.3 corpus, `EXPRESSION_ENV_EXPOSURE` fired on 2,202 workflows. Both rules are
+`REPORT_ONLY`: they are visible and filterable, and they do not change a grade.
 
+**What is still not detected:**
+
+- **Python code does not carry the environment signal.** `python-analysis.ts` only recognizes
+  `eval`/`exec`/dynamic import and `subprocess`/`os` process primitives (`SUBPROCESS_METHODS`,
+  `isOsProcessMember`). There is no equivalent of `secretRoots` or `isEnvironmentPath` in the Python
+  analyzer, so `os.environ.get('TOKEN')` in a Python Code node is invisible.
 - **Parsing is all-or-nothing per code node.** JavaScript is parsed by Acorn, which returns a
   complete AST or throws; a syntax-invalid node yields `JAVASCRIPT_PARSE_FAILED` with no findings
   from that node, and the required-stage mapping makes the core result `INDETERMINATE` rather than
@@ -195,24 +216,12 @@ that asserts `process.env.TOKEN;` yields exactly that indicator. The analyzer is
   Python uses a lossless CST traversal, so findings parsed before a later syntax error are retained
   and `PYTHON_PARSE_FAILED` is emitted alongside them; the resulting required-stage failure is still
   `INDETERMINATE`.
-- **Python code is not covered.** `python-analysis.ts` only recognizes `eval`/`exec`/dynamic
-  import and `subprocess`/`os` process primitives (`SUBPROCESS_METHODS`, `isOsProcessMember`).
-  There is no equivalent of `secretRoots` or `isEnvironmentPath` in the Python analyzer, so
-  `os.environ.get('TOKEN')` in a Python Code node is invisible to the scanner today.
-- **n8n's own expression syntax is not covered.** A parameter value like
-  `={{ $env.TOKEN }}` written directly into an ordinary node field (an HTTP Request header, a Set
-  node value, anything outside a Code node's source) is never parsed by Acorn — it is a string,
-  and the taint-expression parser (`taint-expressions.ts`) has no `$env`/`$secrets`/`$credentials`
-  root in its own reference resolution (`taint-expression-references.ts`). So the far more common
-  path — pasting `{{ $env.API_KEY }}` straight into a parameter — is not flagged by any rule.
-- **This signal belongs to the `beta-hardened` profile, which is defined but not admitted or
-  selectable.** The shipped `beta-default` path runs no JavaScript analysis and no shipped scan sees
-  it. If the hardened profile is admitted later, the finding remains `REPORT_ONLY` and does not
-  affect the risk score or grade.
+- **Values assembled at runtime are not reconstructed.** A secret built from concatenated fragments,
+  or an environment read whose result is computed rather than named, is outside a static model.
 
-Net: the analyzer that detects direct `process.env`/`$env`/`$secrets`/`$credentials` **member access
-written as JavaScript inside a Code node** is defined but not admitted, so no shipped profile reports
-it. It does not detect the same leakage pattern in Python or in n8n's own expression language.
+Net: direct environment and secret access is reported in JavaScript code nodes **and** in n8n's own
+expression language under the v0.3 defaults. The remaining gap is Python, plus any value whose
+secret-ness only exists at runtime.
 
 ## Expression literals in `RAW_AUTH_HEADER` and `RAW_SECRET_INDICATOR`
 
@@ -284,8 +293,8 @@ Assessed against the incidents in [the threat model](threat-model.md#why-this-ma
 | Prompt injection into AI agents | Yes | `TAINTED_AI_PROMPT` |
 | Over-permissioned agent tools | Yes | `AI_AGENT_UNGATED_TOOL` |
 | Community-node supply chain | Partial | `UNKNOWN_NODE_PACKAGE` flags the namespace only — no reputation or known-malicious list |
-| Data exfiltration via agent HTTP tools | Partial | `TAINTED_REQUEST_URL` covers taint; egress-destination policy is a separate, unbuilt rule |
-| `$env` / secret-variable leakage | Partial | See the dedicated section above — JavaScript-only, hardened-only, `REPORT_ONLY` |
+| Data exfiltration via agent HTTP tools | Yes | `AGENT_EGRESS_UNRESTRICTED` reports an agent HTTP tool with no approved-domain allowlist; `TAINTED_REQUEST_URL` covers the taint path |
+| `$env` / secret-variable leakage | Partial | See the dedicated section above — n8n expressions and JavaScript code nodes both covered, Python not; `REPORT_ONLY` |
 | Credential over-scoping across workflows | No | Single-workflow analysis cannot see instance-wide credential sharing |
 | Known-vulnerable n8n version detection | No | No rule reads or warns about the target n8n version |
 

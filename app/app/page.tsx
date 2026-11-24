@@ -10,6 +10,7 @@ import { FeaturedRail } from '../src/ui/featured-rail';
 import { HomeFacts } from '../src/ui/home-facts';
 import { HomeHubLinks } from '../src/ui/home-hub-links';
 import { HomeSearch } from '../src/ui/home-search';
+import { HomeSecurityInsights } from '../src/ui/home-security-insights';
 import { HomeTools } from '../src/ui/home-tools';
 import { HeroWorkflowFlare } from '../src/ui/hero-workflow-flare';
 import { IdlePrefetch } from '../src/ui/idle-prefetch';
@@ -80,47 +81,59 @@ export default function HomePage() {
       <IdlePrefetch />
       <JsonLdScript data={homeJsonLd()} />
 
-      {/* Hero Chapter */}
+      {/* Hero Chapter: Scanner-first entry + instant community index search */}
       <section className="-mx-4 -mt-8 mb-12 border-b border-hairline bg-page px-4 py-12 text-ink sm:-mx-6 sm:px-6 lg:py-16">
         <div className="mx-auto grid max-w-7xl min-w-0 grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,auto)]">
-          <div className="flex max-w-3xl flex-col gap-6">
+          <div className="flex min-w-0 max-w-3xl flex-col gap-5">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 bg-accent" aria-hidden="true" />
-                <p className="font-mono text-2xs uppercase tracking-wider text-accent-text font-bold">
-                  Open Community Index · Deterministic Scanner
+                <span className="h-2 w-2 shrink-0 bg-accent" aria-hidden="true" />
+                <p className="font-mono text-2xs font-bold uppercase tracking-wider text-accent-text">
+                  Zero-Upload Browser Scanner · Deterministic Community Index
                 </p>
               </div>
               <h1 className="font-sans text-3xl font-bold leading-[1.15] tracking-tight text-ink sm:text-4xl lg:text-[44px]">
-                Find the workflow you need, then check it before you run it.
+                Scan any n8n workflow locally before you deploy it.
               </h1>
               <p className="max-w-[62ch] text-base leading-7 text-ink-muted">
-                Search {compact(analytics.searchable)} community workflows by integration, trigger and
-                security grade, then scan any workflow JSON before you import it.
+                Audit credentials, unauthenticated webhook sinks, and cross-node taint flows in your browser,
+                or search {compact(analytics.searchable)} community workflows by integration, trigger and security grade.
               </p>
             </div>
 
-            <div className="flex max-w-2xl flex-col gap-2.5">
-              <HomeSearch />
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/scanner/"
+                prefetch={false}
+                className="inline-flex h-11 items-center justify-center rounded-control bg-accent px-6 font-sans text-sm font-bold text-accent-ink transition-colors hover:brightness-95 active:brightness-90"
+              >
+                Scan Workflow Now
+              </Link>
+              <Link
+                href="/library/"
+                prefetch={false}
+                className="inline-flex h-11 items-center justify-center rounded-control border border-hairline bg-panel px-6 font-sans text-sm font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-raised"
+              >
+                Browse Library
+              </Link>
+            </div>
+
+            <div className="flex min-w-0 max-w-2xl flex-col gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-control border border-hairline bg-panel px-3.5 py-2.5 font-mono text-xs">
+                <code className="min-w-0 break-all text-ink">
+                  <span className="select-none text-ink-faint">$ </span>npx sfscanner scan workflow.json
+                </code>
+                <span className="shrink-0 font-mono text-2xs uppercase tracking-wider text-accent-text font-bold">
+                  CLI · Zero upload
+                </span>
+              </div>
               <p className="font-mono text-2xs text-ink-muted">
                 The scanner runs locally in your browser. Nothing is uploaded.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <Link
-                href="/scanner/"
-                className="inline-flex h-11 items-center justify-center rounded-control bg-accent px-6 font-sans text-sm font-bold text-accent-ink transition-colors hover:brightness-95 active:brightness-90"
-              >
-                Scan a Workflow
-              </Link>
-              <Link
-                href="/library/"
-                prefetch={false}
-                className="inline-flex h-11 items-center justify-center rounded-control border border-hairline bg-raised px-6 font-sans text-sm font-bold text-ink transition-colors hover:bg-page hover:border-hairline-strong"
-              >
-                Browse Library
-              </Link>
+            <div className="flex max-w-2xl flex-col gap-2 pt-1">
+              <HomeSearch />
             </div>
           </div>
 
@@ -130,6 +143,8 @@ export default function HomePage() {
 
       {/* Body Content Chapters: Flat paper-white canvas */}
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-14">
+        <HomeSecurityInsights />
+
         <HomeTools />
 
         <HomeFacts
@@ -165,6 +180,7 @@ export default function HomePage() {
           </div>
           <Link
             href="/scanner/"
+            prefetch={false}
             className="inline-flex h-11 shrink-0 items-center justify-center rounded-control bg-accent px-6 font-sans text-sm font-bold text-accent-ink transition-colors hover:brightness-95 active:brightness-90"
           >
             Launch Scanner

@@ -7,13 +7,19 @@ import { validateScannerResultV2, type ScannerResultV2 } from '@hub/contracts/sc
 import type { SourceMemberRefV2, SourceSpanV2, SubjectV2 } from '@hub/contracts/scanner-v2-source';
 import { V1_RULE_TEMPLATES } from '@hub/scanner-core/compat/v1-registry';
 import { buildBatchSarifV2, buildSarifV2, coverageOmissionsV2, serializeSarifV2, type BatchSarifInputV2 } from '@hub/scanner-core/report/sarif-v2/output';
+import { scanWorkflowV2 } from '@hub/scanner-core/v2';
 import type { BatchResultV2 } from './batch-runner';
 import { projectBatchV2 } from './json-output';
 import { serializeNdjsonV2 } from './ndjson-output';
 import { renderTableV2 } from './table-output';
 
 type TestLocation = { physicalLocation: { artifactLocation: { uri: string }; region?: Record<string, unknown> } };
-type TestResult = { ruleId: string; level: string; message: { text: string }; locations?: TestLocation[]; taxa?: Array<{ id: string; toolComponent: { name: string } }>; partialFingerprints?: Record<string, string> };
+type TestCodeFlow = { threadFlows: Array<{ locations: Array<{ location: TestLocation }> }> };
+type TestResult = {
+  ruleId: string; level: string; message: { text: string };
+  locations?: TestLocation[]; taxa?: Array<{ id: string; toolComponent: { name: string } }>;
+  partialFingerprints?: Record<string, string>; properties?: Record<string, unknown>; codeFlows?: TestCodeFlow[];
+};
 type TestNotification = { descriptor: { id: string }; level?: string; locations?: TestLocation[] };
 type TestCounts = { findings: number; capabilityOmitted: number; limitOmitted: number; findingOmitted: number; omittedTotal: number; coverageAnalyzed: number; coverageSeen: number };
 type TestSecureflow = {
@@ -27,7 +33,8 @@ type TestSecureflow = {
   counts: TestCounts;
   omissions: Array<Record<string, unknown>>;
 };
-type TestRun = { tool: { driver: { name: string; version: string; rules: Array<{ id: string; helpUri?: string }> } }; results: TestResult[]; invocations: Array<{ executionSuccessful: boolean; toolExecutionNotifications: TestNotification[] }>; taxonomies?: Array<{ name: string; taxa?: Array<{ id: string }> }>; properties?: { secureflow?: TestSecureflow } };
+type TestRule = { id: string; helpUri?: string; shortDescription?: { text: string }; fullDescription?: { text: string }; help?: { text: string }; properties?: { tags?: string[] } };
+type TestRun = { tool: { driver: { name: string; version: string; rules: TestRule[] } }; results: TestResult[]; invocations: Array<{ executionSuccessful: boolean; toolExecutionNotifications: TestNotification[] }>; taxonomies?: Array<{ name: string; taxa?: Array<{ id: string }> }>; properties?: { secureflow?: TestSecureflow } };
 
 let fid = 1;
 const digest = (v = '0') => {
@@ -336,5 +343,209 @@ describe('sarif-output core and schema', () => {
 
     expect(() => serializeSarifV2({ runs: [] } as unknown as BatchSarifInputV2)).toThrow(TypeError);
     expect(() => serializeSarifV2({ runs: [{ dangerous: true }] } as unknown as BatchSarifInputV2)).toThrow(TypeError);
+  });
+
+  it('emits 4-digit CWE tags for UNKNOWN_NODE_PACKAGE', () => {
+    const log = buildBatchSarifV2([{ label: 'pkg.json', status: 'COMPLETED', result: baseResult([finding('UNKNOWN_NODE_PACKAGE')]) }]);
+    const run = log.runs[0] as unknown as TestRun;
+    const rule = run.tool.driver.rules.find((item) => item.id === 'UNKNOWN_NODE_PACKAGE');
+    expect(rule?.properties?.tags).toEqual(['external/cwe/cwe-1357']);
+    expect(run.taxonomies?.find((t) => t.name === 'CWE')?.taxa?.some((t) => t.id === 'external/cwe/cwe-1357')).toBe(true);
+  });
+});
+
+describe('sarif-output v0.3 profiles and rules', () => {
+  const encodeWorkflow = (workflow: Record<string, unknown>) => new TextEncoder().encode(JSON.stringify(workflow, null, 2));
+  const v03Workflow = encodeWorkflow({
+    nodes: [
+      { id: 'w1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 1, parameters: { path: 'run', httpMethod: 'POST' } },
+      { id: 'n1', name: 'NoOp', type: 'n8n-nodes-base.noOp', typeVersion: 1, parameters: {} },
+      { id: 'e1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: '={{ $json.body.cmd }}' } },
+      { id: 'js1', name: 'JS', type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { jsCode: 'return eval(input)' } },
+      { id: 'py1', name: 'PY', type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { language: 'python', pythonCode: "from os import getenv\ngetenv('SECRET')" } },
+      { id: 'esc1', name: 'Escape', type: 'n8n-nodes-base.set', typeVersion: 3, parameters: { value: "={{ (function(){ return this.process.mainModule.require('child_process').execSync('id') })() }}" } },
+      { id: 'env1', name: 'Env', type: 'n8n-nodes-base.set', typeVersion: 3, parameters: { keyA: '={{ $env.AWS_SECRET_ACCESS_KEY }}' } },
+      { id: 'a1', name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', typeVersion: 1, parameters: { text: '={{ $json.body.prompt }}' } },
+      { id: 't1', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', typeVersion: 1, parameters: { url: '={{ $json.url }}' } },
+    ],
+    connections: {
+      Webhook: { main: [[{ node: 'NoOp', type: 'main', index: 0 }, { node: 'Agent', type: 'main', index: 0 }]] },
+      NoOp: { main: [[{ node: 'Exec', type: 'main', index: 0 }]] },
+      Tool: { ai_tool: [[{ node: 'Agent', type: 'ai_tool', index: 0 }]] },
+    },
+  });
+  const singleHopFieldFlowWorkflow = encodeWorkflow({
+    nodes: [
+      { id: 'w1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 1, parameters: { path: 'cmd', httpMethod: 'POST' } },
+      { id: 'e1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: '={{ $json.body.cmd }}' } },
+    ],
+    connections: {
+      Webhook: { main: [[{ node: 'Exec', type: 'main', index: 0 }]] },
+    },
+  });
+
+  it.each([
+    { id: 'standard', version: '3.0.0' },
+    { id: 'strict', version: '3.0.0' },
+  ] as const)('emits complete SARIF 2.1.0 for $id@$version across promoted and v0.3 rules without unknown-rule diagnostics', (profile) => {
+    const multiHopScan = scanWorkflowV2({ bytes: v03Workflow, profile });
+    const singleHopScan = scanWorkflowV2({ bytes: singleHopFieldFlowWorkflow, profile });
+    expect(multiHopScan.ok).toBe(true);
+    expect(singleHopScan.ok).toBe(true);
+    if (!multiHopScan.ok || !singleHopScan.ok) throw new Error('Expected v0.3 scan to succeed');
+    expect(multiHopScan.result.facts.some((f) => f.kind === 'dataflow.summary.v2' && f.properties.flowKind === 'TAINT_SINK')).toBe(true);
+    expect(singleHopScan.result.facts.some((f) => f.kind === 'dataflow.summary.v3' && f.properties.sinkClass === 'COMMAND')).toBe(true);
+
+    const log = buildBatchSarifV2([
+      { label: 'v03-multi.json', status: 'COMPLETED', result: multiHopScan.result },
+      { label: 'v03-single.json', status: 'COMPLETED', result: singleHopScan.result },
+    ]);
+    const serialized = JSON.stringify(log);
+    expect(serialized).not.toContain('AWS_SECRET_ACCESS_KEY');
+
+    const run = log.runs[0] as unknown as TestRun;
+    expect(run.properties?.secureflow?.profile).toEqual(profile);
+    expect(run.invocations[0].executionSuccessful).toBe(true);
+    const notifIds = run.invocations[0].toolExecutionNotifications.map((n) => n.descriptor.id);
+    expect(notifIds).not.toContain('UNKNOWN_SCORING_RULE');
+    expect(notifIds).not.toContain('UNKNOWN_REPORT_ONLY_RULE');
+
+    const byRule = (ruleId: string) => run.results.filter((r) => r.ruleId === ruleId);
+    const ruleDesc = (ruleId: string) => run.tool.driver.rules.find((r) => r.id === ruleId);
+
+    const js = byRule('JAVASCRIPT_DYNAMIC_EXECUTION');
+    expect(js.length).toBeGreaterThanOrEqual(1);
+    expect(js[0].properties).toMatchObject({ effect: 'SCORING', capabilityId: 'javascript-security' });
+
+    const py = byRule('PYTHON_DYNAMIC_EXECUTION');
+    expect(py.length).toBeGreaterThanOrEqual(1);
+    expect(py[0].properties).toMatchObject({ effect: 'SCORING', capabilityId: 'python-security' });
+
+    const taintedCmdMulti = byRule('TAINTED_COMMAND').filter((r) => r.locations?.[0]?.physicalLocation.artifactLocation.uri === 'v03-multi.json');
+    expect(taintedCmdMulti.length).toBeGreaterThanOrEqual(1);
+    expect(taintedCmdMulti[0].properties).toMatchObject({ effect: 'SCORING', severity: 'CRITICAL', evidenceClass: 'POTENTIAL_DATAFLOW' });
+    expect(taintedCmdMulti[0].codeFlows?.[0]?.threadFlows[0]?.locations.length).toBeGreaterThanOrEqual(3);
+
+    const taintedCmdSingle = byRule('TAINTED_COMMAND').filter((r) => r.locations?.[0]?.physicalLocation.artifactLocation.uri === 'v03-single.json');
+    expect(taintedCmdSingle.length).toBeGreaterThanOrEqual(1);
+    expect(taintedCmdSingle[0].properties).toMatchObject({ effect: 'SCORING', severity: 'CRITICAL', evidenceClass: 'POTENTIAL_DATAFLOW' });
+    expect(taintedCmdSingle[0].codeFlows?.[0]?.threadFlows[0]?.locations.length).toBeGreaterThanOrEqual(2);
+
+    const escape = byRule('EXPRESSION_SANDBOX_ESCAPE');
+    expect(escape.length).toBeGreaterThanOrEqual(1);
+    expect(escape[0]).toMatchObject({ level: 'error', properties: { severity: 'CRITICAL', effect: 'SCORING', evidenceClass: 'SUSPICIOUS_SYNTAX' } });
+    expect(ruleDesc('EXPRESSION_SANDBOX_ESCAPE')?.properties?.tags).toContain('external/cwe/cwe-094');
+
+    const envExp = byRule('EXPRESSION_ENV_EXPOSURE');
+    expect(envExp.length).toBeGreaterThanOrEqual(1);
+    expect(envExp[0]).toMatchObject({ level: 'error', properties: { severity: 'HIGH', effect: 'SCORING', evidenceClass: 'SUSPICIOUS_SYNTAX' } });
+    expect(ruleDesc('EXPRESSION_ENV_EXPOSURE')?.properties?.tags).toContain('external/cwe/cwe-200');
+
+    const egress = byRule('AGENT_EGRESS_UNRESTRICTED');
+    expect(egress.length).toBeGreaterThanOrEqual(1);
+    expect(egress[0]).toMatchObject({ level: 'error', properties: { severity: 'HIGH', effect: 'SCORING', evidenceClass: 'CAPABILITY' } });
+    expect(ruleDesc('AGENT_EGRESS_UNRESTRICTED')?.properties?.tags).toEqual(
+      expect.arrayContaining(['external/cwe/cwe-918', 'owasp-agentic/excessive-agency']),
+    );
+
+    const triggerSink = byRule('UNAUTHENTICATED_TRIGGER_TO_SINK').filter((r) => r.locations?.[0]?.physicalLocation.artifactLocation.uri === 'v03-multi.json');
+    expect(triggerSink.length).toBeGreaterThanOrEqual(1);
+    expect(triggerSink[0]).toMatchObject({ level: 'error', properties: { severity: 'CRITICAL', effect: 'SCORING', evidenceClass: 'POTENTIAL_DATAFLOW' } });
+    expect(ruleDesc('UNAUTHENTICATED_TRIGGER_TO_SINK')?.properties?.tags).toContain('external/cwe/cwe-306');
+    expect(triggerSink[0].codeFlows?.[0]?.threadFlows[0]?.locations.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('respects beta-hardened@2.0.0 REPORT_ONLY effects and fails closed on tampered metadata or forged facts', () => {
+    const hardened = scanWorkflowV2({ bytes: v03Workflow, profile: { id: 'beta-hardened', version: '2.0.0' } });
+    expect(hardened.ok).toBe(true);
+    if (!hardened.ok) throw new Error('Expected beta-hardened scan to succeed');
+    const hardenedLog = buildBatchSarifV2([{ label: 'hardened.json', status: 'COMPLETED', result: hardened.result }]);
+    const hardenedRun = hardenedLog.runs[0] as unknown as TestRun;
+    expect(hardenedRun.results.find((r) => r.ruleId === 'EXPRESSION_SANDBOX_ESCAPE')?.properties?.effect).toBe('REPORT_ONLY');
+    expect(hardenedRun.results.find((r) => r.ruleId === 'JAVASCRIPT_DYNAMIC_EXECUTION')?.properties?.effect).toBe('REPORT_ONLY');
+
+    const standard = scanWorkflowV2({ bytes: v03Workflow, profile: { id: 'standard', version: '3.0.0' } });
+    expect(standard.ok).toBe(true);
+    if (!standard.ok) throw new Error('Expected standard scan to succeed');
+
+    const tamperedEffect = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'EXPRESSION_SANDBOX_ESCAPE' ? { ...f, effect: 'REPORT_ONLY' as const } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-effect.json', status: 'COMPLETED', result: tamperedEffect }])).toThrow(TypeError);
+
+    const tamperedSeverity = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'AGENT_EGRESS_UNRESTRICTED' ? { ...f, severity: 'LOW' as const } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-sev.json', status: 'COMPLETED', result: tamperedSeverity }])).toThrow(TypeError);
+
+    const tamperedClass = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'UNAUTHENTICATED_TRIGGER_TO_SINK' ? { ...f, evidenceClass: 'CAPABILITY' as const } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-class.json', status: 'COMPLETED', result: tamperedClass }])).toThrow(TypeError);
+
+    const tamperedFact = {
+      ...standard.result,
+      facts: standard.result.facts.map((fact) => (fact.kind === 'dataflow.summary.v2' && fact.properties.flowKind === 'TAINT_SINK'
+        ? { ...fact, properties: { ...fact.properties, flowKind: 'AGENT_INFLUENCE' } }
+        : fact)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-fact.json', status: 'COMPLETED', result: tamperedFact }])).toThrow(TypeError);
+
+    const tamperedRevision = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'EXPRESSION_ENV_EXPOSURE' ? { ...f, ruleRevision: '99' } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-rev.json', status: 'COMPLETED', result: tamperedRevision }])).toThrow(TypeError);
+
+    const tamperedConfidence = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'EXPRESSION_ENV_EXPOSURE' ? { ...f, confidence: 'LOW' as const } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-conf.json', status: 'COMPLETED', result: tamperedConfidence }])).toThrow(TypeError);
+
+    const tamperedRemediation = {
+      ...standard.result,
+      findings: standard.result.findings.map((f) => (f.ruleId === 'EXPRESSION_ENV_EXPOSURE' ? { ...f, remediationId: 'forged' } : f)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-rem.json', status: 'COMPLETED', result: tamperedRemediation }])).toThrow(TypeError);
+
+    const singleHop = scanWorkflowV2({ bytes: singleHopFieldFlowWorkflow, profile: { id: 'standard', version: '3.0.0' } });
+    expect(singleHop.ok).toBe(true);
+    if (!singleHop.ok) throw new Error('Expected single-hop scan to succeed');
+    const tamperedV3Sink = {
+      ...singleHop.result,
+      facts: singleHop.result.facts.map((fact) => (fact.kind === 'dataflow.summary.v3'
+        ? { ...fact, properties: { ...fact.properties, sinkClass: 'SQL' } }
+        : fact)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-v3.json', status: 'COMPLETED', result: tamperedV3Sink }])).toThrow(TypeError);
+
+    const tamperedExprLang = {
+      ...standard.result,
+      facts: standard.result.facts.map((fact) => (fact.kind === 'code.indicator.v2' && fact.properties.language === 'EXPRESSION'
+        ? { ...fact, properties: { ...fact.properties, language: 'JAVASCRIPT' } }
+        : fact)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-lang.json', status: 'COMPLETED', result: tamperedExprLang }])).toThrow(TypeError);
+
+    const tamperedEgressTools = {
+      ...standard.result,
+      facts: standard.result.facts.map((fact) => (fact.kind === 'node.capability.v2' && Array.isArray(fact.properties.capabilities) && fact.properties.capabilities.includes('AI_AGENT')
+        ? { ...fact, properties: { ...fact.properties, toolCount: 0 } }
+        : fact)),
+    };
+    expect(() => buildBatchSarifV2([{ label: 'tamper-egress.json', status: 'COMPLETED', result: tamperedEgressTools }])).toThrow(TypeError);
+
+    const legacySynthetic = {
+      ...baseResult([finding('N8N_EXECUTE_COMMAND'), { ...finding('N8N_EXECUTE_COMMAND'), ruleId: 'SYNTHETIC_UNKNOWN', effect: 'SCORING' as const }]),
+      profile: { id: 'legacy-custom', version: '1.0.0' },
+    };
+    const legacyLog = buildBatchSarifV2([{ label: 'legacy.json', status: 'COMPLETED', result: legacySynthetic }]);
+    const legacyRun = legacyLog.runs[0] as unknown as TestRun;
+    expect(legacyRun.results.map((r) => r.ruleId)).toEqual(['N8N_EXECUTE_COMMAND']);
+    expect(legacyRun.invocations[0].toolExecutionNotifications.some((n) => n.descriptor.id === 'UNKNOWN_SCORING_RULE')).toBe(true);
   });
 });

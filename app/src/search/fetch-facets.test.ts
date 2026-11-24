@@ -255,4 +255,37 @@ describe('fetchFacetsResult release binding', () => {
     const result = await fetchFacetsResult();
     expect(result.ok).toBe(true);
   });
+
+  it('reads searchable entryCount from .json.gzbin search artifacts in packed manifests', async () => {
+    const validText = facetsJsonText(2);
+    const incompleteText = facetsJsonText(1);
+    let serveIncomplete = true;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: 'manifest-v1',
+            generatedAt: '2026-01-01T00:00:00.000Z',
+            totalEntries: 4,
+            catalogueShards: {},
+            artifacts: [
+              artifact('search-index.json.gzbin', 1),
+              artifact('search-index-extended.json.gzbin', 1),
+              facetsArtifact(serveIncomplete ? incompleteText : validText),
+            ],
+          }),
+        } as unknown as Response;
+      }
+      return { ok: true, text: async () => (serveIncomplete ? incompleteText : validText) } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchFacetsResult()).resolves.toEqual({ ok: false, reason: 'incomplete', retryable: true });
+
+    resetManifestCache();
+    serveIncomplete = false;
+    await expect(fetchFacetsResult()).resolves.toMatchObject({ ok: true, data: { total: 2 } });
+  });
 });

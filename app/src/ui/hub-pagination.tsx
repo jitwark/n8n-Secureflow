@@ -36,6 +36,7 @@ export function HubPagination({ basePath, currentPage, totalPages }: HubPaginati
         {prevUrl ? (
           <Link
             href={prevUrl}
+            prefetch={false}
             className="px-3 py-1.5 rounded-control bg-panel border border-hairline text-ink font-bold hover:border-hairline-strong transition-colors"
             rel="prev"
           >
@@ -53,6 +54,7 @@ export function HubPagination({ basePath, currentPage, totalPages }: HubPaginati
           <>
             <Link
               href={pageUrl(1)}
+              prefetch={false}
               className={`px-3 py-1.5 rounded-control border border-hairline transition-colors ${
                 currentPage === 1
                   ? 'bg-ink border-ink text-page font-bold'
@@ -69,6 +71,7 @@ export function HubPagination({ basePath, currentPage, totalPages }: HubPaginati
           <Link
             key={p}
             href={pageUrl(p)}
+            prefetch={false}
             className={`px-3 py-1.5 rounded-control border border-hairline transition-colors ${
               currentPage === p
                 ? 'bg-ink border-ink text-page font-bold'
@@ -85,6 +88,7 @@ export function HubPagination({ basePath, currentPage, totalPages }: HubPaginati
             {end < publishedPages - 1 && <span className="text-ink-muted px-1">...</span>}
             <Link
               href={pageUrl(publishedPages)}
+              prefetch={false}
               className={`px-3 py-1.5 rounded-control border border-hairline transition-colors ${
                 currentPage === publishedPages
                   ? 'bg-ink border-ink text-page font-bold'
@@ -101,6 +105,7 @@ export function HubPagination({ basePath, currentPage, totalPages }: HubPaginati
         {nextUrl ? (
           <Link
             href={nextUrl}
+            prefetch={false}
             className="px-3 py-1.5 rounded-control bg-panel border border-hairline text-ink font-bold hover:border-hairline-strong transition-colors"
             rel="next"
           >

@@ -229,13 +229,14 @@ describe('scanWorkflowDormantHardenedV2 internal bridge seam', () => {
     }
   });
 
-  it('rejects hardened profile requests to the public scanWorkflowV2 with PROFILE_NOT_ADMITTED', () => {
+  it('rejects unadmitted profile requests to the public scanWorkflowV2 with PROFILE_NOT_ADMITTED', () => {
     const source = bytes('{"nodes":[],"connections":{}}');
-    const hardenedRequest = { bytes: source, profile: { id: 'beta-hardened', version: '2.0.0' } };
-    const resPublic = scanWorkflowV2(hardenedRequest);
+    const unadmittedRequest = { bytes: source, profile: { id: 'unadmitted-profile', version: '9.9.9' } };
+    const resPublic = scanWorkflowV2(unadmittedRequest);
     expect(resPublic.ok).toBe(false);
     if (resPublic.ok) throw new Error('Expected failure');
     expect(resPublic.code).toBe('PROFILE_NOT_ADMITTED');
+    expect(scanWorkflowV2({ bytes: source, profile: { id: 'standard', version: '3.0.0' } }).ok).toBe(true);
   });
 
   it('rejects oversized input with WORKFLOW_TOO_LARGE before enumerating properties or slicing bytes', () => {

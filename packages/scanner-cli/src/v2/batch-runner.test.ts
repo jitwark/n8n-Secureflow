@@ -187,10 +187,29 @@ describe('runBatchV2', () => {
     expect(result).toEqual({ ok: false, code: 'INVALID_CONFIG', message: 'Configuration is invalid.' });
   });
 
-  it('calls the scanner core by default for Uint8Array input', async () => {
+  it('calls the scanner core by default for Uint8Array input using standard@3.0.0', async () => {
     const result = await runBatchV2(base({ read: async () => encoder.encode('{"nodes":[],"connections":{}}') }));
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.items[0]?.status).toBe('COMPLETED');
+    if (result.ok) {
+      expect(result.items[0]?.status).toBe('COMPLETED');
+      if (result.items[0]?.result?.ok) {
+        expect(result.items[0].result.result.profile).toEqual({ id: 'standard', version: '3.0.0' });
+      }
+    }
+  });
+
+  it('rejects a worker result whose profile disagrees with the configured profile', async () => {
+    const result = await runBatchV2(base({
+      config: { ...DEFAULT_SCAN_CONFIG_V2, profile: 'strict' },
+      scan: async () => ({
+        ok: true,
+        result: {
+          profile: { id: 'beta-default', version: '2.0.0' },
+        } as never,
+      }),
+    }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.items[0]).toMatchObject({ status: 'FAILED', error: { code: 'TOOL_INVARIANT_FAILED' } });
   });
 
   it('does not perform network I/O', async () => {

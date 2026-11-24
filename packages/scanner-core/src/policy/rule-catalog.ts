@@ -114,4 +114,8 @@ export const betaHardenedRuleCatalog: readonly RuleCatalogEntry[] = [
   // also defensible, but the OWASP Agentic "Excessive Agency" pairing does the precise work
   // either way, so CWE-269 is kept per docs/scanner/policy-inventory.md.
   reportOnlyRule('AI_AGENT_UNGATED_TOOL', 'MEDIUM', 'LOW', 'LOW', ['CWE-269'], ['Excessive Agency']),
+  reportOnlyRule('EXPRESSION_SANDBOX_ESCAPE', 'CRITICAL', 'HIGH', 'HIGH', ['CWE-94']),
+  reportOnlyRule('EXPRESSION_ENV_EXPOSURE', 'HIGH', 'HIGH', 'HIGH', ['CWE-200']),
+  reportOnlyRule('AGENT_EGRESS_UNRESTRICTED', 'HIGH', 'MEDIUM', 'MEDIUM', ['CWE-918'], ['Excessive Agency']),
+  reportOnlyRule('UNAUTHENTICATED_TRIGGER_TO_SINK', 'CRITICAL', 'HIGH', 'HIGH', ['CWE-306']),
 ];

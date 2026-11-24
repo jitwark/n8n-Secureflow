@@ -128,7 +128,7 @@ describe('ReportResult', () => {
 
     const heading = screen.getByRole('heading', { name: 'Decision and next step' });
     await waitFor(() => expect(document.activeElement).toBe(heading));
-    expect(screen.getByRole('heading', { name: 'Analysis coverage' })).not.toBe(heading);
+    expect(screen.getByRole('heading', { name: 'Analysis coverage', hidden: true })).not.toBe(heading);
   });
 
   it('keeps the v1 report shape and grade when no v2 model is attached', () => {
@@ -193,33 +193,32 @@ describe('ReportResult', () => {
     expect(screen.queryByText(/Analysis complete\./)).toBeNull();
   });
 
-  it('renders a graded degraded v2 envelope with both coverage codes and its retained, redacted finding', () => {
+  it('renders a graded COMPLETE v2 envelope with catalogue-miss info diagnostics and its retained, redacted finding', () => {
     const scan = reportModel(fixture('fallback.json'));
-    expect(scan.v2.analysis.status).toBe('DEGRADED');
+    expect(scan.v2.analysis.status).toBe('COMPLETE');
     expect(scan.assessment).not.toBeNull();
 
     const { container } = renderReport(scan);
 
-    expect(screen.getByLabelText('Analysis status: Standard scan')).toBeTruthy();
-    expect(screen.getAllByText(/Some node behavior is not modelled/i).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Analysis status: Analysis complete')).toBeTruthy();
     expect(screen.getByText(`${scan.assessment!.grade} risk`)).toBeTruthy();
-    expect(screen.getByText('SEMANTIC_CATALOGUE_MISS · DEGRADED')).toBeTruthy();
-    expect(screen.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · DEGRADED')).toBeTruthy();
+    expect(screen.getByText('SEMANTIC_CATALOGUE_MISS · NONE')).toBeTruthy();
+    expect(screen.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · NONE')).toBeTruthy();
     expect(screen.getByText('Workflow parameters contain raw secret material')).toBeTruthy();
     expect(screen.getAllByText('RAW_SECRET_INDICATOR', { exact: true }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('HIGH').length).toBeGreaterThan(0);
     expect(container.textContent).not.toContain(RAW_SECRET);
   });
 
-  it('labels a real readable unmodelled node Standard scan with the model caveat', () => {
+  it('keeps COMPLETE status cleanly when a readable unmodelled custom node is scanned', () => {
     const scan = reportModel(UNKNOWN_INNOCENT);
-    expect(scan.v2.analysis.status).toBe('DEGRADED');
+    expect(scan.v2.analysis.status).toBe('COMPLETE');
     expect(scan.assessment).not.toBeNull();
 
     renderReport(scan);
 
-    expect(screen.getByLabelText('Analysis status: Standard scan')).toBeTruthy();
-    expect(screen.getAllByText(/Some node behavior is not modelled/i).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Analysis status: Analysis complete')).toBeTruthy();
+    expect(screen.queryByText('Partial analysis')).toBeNull();
     expect(screen.queryByText('No grade')).toBeNull();
   });
 
@@ -236,5 +235,62 @@ describe('ReportResult', () => {
     expect(screen.queryByLabelText(/^Risk score:/)).toBeNull();
     expect(screen.queryByText(/^(?:LOW|MEDIUM|HIGH|CRITICAL) risk$/)).toBeNull();
     expect(screen.getByText(/Analysis did not complete; no findings can be treated as conclusive/)).toBeTruthy();
+  });
+
+  it('renders Webhook -> ExecuteCommand under standard@3.0.0 with CRITICAL alert styling, taint/trigger findings, no unregistered fact noise, and Technical details collapsed', () => {
+    const webhookRce = JSON.stringify({
+      name: 'Webhook RCE',
+      nodes: [
+        { id: 'w1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 1, parameters: { path: 'run', httpMethod: 'POST' } },
+        { id: 'e1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: '={{ $json.body.cmd }}' } },
+      ],
+      connections: { Webhook: { main: [[{ node: 'Exec', type: 'main', index: 0 }]] } },
+    });
+    const outcome = scanWorkflowV2({
+      bytes: Uint8Array.from(new TextEncoder().encode(webhookRce)),
+      profile: { id: 'standard', version: '3.0.0' },
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error(outcome.code);
+    const scan = toScannerReportModelV2(outcome.result);
+
+    const { container } = renderReport(scan);
+    const decisionSection = container.querySelector('section[aria-labelledby="scanner-decision-heading"]')!;
+    expect(decisionSection.className).toContain('border-sev-critical');
+    expect(decisionSection.className).not.toContain('bg-accent-dim');
+    expect(screen.getByText('CRITICAL risk')).toBeTruthy();
+    expect(screen.getAllByText('TAINTED_COMMAND', { exact: true }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('UNAUTHENTICATED_TRIGGER_TO_SINK', { exact: true }).length).toBeGreaterThan(0);
+
+    const details = container.querySelector('#scanner-technical-details') as HTMLDetailsElement | null;
+    expect(details).toBeTruthy();
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector('summary')?.textContent).toContain('Technical details');
+    expect(container.textContent).not.toContain('Properties are not displayed for an unregistered fact kind.');
+  });
+
+  it('keeps an unmodelled custom node COMPLETE under standard@3.0.0 without Partial analysis or GRAPH_ANALYSIS_DEGRADED alarms', () => {
+    const customWorkflow = JSON.stringify({
+      name: 'Custom node flow',
+      nodes: [
+        { id: 's1', name: 'Start', type: 'n8n-nodes-base.manualTrigger', typeVersion: 1, parameters: {} },
+        { id: 'c1', name: 'Custom', type: '@acme/custom-node.enrich', typeVersion: 1, parameters: { value: '={{ $json.ok }}' } },
+      ],
+      connections: { Start: { main: [[{ node: 'Custom', type: 'main', index: 0 }]] } },
+    });
+    const outcome = scanWorkflowV2({
+      bytes: Uint8Array.from(new TextEncoder().encode(customWorkflow)),
+      profile: { id: 'standard', version: '3.0.0' },
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error(outcome.code);
+    expect(outcome.result.analysis.status).toBe('COMPLETE');
+    const scan = toScannerReportModelV2(outcome.result);
+
+    const { container } = renderReport(scan);
+    expect(screen.getByLabelText('Analysis status: Analysis complete')).toBeTruthy();
+    expect(container.textContent).not.toContain('Partial analysis');
+    expect(container.textContent).not.toContain('GRAPH_ANALYSIS_DEGRADED');
+    expect(container.textContent).not.toContain('Properties are not displayed for an unregistered fact kind.');
   });
 });

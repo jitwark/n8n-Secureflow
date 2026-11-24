@@ -19,20 +19,52 @@ describe('CLI v2 explicit configuration', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.config).toEqual(DEFAULT_SCAN_CONFIG_V2);
-    expect(result.config.profile).toBe('beta-default');
+    expect(result.config.profile).toBe('standard');
     expect(result.config).toEqual(expect.objectContaining({ format: 'json', failOn: 'INFO', concurrency: 1 }));
     expect(Object.isFrozen(result.config)).toBe(true);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.config.include)).toBe(true);
   });
 
-  it('accepts the pinned profile and built-in authority markers only', () => {
-    const result = load({ ...base, profile: `${ADMITTED_PROFILE_V2.id}@${ADMITTED_PROFILE_V2.version}`, rules: 'builtin', catalogue: 'builtin' });
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.config.profile).toBe('beta-default');
+  it('accepts all four admitted profiles, version pins, and the ci alias', () => {
+    const cases: readonly [string, string][] = [
+      ['standard', 'standard'],
+      ['standard@3.0.0', 'standard'],
+      ['strict', 'strict'],
+      ['strict@3.0.0', 'strict'],
+      ['ci', 'strict'],
+      [`${ADMITTED_PROFILE_V2.id}@${ADMITTED_PROFILE_V2.version}`, 'beta-default'],
+      ['beta-default', 'beta-default'],
+      ['beta-hardened', 'beta-hardened'],
+      ['beta-hardened@2.0.0', 'beta-hardened'],
+    ];
+    for (const [specifier, canonical] of cases) {
+      const result = load({ ...base, profile: specifier, rules: 'builtin', catalogue: 'builtin' });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.config.profile).toBe(canonical);
+    }
     expect(BUILTIN_AUTHORITIES_V2.rules.signatureStatus).toBe('VERIFIED');
     expect(BUILTIN_AUTHORITIES_V2.semantics.id).toBe('scanner-core-builtins');
+  });
+
+  it('accepts v0.3 formats, NONE failOn, minSeverity, minConfidence, and local baseline paths', () => {
+    for (const format of ['pretty', 'markdown', 'table', 'json', 'ndjson', 'sarif'] as const) {
+      const result = load({ ...base, format, failOn: 'NONE', minSeverity: 'HIGH', minConfidence: 'MEDIUM', baseline: '.\\baselines\\known.json' });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.config).toEqual(expect.objectContaining({
+          format, failOn: 'NONE', minSeverity: 'HIGH', minConfidence: 'MEDIUM', baseline: 'baselines/known.json',
+        }));
+      }
+    }
+    for (const bad of [
+      { ...base, minSeverity: 'NONE' },
+      { ...base, minConfidence: 'CRITICAL' },
+      { ...base, baseline: '../secret.json' },
+      { ...base, baseline: 'builtin' },
+    ]) {
+      expect(load(bad)).toMatchObject({ ok: false, code: 'INVALID_CONFIG' });
+    }
   });
 
   it('replaces config scalars and arrays with CLI values', () => {

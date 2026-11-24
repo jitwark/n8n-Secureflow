@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ADMITTED_PROFILE_MANIFESTS_V2,
   BETA_DEFAULT_PROFILE_MANIFEST,
   BETA_HARDENED_PROFILE_MANIFEST,
+  DEFAULT_PROFILE_REF,
+  STANDARD_PROFILE_MANIFEST,
+  STRICT_PROFILE_MANIFEST,
   computeProfileManifestDigest,
   isProfileAdmitted,
+  resolveAdmittedProfileManifest,
   validateProfileManifest,
   type ProfileManifestV2,
 } from './profile-manifest';
@@ -26,16 +31,31 @@ function copyManifest(manifest: ProfileManifestV2, capabilities = manifest.capab
 }
 
 describe('profile manifests', () => {
-  it('defines exact frozen manifests and admits only beta-default', () => {
+  it('defines exact frozen manifests and admits beta-default, beta-hardened, standard, and strict', () => {
     const defaultResult = validateProfileManifest(BETA_DEFAULT_PROFILE_MANIFEST, registryFor(BETA_DEFAULT_PROFILE_MANIFEST));
     const hardenedResult = validateProfileManifest(BETA_HARDENED_PROFILE_MANIFEST, registryFor(BETA_HARDENED_PROFILE_MANIFEST));
+    const standardResult = validateProfileManifest(STANDARD_PROFILE_MANIFEST, registryFor(STANDARD_PROFILE_MANIFEST));
+    const strictResult = validateProfileManifest(STRICT_PROFILE_MANIFEST, registryFor(STRICT_PROFILE_MANIFEST));
+    const syntheticBody = { ...STANDARD_PROFILE_MANIFEST, id: 'custom-profile' };
+    const { digest: _removed, ...syntheticCleanBody } = syntheticBody;
+    const synthetic = Object.freeze({ ...syntheticCleanBody, digest: computeProfileManifestDigest(syntheticCleanBody) });
 
     expect(defaultResult).toMatchObject({ ok: true, manifest: BETA_DEFAULT_PROFILE_MANIFEST });
     expect(Object.isFrozen(defaultResult)).toBe(true);
-    expect(hardenedResult).toMatchObject({ ok: false, code: 'PROFILE_MANIFEST_NOT_ADMITTED', reason: 'PROFILE_NOT_ADMITTED' });
-    expect(validateProfileManifest(BETA_HARDENED_PROFILE_MANIFEST, registryFor(BETA_DEFAULT_PROFILE_MANIFEST))).toMatchObject({ ok: false, code: 'PROFILE_MANIFEST_NOT_ADMITTED', reason: 'PROFILE_NOT_ADMITTED' });
+    expect(hardenedResult).toMatchObject({ ok: true, manifest: BETA_HARDENED_PROFILE_MANIFEST });
+    expect(standardResult).toMatchObject({ ok: true, manifest: STANDARD_PROFILE_MANIFEST });
+    expect(strictResult).toMatchObject({ ok: true, manifest: STRICT_PROFILE_MANIFEST });
+    expect(validateProfileManifest(BETA_HARDENED_PROFILE_MANIFEST, registryFor(BETA_DEFAULT_PROFILE_MANIFEST))).toMatchObject({ ok: false, code: 'PROFILE_MANIFEST_INVALID', reason: 'UNKNOWN_CAPABILITY' });
+    expect(DEFAULT_PROFILE_REF).toEqual({ id: 'standard', version: '3.0.0' });
+    expect(ADMITTED_PROFILE_MANIFESTS_V2).toHaveLength(4);
     expect(isProfileAdmitted(BETA_DEFAULT_PROFILE_MANIFEST)).toBe(true);
-    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(false);
+    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(true);
+    expect(isProfileAdmitted(STANDARD_PROFILE_MANIFEST)).toBe(true);
+    expect(isProfileAdmitted(STRICT_PROFILE_MANIFEST)).toBe(true);
+    expect(isProfileAdmitted(synthetic)).toBe(false);
+    expect(resolveAdmittedProfileManifest({ id: 'standard', version: '3.0.0' })).toBe(STANDARD_PROFILE_MANIFEST);
+    expect(resolveAdmittedProfileManifest({ id: 'strict', version: '3.0.0' })).toBe(STRICT_PROFILE_MANIFEST);
+    expect(resolveAdmittedProfileManifest({ id: 'custom-profile', version: '3.0.0' })).toBeUndefined();
     expect(Object.isFrozen(BETA_DEFAULT_PROFILE_MANIFEST)).toBe(true);
     expect(Object.isFrozen(BETA_DEFAULT_PROFILE_MANIFEST.capabilities[0])).toBe(true);
     expect(BETA_DEFAULT_PROFILE_MANIFEST.capabilities.map(({ id }) => id)).toEqual([
@@ -56,10 +76,14 @@ describe('profile manifests', () => {
       TAINTED_FILE_PATH: 'taint-integrity', TAINTED_CODE_INPUT: 'taint-integrity',
       TAINTED_REQUEST_HEADER: 'taint-integrity', TAINTED_AI_PROMPT: 'taint-integrity',
       AI_AGENT_UNGATED_TOOL: 'agentic-control',
+      EXPRESSION_SANDBOX_ESCAPE: 'expression-security',
+      EXPRESSION_ENV_EXPOSURE: 'expression-security',
+      AGENT_EGRESS_UNRESTRICTED: 'agentic-control',
+      UNAUTHENTICATED_TRIGGER_TO_SINK: 'graph-semantics',
     } as const;
-    const actualOwnership = new Map(BETA_HARDENED_PROFILE_MANIFEST.capabilities.flatMap(({ id, ruleIds }) => ruleIds.map((ruleId) => [ruleId, id] as const)));
+    const actualOwnership = new Map(STANDARD_PROFILE_MANIFEST.capabilities.flatMap(({ id, ruleIds }) => ruleIds.map((ruleId) => [ruleId, id] as const)));
     expect(actualOwnership).toEqual(new Map(Object.entries(expectedOwnership)));
-    expect(actualOwnership.size).toBe(17);
+    expect(actualOwnership.size).toBe(21);
   });
   it('defines the exact capability order, requiredness, and dependency frontier', () => {
     expect(BETA_DEFAULT_PROFILE_MANIFEST.capabilities.map(({ id, required, dependsOn, ruleIds }) => [id, required, dependsOn, ruleIds])).toEqual([
@@ -223,7 +247,7 @@ describe('profile manifests', () => {
     const extraSymbolCapabilities = BETA_DEFAULT_PROFILE_MANIFEST.capabilities.slice();
     Object.defineProperty(extraSymbolCapabilities, Symbol('overflow'), { value: true });
     const oversizedDependency = copyManifest(BETA_DEFAULT_PROFILE_MANIFEST, BETA_DEFAULT_PROFILE_MANIFEST.capabilities.map((capability, index) => index === 0
-      ? { ...capability, dependsOn: new Array(18).fill('source-normalization') } : capability));
+      ? { ...capability, dependsOn: new Array(65).fill('source-normalization') } : capability));
     expect(validateProfileManifest({ ...BETA_DEFAULT_PROFILE_MANIFEST, capabilities: oversizedCapabilities }, registryFor(BETA_DEFAULT_PROFILE_MANIFEST))).toMatchObject({ ok: false });
     expect(validateProfileManifest({ ...BETA_DEFAULT_PROFILE_MANIFEST, capabilities: extraKeyCapabilities }, registryFor(BETA_DEFAULT_PROFILE_MANIFEST))).toMatchObject({ ok: false });
     expect(validateProfileManifest({ ...BETA_DEFAULT_PROFILE_MANIFEST, capabilities: extraSymbolCapabilities }, registryFor(BETA_DEFAULT_PROFILE_MANIFEST))).toMatchObject({ ok: false });

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADMITTED_PROFILE_SPECIFIERS_V2, ADMITTED_PROFILE_V2 } from './contracts';
+import { ADMITTED_PROFILE_SPECIFIERS_V2, ADMITTED_PROFILE_V2, CLI_VERSION_V2, DEFAULT_PROFILE_V3, resolveAdmittedProfileV2 } from './contracts';
 import { loadExplicitConfig } from './config';
 import { MCP_TOOL_NAME, handleMcpRequest, runMcpStdio, type McpResponse } from './mcp';
 
@@ -14,7 +14,13 @@ import { MCP_TOOL_NAME, handleMcpRequest, runMcpStdio, type McpResponse } from '
  */
 const fixtureDirectory = fileURLToPath(new URL('./__fixtures__', import.meta.url));
 const INPUT = 'clean-workflow.json';
-const UNADMITTED_PROFILES = ['beta-hardened', `${ADMITTED_PROFILE_V2.id}@9.9.9`, `${ADMITTED_PROFILE_V2.id}@${ADMITTED_PROFILE_V2.version}.1`, 'Beta-Default'];
+const UNADMITTED_PROFILES = [
+  'unknown-profile',
+  `${DEFAULT_PROFILE_V3.id}@9.9.9`,
+  `${ADMITTED_PROFILE_V2.id}@9.9.9`,
+  `${ADMITTED_PROFILE_V2.id}@${ADMITTED_PROFILE_V2.version}.1`,
+  'Beta-Default',
+];
 
 async function scanUnderMcpProfile(profile: string): Promise<McpResponse | null> {
   return handleMcpRequest(
@@ -33,17 +39,22 @@ describe('MCP and CLI-config profile admission', () => {
   });
 
   it('runs every admitted specifier past the config loader and the MCP tool alike', async () => {
-    const canonical = await scanUnderMcpProfile(ADMITTED_PROFILE_V2.id);
-    expect(canonical?.error).toBeUndefined();
-    expect((canonical?.result as { isError?: boolean } | undefined)?.isError).toBe(false);
+    const canonicalByProfile = new Map<string, McpResponse | null>();
+    for (const id of ['standard', 'strict', 'beta-default', 'beta-hardened']) {
+      const canonical = await scanUnderMcpProfile(id);
+      expect(canonical?.error).toBeUndefined();
+      expect((canonical?.result as { isError?: boolean } | undefined)?.isError).toBe(false);
+      canonicalByProfile.set(id, canonical);
+    }
 
     for (const specifier of ADMITTED_PROFILE_SPECIFIERS_V2) {
+      const expectedId = resolveAdmittedProfileV2(specifier)?.id;
+      expect(expectedId).toBeDefined();
       const configured = loadExplicitConfig({ schemaVersion: 'n8n-scan-config-v2', profile: specifier });
       expect(configured.ok).toBe(true);
-      if (!configured.ok) continue;
-      expect(configured.config.profile).toBe(ADMITTED_PROFILE_V2.id);
-      // An `id@version` pin is the same admission, not a second one: the scan is identical.
-      expect(await scanUnderMcpProfile(specifier)).toEqual(canonical);
+      if (!configured.ok || !expectedId) continue;
+      expect(configured.config.profile).toBe(expectedId);
+      expect(await scanUnderMcpProfile(specifier)).toEqual(canonicalByProfile.get(expectedId));
     }
   });
 
@@ -97,7 +108,7 @@ describe('MCP stdio transport', () => {
       { jsonrpc: '2.0', id: 3, error: { code: -32601, message: 'Method not found.' } },
       { jsonrpc: '2.0', id: 4, error: { code: -32602, message: 'Invalid n8n_scan arguments.' } },
       { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON.' } },
-      { jsonrpc: '2.0', id: 6, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'n8n-secureflow-scanner', version: '0.1.0' } } },
+      { jsonrpc: '2.0', id: 6, result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'n8n-secureflow-scanner', version: CLI_VERSION_V2 } } },
     ]);
   });
 

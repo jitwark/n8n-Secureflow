@@ -73,20 +73,21 @@ describe('scanner fail-open mutation canaries', () => {
 
   it('never restores unknown-rule fallback, and keeps unreadable semantics fail-closed', () => {
     // The posture change is labelled, not silent: an uncatalogued node is scanned under the generic
-    // fallback and says so (degraded advisory), and a node whose parameters were not readable still
+    // fallback and says so (NONE advisory), and a node whose parameters were not readable still
     // withholds the verdict instead of being assumed assessable.
     const uncatalogued = v2('{"nodes":[{"id":"custom","name":"Custom","type":"@example/custom-node.unknown","parameters":{}}],"connections":{}}');
     expect(uncatalogued).toMatchObject({ ok: true });
     if (uncatalogued.ok) {
-      expect(uncatalogued.result.analysis.status).toBe('DEGRADED');
-      expect(uncatalogued.result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'DEGRADED', assessmentEligible: true }));
+      expect(uncatalogued.result.analysis.status).toBe('COMPLETE');
+      expect(uncatalogued.result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true }));
     }
     const unreadable = v2('{"nodes":[{"id":"custom","name":"Custom","type":"@example/custom-node.unknown","parameters":"not-an-object"}],"connections":{}}');
     expect(unreadable).toMatchObject({ ok: true });
     if (unreadable.ok) {
       expect(unreadable.result.analysis.status).toBe('INDETERMINATE');
       expect(unreadable.result.assessment).toBeNull();
-      expect(unreadable.result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'INDETERMINATE' }));
+      expect(unreadable.result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'MALFORMED_NODE_PARAMETERS', aggregateEffect: 'INDETERMINATE', assessmentEligible: false }));
+      expect(unreadable.result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true }));
     }
     expect(projectResultV2ToV1({ ...V2_PROJECTION_FIXTURE, findings: [{ ...V2_PROJECTION_FIXTURE.findings[0]!, ruleId: 'UNKNOWN_RULE' }] })).toMatchObject({ ok: false, reason: 'UNKNOWN_RULE' });
   });

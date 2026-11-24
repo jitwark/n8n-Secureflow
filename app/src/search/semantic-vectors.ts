@@ -1,4 +1,11 @@
 import { sitePath } from '../ui/site-url.mjs';
+import {
+  decodeResponsePayload,
+  getKnownManifest,
+  readResponseBytes,
+  resolvePackedPath,
+  setKnownManifest,
+} from './artifact-integrity';
 
 /**
  * When the semantic vectors are fetched, and who hears about it.
@@ -56,9 +63,13 @@ export function requestSemanticVectors(
   void (async () => {
     try {
       if (typeof fetch !== 'function') return;
-      const response = await fetch(sitePath('/data/semantic-index.json'));
+      const { loadManifest } = await import('../catalogue/manifest');
+      const manifest = getKnownManifest() ?? (await loadManifest().catch(() => undefined));
+      if (manifest) setKnownManifest(manifest);
+      const resolved = resolvePackedPath(manifest, 'semantic-index.json');
+      const response = await fetch(sitePath(`/data/${resolved.path}`));
       if (!response.ok || !isCurrent()) return;
-      const json = await response.text();
+      const json = await decodeResponsePayload(await readResponseBytes(response));
       if (isCurrent()) deliver(json);
     } catch {
       // A failed vector fetch degrades ranking; it never breaks search. Allow a

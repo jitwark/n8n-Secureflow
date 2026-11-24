@@ -19,6 +19,7 @@ import {
   EAGER,
   gzipSize,
   referencedDataFiles,
+  stripPackSuffix,
 } from './lib/bundle-data-budget.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -143,10 +144,12 @@ for (const name of EAGER) {
   else eagerBytes += size;
 }
 
-const unclassified = (await referencedDataFiles(outDir)).filter(
-  (name) => !EAGER.includes(name) && !DEFERRED.includes(name)
-    && !DEFERRED_PREFIXES.some((prefix) => name.startsWith(prefix)),
-);
+const unclassified = (await referencedDataFiles(outDir)).filter((name) => {
+  const canonical = stripPackSuffix(name);
+  return !EAGER.includes(name) && !EAGER.includes(canonical)
+    && !DEFERRED.includes(name) && !DEFERRED.includes(canonical)
+    && !DEFERRED_PREFIXES.some((prefix) => name.startsWith(prefix));
+});
 
 const eagerMb = eagerBytes / 1048576;
 process.stdout.write(

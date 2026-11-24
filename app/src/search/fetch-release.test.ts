@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { resetManifestCache } from '../catalogue/manifest';
-import { fetchSearchIndexWithRelease } from './fetch-index';
+import {
+  fetchSearchIndexWithRelease,
+  sameSearchReleaseIdentity,
+  searchReleaseIdentityFromManifest,
+} from './fetch-index';
 
 const emptyIndex = JSON.stringify({
   documentCount: 0,
@@ -77,5 +82,80 @@ describe('search release identity', () => {
     } as Response);
 
     await expect(fetchSearchIndexWithRelease(vi.fn())).rejects.toMatchObject({ kind: 'schema' });
+  });
+
+  it('prefers search-index.json.gzbin in manifest, tracks streaming progress, verifies compressed bytes, and decompresses', async () => {
+    const gz = new Uint8Array(gzipSync(Buffer.from(emptyIndex, 'utf8')));
+    const gzSha = bytesToHex(sha256(gz));
+    const report = vi.fn();
+    const mid = Math.floor(gz.byteLength / 2);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(gz.slice(0, mid));
+        controller.enqueue(gz.slice(mid));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: 'manifest-v1',
+            generatedAt: '2026-08-30T00:00:00.000Z',
+            totalEntries: 0,
+            catalogueShards: {},
+            artifacts: [
+              { path: 'search-index.json.gzbin', byteSize: gz.byteLength, sha256: gzSha },
+            ],
+          }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        headers: new Headers({ 'content-length': String(gz.byteLength) }),
+        body: stream,
+      } as unknown as Response;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+
+    const result = await fetchSearchIndexWithRelease(report);
+    expect(result).toMatchObject({
+      indexJson: emptyIndex,
+      identity: { searchIndexSha256: gzSha },
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/data/search-index.json.gzbin'))).toBe(true);
+    expect(report).toHaveBeenCalledTimes(2);
+    expect(report).toHaveBeenLastCalledWith(gz.byteLength, gz.byteLength);
+  });
+
+  it('matches a pre-pack manifest identity when a valid packed search-index.json.gzbin decompresses to identical JSON', async () => {
+    const gz = new Uint8Array(gzipSync(Buffer.from(emptyIndex, 'utf8')));
+    const gzSha = bytesToHex(sha256(gz));
+    const prePackIdentity = searchReleaseIdentityFromManifest(manifestFor(emptyIndex) as never);
+    const differentPrePackIdentity = searchReleaseIdentityFromManifest(
+      manifestFor(emptyIndex.replace('"nextId":0', '"nextId":1')) as never,
+    );
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).includes('manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: 'manifest-v1',
+            generatedAt: '2026-08-30T00:00:00.000Z',
+            totalEntries: 0,
+            catalogueShards: {},
+            artifacts: [{ path: 'search-index.json.gzbin', byteSize: gz.byteLength, sha256: gzSha }],
+          }),
+        } as unknown as Response;
+      }
+      return { ok: true, headers: new Headers(), arrayBuffer: async () => gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) } as unknown as Response;
+    });
+
+    const result = await fetchSearchIndexWithRelease(vi.fn());
+    expect(sameSearchReleaseIdentity(prePackIdentity, result.identity)).toBe(true);
+    expect(sameSearchReleaseIdentity(differentPrePackIdentity, result.identity)).toBe(false);
   });
 });

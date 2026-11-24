@@ -38,9 +38,9 @@ describe('generic node semantic fallback', () => {
 
     expect(coverage(result)).toEqual(['SEMANTIC_CATALOGUE_MISS', 'GENERIC_NODE_UNMODELED_CAPABILITY']);
     expect(result.analysis.diagnostics).toContainEqual(
-      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'DEGRADED', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/1' }) }),
+      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/1' }) }),
     );
-    expect(result.analysis.status).not.toBe('INDETERMINATE');
+    expect(result.analysis.status).toBe('COMPLETE');
     expect(result.assessment).not.toBeNull();
     expect(rules(result)).toContain('RAW_SECRET_INDICATOR');
     const secret = result.findings.find(({ ruleId }) => ruleId === 'RAW_SECRET_INDICATOR');
@@ -77,8 +77,11 @@ describe('generic node semantic fallback', () => {
 
     expect(result.analysis.status).toBe('INDETERMINATE');
     expect(result.assessment).toBeNull();
+    expect(result.analysis.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'MALFORMED_NODE_PARAMETERS', aggregateEffect: 'INDETERMINATE', assessmentEligible: false, location: expect.objectContaining({ pointer: '/nodes/1/parameters' }) }),
+    );
     expect(misses(result)).toEqual([
-      expect.objectContaining({ aggregateEffect: 'INDETERMINATE', assessmentEligible: false, location: expect.objectContaining({ pointer: '/nodes/1' }) }),
+      expect.objectContaining({ aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/1' }) }),
     ]);
   });
 
@@ -88,7 +91,8 @@ describe('generic node semantic fallback', () => {
 
     expect(result.analysis.status).toBe('INDETERMINATE');
     expect(result.assessment).toBeNull();
-    expect(misses(result)).toEqual([expect.objectContaining({ aggregateEffect: 'INDETERMINATE', assessmentEligible: false })]);
+    expect(result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'DUPLICATE_SECURITY_KEY', aggregateEffect: 'INDETERMINATE', assessmentEligible: false }));
+    expect(misses(result)).toEqual([expect.objectContaining({ aggregateEffect: 'NONE', assessmentEligible: true })]);
   });
 
   it('leaves a node whose type member is unreadable fail-closed at the scan boundary', () => {

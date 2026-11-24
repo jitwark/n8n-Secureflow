@@ -121,19 +121,17 @@ describe('reviewed Webhook v1 to ExecuteCommand v1 model', () => {
     expect(model).toEqual({ status: 'UNKNOWN', reason });
   });
 
-  it('publishes an applicable model failure internally as UNKNOWN', () => {
+  it('publishes an unmodeled flow pair internally as COMPLETE with zero-flow coverage and no diagnostics', () => {
     const value = { ...positive, nodes: [positive.nodes[0], { ...positive.nodes[1], parameters: { command: 'echo fixed' } }] };
     const { workflow, semantics } = compile(JSON.stringify(value));
     const analysis = compileWorkflowFlowWitnesses({ workflow, semantics, limits: DEFAULT_SCANNER_LIMITS_V2,
       semanticSha256: '0'.repeat(64) });
-    expect(analysis.status).toBe('UNKNOWN');
-    expect(analysis.facts).toEqual([]);
+    expect(analysis.status).toBe('COMPLETE');
+    expect(analysis.facts).toHaveLength(1);
+    expect(analysis.facts[0]).toMatchObject({ kind: 'dataflow.coverage.v1',
+      properties: { coverageStatus: 'COMPLETE', fieldsExamined: 0, emittedFlows: 0 } });
     expect(analysis.traces).toEqual([]);
-    expect(analysis.diagnostics).toHaveLength(1);
-    expect(analysis.diagnostics[0]).toMatchObject({ code: 'GRAPH_ANALYSIS_DEGRADED',
-      capabilityId: 'structural-policies', aggregateEffect: 'DEGRADED', assessmentEligible: true,
-      observed: 1, omitted: 0 });
-    expect(analysis.diagnostics[0]).not.toHaveProperty('maximum');
+    expect(analysis.diagnostics).toEqual([]);
   });
 
   it('returns DISCONNECTED without inventing a ManualTrigger source', () => {

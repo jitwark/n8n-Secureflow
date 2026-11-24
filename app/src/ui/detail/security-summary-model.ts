@@ -10,10 +10,10 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 };
 
 const SEVERITY_CLASS: Record<Severity, string> = {
-  CRITICAL: 'border-sev-critical/50 bg-sev-critical/10 text-sev-critical',
-  HIGH: 'border-sev-high/50 bg-sev-high/10 text-sev-high',
-  MEDIUM: 'border-sev-medium/50 bg-sev-medium/10 text-sev-medium',
-  LOW: 'border-sev-low/50 bg-sev-low/10 text-sev-low',
+  CRITICAL: 'border-sev-critical bg-sev-critical/10 text-sev-critical',
+  HIGH: 'border-sev-high bg-sev-high/10 text-sev-high',
+  MEDIUM: 'border-sev-medium bg-sev-medium/10 text-sev-medium',
+  LOW: 'border-sev-low bg-sev-low/10 text-sev-low',
   INFO: 'border-hairline bg-raised text-ink-muted',
 };
 
@@ -23,10 +23,10 @@ export type StatusToneClasses = {
 };
 
 const STATUS_TONE_CLASS: Record<AnalysisTone, StatusToneClasses> = {
-  complete: { panel: 'border-sev-low/40 bg-sev-low/5', label: 'text-sev-low' },
+  complete: { panel: 'border-sev-low bg-sev-low/5', label: 'text-sev-low' },
   neutral: { panel: 'border-hairline bg-raised/50', label: 'text-ink-muted' },
-  caution: { panel: 'border-sev-medium/50 bg-sev-medium/10', label: 'text-sev-medium' },
-  warning: { panel: 'border-sev-high/50 bg-sev-high/10', label: 'text-sev-high' },
+  caution: { panel: 'border-sev-medium bg-sev-medium/10', label: 'text-sev-medium' },
+  warning: { panel: 'border-sev-high bg-sev-high/10', label: 'text-sev-high' },
 };
 
 export type SecuritySummaryModel = {

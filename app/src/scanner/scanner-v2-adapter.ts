@@ -1,11 +1,12 @@
 import { validateScannerResultV2, type ScannerResultV2 } from '@hub/contracts/scanner-v2-result';
 import { DEFAULT_SCANNER_LIMITS } from '@hub/contracts';
+import { DEFAULT_SCAN_PROFILE, type ScanProfile } from './scan-profiles';
 import { exceedsWorkflowByteLimit } from './scanner-input-validation';
 import type { ScanWorkerRequest, ScanWorkerResponse } from './scan.worker';
 
 export type BrowserScanRequestV2 = Readonly<{
   json: string;
-  profile: 'beta-default';
+  profile?: ScanProfile;
   approvedDomains: readonly string[];
   signal?: AbortSignal;
   deadlineMs?: number;
@@ -206,7 +207,7 @@ export function runBrowserScanV2(request: BrowserScanRequestV2): Promise<Browser
         kind: 'scan-v2',
         id,
         json: request.json,
-        profile: request.profile,
+        profile: request.profile ?? DEFAULT_SCAN_PROFILE,
         ...(request.approvedDomains.length > 0 ? { approvedDomains: [...request.approvedDomains] } : {}),
       };
       getWorker().postMessage(message);

@@ -4,10 +4,11 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Entry } from '@hub/contracts';
 import { fetchEntryById } from '../../../src/catalogue/entry-detail-client';
+import { loadManifest } from '../../../src/catalogue/manifest';
 import { DetailBody } from '../../../src/ui/detail/detail-body';
 import { sitePath } from '../../../src/ui/site-url.mjs';
 
-type ViewState = { entry: Entry | null; related: Entry[]; error: string | null };
+type ViewState = { entry: Entry | null; related: Entry[]; packedChartAvailable: boolean; error: string | null };
 
 function DetailSkeleton() {
   return (
@@ -39,8 +40,9 @@ function Content() {
  * Parsed defensively: a malformed or hand-edited URL must never resurrect the
  * entry's own id into its own "related" list.
  */
-function parseRelatedIds(raw: string | null, currentId: string): string[] {
+function parseRelatedIds(raw: string | null, currentIds: readonly string[]): string[] {
   if (!raw) return [];
+  const excluded = new Set(currentIds);
   const seen = new Set<string>();
   const ids: string[] = [];
   for (const part of raw.split(',')) {
@@ -52,7 +54,7 @@ function parseRelatedIds(raw: string | null, currentId: string): string[] {
     } catch {
       continue;
     }
-    if (!candidate || candidate === currentId || seen.has(candidate)) continue;
+    if (!candidate || excluded.has(candidate) || seen.has(candidate)) continue;
     seen.add(candidate);
     ids.push(candidate);
   }
@@ -80,6 +82,7 @@ function WorkflowContent({ id, relatedParam }: { id: string | null; relatedParam
   const [state, setState] = useState<ViewState>(() => ({
     entry: null,
     related: [],
+    packedChartAvailable: false,
     error: id ? null : 'This view needs a workflow id.',
   }));
 
@@ -91,10 +94,14 @@ function WorkflowContent({ id, relatedParam }: { id: string | null; relatedParam
       try {
         const entry = await fetchEntryById(id, controller.signal);
         if (!entry) throw new Error('Workflow not found.');
-        const related = await loadRelated(parseRelatedIds(relatedParam, id), controller.signal);
-        if (active) setState({ entry, related, error: null });
+        const manifest = await loadManifest().catch(() => null);
+        const packedChartAvailable = Boolean(
+          manifest?.artifacts?.some((item) => item.path.startsWith('charts/pack-') && item.path.endsWith('.jsonl.gzbin')),
+        );
+        const related = await loadRelated(parseRelatedIds(relatedParam, [id, entry.id, entry.slug]), controller.signal);
+        if (active) setState({ entry, related, packedChartAvailable, error: null });
       } catch (cause) {
-        if (active) setState({ entry: null, related: [], error: cause instanceof Error ? cause.message : 'Unable to load workflow.' });
+        if (active) setState({ entry: null, related: [], packedChartAvailable: false, error: cause instanceof Error ? cause.message : 'Unable to load workflow.' });
       }
     })();
     return () => { active = false; controller.abort(); };
@@ -125,7 +132,7 @@ function WorkflowContent({ id, relatedParam }: { id: string | null; relatedParam
   // and left this route on `default`; `a1681ad` moved it here incidentally, which
   // is the state this restores from. `?layout=workbench` still selects the
   // workbench on request — only the interactive default changed back.
-  return <DetailBody entry={state.entry} related={state.related} initialLayout="default" />;
+  return <DetailBody entry={state.entry} related={state.related} packedChartAvailable={state.packedChartAvailable} initialLayout="default" />;
 }
 
 export function WorkflowViewClient() {

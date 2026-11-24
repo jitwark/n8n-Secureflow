@@ -94,7 +94,18 @@ if (dispatch.mode === 'v1') {
   const onSigint = (): void => controller.abort();
   process.on('SIGINT', onSigint);
   try {
-    const result = await runCliV2(dispatch.result.command, { signal: controller.signal });
+    const rawCommand = dispatch.result.command;
+    const scanCommand = process.stdout.isTTY === true
+      && !rawCommand.formatSpecified
+      && rawCommand.configPath === undefined
+      && (rawCommand.output === undefined || rawCommand.output === '-')
+      ? Object.freeze({
+          ...rawCommand,
+          format: 'pretty' as const,
+          cliOverrides: Object.freeze({ ...rawCommand.cliOverrides, format: 'pretty' as const }),
+        })
+      : rawCommand;
+    const result = await runCliV2(scanCommand, { signal: controller.signal });
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
     process.exitCode = result.exitCode;

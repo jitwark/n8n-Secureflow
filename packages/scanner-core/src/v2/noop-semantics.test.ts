@@ -63,22 +63,22 @@ describe('noOp passthrough semantics through the v2 pipeline', () => {
     expect(semanticsFor(nodes[1])).toBeNull();
   });
 
-  it('covers a noOp outside the pinned exact version with the degraded fallback advisory', () => {
+  it('covers a noOp outside the pinned exact version with the advisory fallback diagnostic', () => {
     const workflow = source([START, finish({ typeVersion: 2 })]);
     const analysis = analysisOf(workflow);
     const advisory = analysis.diagnostics.filter(({ code }) => code === 'SEMANTIC_CATALOGUE_MISS');
     expect(advisory).toHaveLength(1);
-    expect(advisory[0]).toMatchObject({ aggregateEffect: 'DEGRADED', assessmentEligible: true, location: { pointer: '/nodes/1' } });
-    expect(analysis.status).not.toBe('INDETERMINATE');
+    expect(advisory[0]).toMatchObject({ aggregateEffect: 'NONE', assessmentEligible: true, location: { pointer: '/nodes/1' } });
+    expect(analysis.status).toBe('COMPLETE');
     // The admitted catalogue still holds no wildcard record: the fallback is synthesised at the
     // resolution seam, so the pinned catalogue digest does not move.
     expect(semanticsFor(nodesOf(workflow)[1])).toBeNull();
   });
 
-  it('reports one degraded coverage advisory for an arbitrary unknown node type', () => {
+  it('reports one advisory coverage diagnostic for an arbitrary unknown node type', () => {
     const unknown = analysisOf(source([START, finish({ type: 'n8n-nodes-base.notARealNode' })])).diagnostics.filter(({ code }) => code === 'SEMANTIC_CATALOGUE_MISS');
     expect(unknown).toHaveLength(1);
-    expect(unknown[0]).toMatchObject({ aggregateEffect: 'DEGRADED', assessmentEligible: true, location: { pointer: '/nodes/1' } });
+    expect(unknown[0]).toMatchObject({ aggregateEffect: 'NONE', assessmentEligible: true, location: { pointer: '/nodes/1' } });
   });
 
   it('binds equivalent accepted typeVersion strings to identical semantics through the full scan', () => {
@@ -100,8 +100,8 @@ describe('noOp passthrough semantics through the v2 pipeline', () => {
   it('does not bind an unadmitted prerelease typeVersion to noOp semantics', () => {
     const workflow = source([START, finish({ typeVersion: '1.0.0-alpha' })]);
     const analysis = analysisOf(workflow);
-    expect(analysis.status).toBe('DEGRADED');
-    expect(analysis.diagnostics.map(({ code }) => code)).toContain('SEMANTIC_CATALOGUE_MISS');
+    expect(analysis.status).toBe('COMPLETE');
+    expect(analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true }));
     expect(semanticsFor(nodesOf(workflow)[1])).toBeNull();
   });
 

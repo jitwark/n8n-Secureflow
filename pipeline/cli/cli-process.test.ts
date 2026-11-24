@@ -42,12 +42,17 @@ describe('CLI executable process smoke', () => {
     expect(JSON.parse(version.stdout)).toMatchObject({ schemaVersion: 'n8n-scan-version-v2' });
   });
 
-  it('scans stdin and emits a schema-valid JSON document', () => {
+  it('scans stdin and emits a schema-valid v2 JSON document', () => {
     const result = runProcess(['scan', '-', '--format', 'json'], workflow('process-smoke'));
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(0);
     expect(result.stderr).toBe('');
-    expect(validateCliJsonDocument(JSON.parse(result.stdout))).toEqual({ ok: true });
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      schemaVersion: 'n8n-scan-v2',
+      exitReason: 'UNDER_THRESHOLD',
+      artifacts: { profile: { id: 'standard', version: '3.0.0' } },
+      results: [{ input: '-', ok: true, result: { analysis: { status: 'COMPLETE' } } }],
+    });
   });
 
   it('keeps malformed stdin machine-readable and returns the input-error exit code', () => {
@@ -56,11 +61,14 @@ describe('CLI executable process smoke', () => {
     expect(result.status).toBe(3);
     expect(result.stderr).toBe('');
     const document = JSON.parse(result.stdout);
-    expect(validateCliJsonDocument(document)).toEqual({ ok: true });
+    expect(document).toMatchObject({
+      schemaVersion: 'n8n-scan-v2',
+      exitReason: 'ITEM_FAILURE',
+    });
     expect(document.results[0]).toMatchObject({
       input: '-',
       ok: false,
-      error: { kind: 'input', code: 'INVALID_JSON' },
+      error: { kind: 'INPUT', code: 'INVALID_JSON' },
     });
   });
 });

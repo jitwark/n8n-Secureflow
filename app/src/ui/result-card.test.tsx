@@ -36,20 +36,37 @@ describe('ResultCard', () => {
     expect(screen.getByText(/Redistributable/)).toBeDefined();
   });
 
-  it('renders up to 4 integration chips and +n remainder', () => {
+  it('renders up to 4 integration chips, +n remainder, and deduplicates overlapping tags case-insensitively', () => {
     render(<ResultCard item={sampleItem} />);
 
-    expect(screen.getAllByText('Gmail').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Slack').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('PostgreSQL')).toBeDefined();
-    expect(screen.getAllByText('Supabase').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Gmail')).toHaveLength(1);
+    expect(screen.getAllByText('Slack')).toHaveLength(1);
+    expect(screen.getAllByText(/^PostgreSQL|Postgres$/i)).toHaveLength(1);
+    expect(screen.getAllByText('Supabase')).toHaveLength(1);
     expect(screen.getByText('+1')).toBeDefined();
+    expect(screen.getByText('Email')).toBeDefined();
   });
 
-  it('routes to /w/<slug>/ for prerendered entry with valid description and structure', () => {
+  it('deduplicates OpenAI vs Openai pills across integrations and tags', () => {
+    render(
+      <ResultCard
+        item={{
+          ...sampleItem,
+          integrations: ['openai', 'slack'],
+          tags: ['openai', 'Openai', 'slack', 'alerts'],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText(/^OpenAI$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^Slack$/i)).toHaveLength(1);
+    expect(screen.getByText('Alerts')).toBeDefined();
+  });
+
+  it('routes to /w/view/?id=<id> for every entry via packed detail lookup', () => {
     render(<ResultCard item={sampleItem} />);
     const link = screen.getByRole('link', { name: 'Slack Email Notification Workflow' });
-    expect(link.getAttribute('href')).toMatch(/^\/w\/slack-email-notify-workflow/);
+    expect(link.getAttribute('href')).toMatch(/^\/w\/view\/?\?id=abc12345$/);
   });
 
   /**
@@ -77,11 +94,7 @@ describe('ResultCard', () => {
     expect(container.querySelector('article')?.className).toMatch(/hover:bg-raised/);
   });
 
-  it('routes to the slug page whatever the entry is, because every entry has one', () => {
-    // These three used to expect `/w/view/?id=`. They encoded a real constraint:
-    // only 250 slugs had a page, and an entry below the publication floor never
-    // would. `scripts/generate-lean-pages.tsx` writes a page for all 13,221 —
-    // the sub-floor ones noindex, but readable — so the branch is gone.
+  it('routes to /w/view/?id=<id> even for sub-floor or unprerendered entries', () => {
     const belowFloor = [
       { ...sampleItem, descriptionSource: 'fallback', isPrerendered: false },
       { ...sampleItem, nodeCount: 2, isPrerendered: false },
@@ -91,9 +104,7 @@ describe('ResultCard', () => {
     for (const item of belowFloor) {
       const { container } = render(<ResultCard item={item} />);
       const link = within(container).getByRole('link', { name: 'Slack Email Notification Workflow' });
-      // Prefix, not exact: `next/link` only applies `trailingSlash` at build
-      // time, so jsdom drops the slash the real export carries.
-      expect(link.getAttribute('href')).toMatch(/^\/w\/slack-email-notify-workflow\/?$/);
+      expect(link.getAttribute('href')).toMatch(/^\/w\/view\/?\?id=abc12345$/);
       cleanup();
     }
   });

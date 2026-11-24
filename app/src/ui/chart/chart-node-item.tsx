@@ -47,6 +47,7 @@ export function ChartNodeItem({
   const cat = CATEGORY_COLORS[node.category] || CATEGORY_COLORS.other;
   const shortType = node.type.split('.').pop() || node.type;
   const label = node.name.length > 15 ? `${node.name.slice(0, 13)}…` : node.name;
+  const compactType = shortType.length > 10 ? `${shortType.slice(0, 9)}…` : shortType;
 
   // Interactivity is independent of scale; rendered size controls hit padding,
   // never whether a node remains keyboard and assistive-technology accessible.
@@ -146,7 +147,7 @@ export function ChartNodeItem({
         <>
           <text
             x={35}
-            y={20}
+            y={18}
             fontSize={11}
             fontWeight="600"
             fontFamily="var(--font-sans), sans-serif"
@@ -158,13 +159,13 @@ export function ChartNodeItem({
           </text>
           <text
             x={35}
-            y={33}
+            y={35}
             fontSize={8.5}
             fontFamily="var(--font-mono), monospace"
             fill="var(--color-ink-muted)"
             className="select-none"
           >
-            {shortType.length > 14 ? `${shortType.slice(0, 12)}…` : shortType}
+            {compactType}
           </text>
         </>
       )}
@@ -172,9 +173,9 @@ export function ChartNodeItem({
       {/* Category Pill Tag */}
       <rect
         x={node.width - 46}
-        y={4}
+        y={node.height - 15}
         width={42}
-        height={13}
+        height={12}
         rx={2}
         fill="var(--color-raised)"
         fillOpacity={isDimmed ? 0.3 : 0.85}
@@ -183,7 +184,7 @@ export function ChartNodeItem({
       />
       <text
         x={node.width - 25}
-        y={13}
+        y={node.height - 6.5}
         textAnchor="middle"
         fontSize={7}
         fontWeight="700"

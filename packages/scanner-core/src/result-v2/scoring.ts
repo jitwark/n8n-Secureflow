@@ -16,6 +16,7 @@ const DIGEST = /^[0-9a-f]{64}$/;
 const MAX_ARRAY = 100_000;
 const POLICY = 'secureflow-risk-v2@2.0.0';
 const WEIGHT: Record<(typeof SEVERITIES)[number], number> = { CRITICAL: 55, HIGH: 35, MEDIUM: 18, LOW: 6, INFO: 1 };
+const SEVERITY_FLOOR: Record<(typeof SEVERITIES)[number], number> = { CRITICAL: 80, HIGH: 55, MEDIUM: 25, LOW: 0, INFO: 0 };
 const COMPLEXITY_WEIGHT: Record<WorkflowComplexity, number> = { LOW: 0, MEDIUM: 10, HIGH: 20 };
 
 export function scoreFindingsV2(findings: readonly FindingV2[], complexity: WorkflowComplexity): AssessmentV2 {
@@ -30,12 +31,14 @@ export function scoreFindingsV2(findings: readonly FindingV2[], complexity: Work
     const excludedUncertainFindingIds: string[] = [];
     const excludedNotApplicableFindingIds: string[] = [];
     const totals = new Map<string, RuleTotal>();
+    let floor = 0;
     for (const { finding } of prepared) {
       if (finding.effect === 'REPORT_ONLY') excludedReportOnlyFindingIds.push(finding.findingId);
       else if (finding.applicability === 'NOT_APPLICABLE') excludedNotApplicableFindingIds.push(finding.findingId);
       else if (finding.applicability === 'UNKNOWN' || finding.conclusion === 'POTENTIAL' || finding.conclusion === 'UNKNOWN') excludedUncertainFindingIds.push(finding.findingId);
       else {
         basisFindingIds.push(finding.findingId);
+        floor = Math.max(floor, SEVERITY_FLOOR[finding.severity]);
         const base = WEIGHT[finding.severity];
         const prior = totals.get(finding.ruleId);
         if (!prior) totals.set(finding.ruleId, { base, total: base });
@@ -44,7 +47,7 @@ export function scoreFindingsV2(findings: readonly FindingV2[], complexity: Work
     }
     let score = 0;
     for (const item of totals.values()) score += item.total;
-    score = Math.floor(Math.min(100, score + COMPLEXITY_WEIGHT[complexity]) + 0.5);
+    score = Math.max(floor, Math.floor(Math.min(100, score + COMPLEXITY_WEIGHT[complexity]) + 0.5));
     return { score, grade: score >= 80 ? 'CRITICAL' : score >= 55 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW', scoringPolicyVersion: POLICY, basisFindingIds, excludedReportOnlyFindingIds, excludedUncertainFindingIds, excludedNotApplicableFindingIds, unknownEvidenceCount: excludedUncertainFindingIds.length };
   } catch (error) {
     if (error instanceof TypeError) throw error;

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { Entry } from '@hub/contracts';
+import { toNormalizedTag, type Entry } from '@hub/contracts';
 import { LicenceBadge } from '../primitives/badge';
 import { GradePill } from '../primitives/pill';
 import { DownloadControl } from './download-control';
@@ -82,9 +82,15 @@ export function ProvenanceCard({ entry, staticDownloadHref, showMetrics = false 
             <span className="text-ink-faint">NODES: </span>
             <strong className="text-ink">{entry.structure.nodeCount}</strong>
           </div>
+          {entry.structure.annotationNodeCount > 0 && (
+            <div>
+              <span className="text-ink-faint">STICKY NOTES: </span>
+              <strong className="text-ink">{entry.structure.annotationNodeCount}</strong>
+            </div>
+          )}
           <div>
             <span className="text-ink-faint">TRIGGER: </span>
-            <strong className="text-ink truncate">{entry.structure.trigger || 'Manual'}</strong>
+            <strong className="text-ink truncate">{toNormalizedTag('trigger', entry.structure.trigger || 'unknown', 0).label}</strong>
           </div>
           <div>
             <span className="text-ink-faint">CONNS: </span>

@@ -129,15 +129,17 @@ test.describe('scanner accessibility and zoom evidence', () => {
     await fillWorkflow(page, cleanJson);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
 
-    const coverage = page.getByRole('heading', { name: 'Analysis coverage', level: 2 });
-    await expect(coverage).toBeVisible({ timeout: 15000 });
     const outcome = page.getByRole('heading', { name: 'Decision and next step', level: 2 });
+    await expect(outcome).toBeVisible({ timeout: 15000 });
     await expect(outcome).toHaveAttribute('tabindex', '-1');
     await expect(outcome).toBeFocused();
 
+    const details = page.locator('#scanner-technical-details');
+    await expect(details).not.toHaveAttribute('open', '');
+    await details.locator('> summary').click();
+    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+
     for (const name of [
-      // The v2 report's section headings on a graded result. "Analyst summary" and
-      // "Readiness and integrations" were v1 surfaces and left with the cutover.
       'Evidence and conclusions',
       'Applicability and target context',
       'Verified traces',
@@ -156,9 +158,10 @@ test.describe('scanner accessibility and zoom evidence', () => {
     await page.goto(scannerPath);
     await fillWorkflow(page, unreadableParametersJson);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15000 });
     const decision = page.getByRole('heading', { name: 'Decision and next step' });
+    await expect(decision).toBeVisible({ timeout: 15000 });
     await decision.scrollIntoViewIfNeeded();
-    await expect(decision).toBeVisible();
+    await page.locator('#scanner-technical-details > summary').click();
+    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
   });
 });

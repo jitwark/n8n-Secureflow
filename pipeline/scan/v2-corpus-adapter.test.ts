@@ -191,7 +191,7 @@ describe('retainCorpusWorkflowV2Evidence', () => {
     expect(evidence).toMatchObject({
       ok: true,
       identity: { profileId: 'beta-default', profileVersion: '2.0.0' },
-      analysisStatus: 'DEGRADED',
+      analysisStatus: 'COMPLETE',
       assessment: { grade: expect.any(String) },
       diagnosticCodes: expect.arrayContaining([
         'SEMANTIC_CATALOGUE_MISS',

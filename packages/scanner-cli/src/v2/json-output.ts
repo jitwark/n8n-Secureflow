@@ -1,16 +1,10 @@
 import { canonicalizeJson } from '@hub/scanner-core/canonical-json';
 import { validateScannerResultV2, type ScannerResultV2, type TargetContextV3 } from '@hub/contracts/scanner-v2-result';
-import { ADMITTED_PROFILE_V2, BUILTIN_LIMITS_AUTHORITY_V2, BUILTIN_RULESET_AUTHORITY_V2, BUILTIN_SEMANTICS_AUTHORITY_V2, CLI_TOOL_V2 } from './contracts';
+import { ADMITTED_PROFILES_V2, BUILTIN_LIMITS_AUTHORITY_V2, BUILTIN_RULESET_AUTHORITY_V2, BUILTIN_SEMANTICS_AUTHORITY_V2, CLI_TOOL_V2, DEFAULT_PROFILE_V3, resolveAdmittedProfileV2, type ScanFailOnV2, type ScanSeverityV2 } from './contracts';
 import type { BatchErrorCodeV2, BatchItemV2, BatchResultV2 } from './batch-runner';
-import {
-  buildPreflightReadinessReport,
-  type PreflightAnalysisSignalsV1,
-  type PreflightFindingInputV1,
-  type PreflightReadinessReportV1,
-  type PreflightSeverityV1,
-} from './preflight-readiness';
+import { buildPreflightReadinessReport, type PreflightAnalysisSignalsV1, type PreflightFindingInputV1, type PreflightReadinessReportV1, type PreflightSeverityV1 } from './preflight-readiness';
 import { validateSupplyChainRequestV2, type SupplyChainRequestV2 } from './supply-chain-request';
-export type ProjectionFormatV2 = 'json' | 'ndjson' | 'sarif' | 'table';
+export type ProjectionFormatV2 = 'json' | 'ndjson' | 'sarif' | 'table' | 'pretty' | 'markdown';
 export type ProjectionSourceV2 = Readonly<{
   profile: 'BUILT_IN' | 'CONFIG' | 'CLI';
   rules: 'BUILT_IN' | 'CONFIG' | 'CLI';
@@ -22,7 +16,7 @@ export type ProjectionSourceV2 = Readonly<{
 export type ProjectionOptionsV2 = Readonly<{
   format: ProjectionFormatV2;
   profile: string;
-  failOn: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+  failOn: ScanFailOnV2;
   requireComplete: boolean;
   concurrency: number;
   allowUnsignedDevelopmentRules: boolean;
@@ -37,11 +31,11 @@ type CliErrorV2 = Readonly<{ kind: 'INPUT' | 'INCOMPLETE' | 'INTERNAL' | 'CANCEL
 type CliItemV2 = Readonly<{ input: string; ok: true; result: ScannerResultV2; readiness?: PreflightReadinessReportV1 } | { input: string; ok: false; error: CliErrorV2 }>;
 type SummaryV2 = Readonly<{ total: number; complete: number; degraded: number; indeterminate: number; inputErrors: number; internalErrors: number; cancelled: number; findings: number }>;
 type BatchState = Readonly<{ ok: boolean; items: readonly BatchItemV2[]; code?: string; cancelled: boolean; concurrency: number }>;
-export type CliEnvelopeV2 = Readonly<{ schemaVersion: 'n8n-scan-v2'; tool: Readonly<{ name: 'n8n-scan'; version: string; buildDigest: string }>; artifacts: ArtifactV2; invocation: Readonly<{ schema: 'v2'; format: 'json' | 'ndjson' | 'sarif' | 'table'; profile: string; failOn: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'; requireComplete: boolean; concurrency: number; allowUnsignedDevelopmentRules: boolean; sources: ProjectionSourceV2 }>; supplyChain?: SupplyChainRequestV2; results: readonly CliItemV2[]; summary: SummaryV2; exitReason: 'UNDER_THRESHOLD' | 'FINDING_THRESHOLD' | 'REQUIRE_COMPLETE' | 'ITEM_FAILURE' | 'USAGE' | 'INTERNAL' | 'CANCELLED' }>;
+export type CliEnvelopeV2 = Readonly<{ schemaVersion: 'n8n-scan-v2'; tool: Readonly<{ name: 'n8n-scan'; version: string; buildDigest: string }>; artifacts: ArtifactV2; invocation: Readonly<{ schema: 'v2'; format: ProjectionFormatV2; profile: string; failOn: ScanFailOnV2; requireComplete: boolean; concurrency: number; allowUnsignedDevelopmentRules: boolean; sources: ProjectionSourceV2 }>; supplyChain?: SupplyChainRequestV2; results: readonly CliItemV2[]; summary: SummaryV2; exitReason: 'UNDER_THRESHOLD' | 'FINDING_THRESHOLD' | 'REQUIRE_COMPLETE' | 'ITEM_FAILURE' | 'USAGE' | 'INTERNAL' | 'CANCELLED' }>;
 export type ProjectedBatchV2 = Readonly<{ envelope: CliEnvelopeV2; items: readonly CliItemV2[] }>;
 export const DEFAULT_PROJECTION_OPTIONS: ProjectionOptionsV2 = Object.freeze({
   format: 'json',
-  profile: ADMITTED_PROFILE_V2.id,
+  profile: DEFAULT_PROFILE_V3.id,
   failOn: 'INFO',
   requireComplete: false,
   concurrency: 1,
@@ -91,7 +85,7 @@ export function projectBatchV2(batch: BatchResultV2, options: ProjectionOptionsV
         || facts[0].properties.evaluationReason !== supplyChain.evaluation.reason) throw new TypeError('Supply-chain request and canonical evaluation disagree');
     }
   }
-  const artifacts = Object.freeze(validResults.length ? artifact(validResults[0]!) : defaults(supplyChain === undefined ? undefined : projection.target));
+  const artifacts = Object.freeze(validResults.length ? artifact(validResults[0]!) : defaults(supplyChain === undefined ? undefined : projection.target, projection.profile));
   const items = Object.freeze(rawItems.map((item) => normalizeItem(item, artifacts, projection.target, projection.includeReadiness === true)));
   const summary = summarize(items);
   const envelope = Object.freeze({ schemaVersion: 'n8n-scan-v2' as const, tool: CLI_TOOL_V2, artifacts, invocation: invocation(projection), ...(supplyChain === undefined ? {} : { supplyChain }), results: items, summary, exitReason: exitReason(state, summary, items, projection) });
@@ -114,7 +108,7 @@ function readScannerResult(item: BatchItemV2): ScannerResultV2 | undefined {
   try {
     if (!item || typeof item !== 'object' || item.status !== 'COMPLETED' || !item.result || typeof item.result !== 'object' || item.result.ok !== true) return undefined;
     const checked = validateScannerResultV2(item.result.result);
-    if (!checked.ok || checked.result.profile.id !== ADMITTED_PROFILE_V2.id || checked.result.profile.version !== ADMITTED_PROFILE_V2.version) return undefined;
+    if (!checked.ok || !ADMITTED_PROFILES_V2.some((p) => p.id === checked.result.profile.id && p.version === checked.result.profile.version)) return undefined;
     return freezeValue(checked.result);
   } catch { return undefined; }
 }
@@ -128,7 +122,10 @@ function freezeValue<T>(value: T, seen = new WeakSet<object>()): T {
   return value;
 }
 function artifact(result: ScannerResultV2): ArtifactV2 { return Object.freeze({ profile: Object.freeze({ ...result.profile }), ruleset: Object.freeze({ ...result.ruleset }), semantics: Object.freeze({ ...result.semantics }), target: Object.freeze({ ...result.target, communityPackages: Object.freeze(result.target.communityPackages.map((item) => Object.freeze({ ...item }))), configuration: Object.freeze(result.target.configuration.map((item) => Object.freeze({ ...item }))) }), limits: Object.freeze({ schemaVersion: result.limits.schemaVersion, digest: result.limits.digest }) }); }
-function defaults(target?: TargetContextV3): ArtifactV2 { return Object.freeze({ profile: Object.freeze({ id: ADMITTED_PROFILE_V2.id, version: ADMITTED_PROFILE_V2.version }), ruleset: Object.freeze({ ...BUILTIN_RULESET_AUTHORITY_V2 }), semantics: Object.freeze({ ...BUILTIN_SEMANTICS_AUTHORITY_V2 }), target: target ?? TARGET, limits: Object.freeze({ schemaVersion: BUILTIN_LIMITS_AUTHORITY_V2.schemaVersion, digest: BUILTIN_LIMITS_AUTHORITY_V2.digest }) }); }
+function defaults(target?: TargetContextV3, profileName?: string): ArtifactV2 {
+  const profile = resolveAdmittedProfileV2(profileName) ?? DEFAULT_PROFILE_V3;
+  return Object.freeze({ profile: Object.freeze({ id: profile.id, version: profile.version }), ruleset: Object.freeze({ ...BUILTIN_RULESET_AUTHORITY_V2 }), semantics: Object.freeze({ ...BUILTIN_SEMANTICS_AUTHORITY_V2 }), target: target ?? TARGET, limits: Object.freeze({ schemaVersion: BUILTIN_LIMITS_AUTHORITY_V2.schemaVersion, digest: BUILTIN_LIMITS_AUTHORITY_V2.digest }) });
+}
 function normalizeItem(raw: BatchItemV2, artifacts: ArtifactV2, target?: TargetContextV3, includeReadiness = false): CliItemV2 {
   let label: unknown;
   try { label = raw && typeof raw === 'object' ? raw.label : undefined; } catch { label = undefined; }
@@ -226,7 +223,7 @@ function safeLabel(value: unknown): string {
   } catch { return 'input'; }
 }
 function summarize(items: readonly CliItemV2[]): SummaryV2 { let complete = 0; let degraded = 0; let indeterminate = 0; let inputErrors = 0; let internalErrors = 0; let cancelled = 0; let findings = 0; for (const item of items) { if (item.ok) { const status = item.result.analysis.status; if (status === 'COMPLETE') complete += 1; else if (status === 'DEGRADED') degraded += 1; else indeterminate += 1; findings += item.result.findings.length; } else if (item.error.kind === 'CANCELLED') cancelled += 1; else if (item.error.kind === 'INTERNAL') internalErrors += 1; else inputErrors += 1; } return Object.freeze({ total: items.length, complete, degraded, indeterminate, inputErrors, internalErrors, cancelled, findings }); }
-const FINDING_SEVERITY: Readonly<Record<ProjectionOptionsV2['failOn'], number>> = Object.freeze({ CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1 });
+const FINDING_SEVERITY: Readonly<Record<ScanSeverityV2, number>> = Object.freeze({ CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1 });
 function invocation(options: ProjectionOptionsV2) {
   return Object.freeze({
     schema: 'v2' as const,
@@ -243,7 +240,7 @@ function exitReason(state: BatchState, summary: SummaryV2, items: readonly CliIt
   if (!state.ok) return state.code === 'CANCELLED' ? 'CANCELLED' : 'USAGE';
   if (state.cancelled || summary.cancelled > 0) return 'CANCELLED';
   if (summary.internalErrors > 0) return 'INTERNAL';
-  if (items.some((item) => item.ok && item.result.findings.some((finding) => typeof finding.severity === 'string' && FINDING_SEVERITY[finding.severity as ProjectionOptionsV2['failOn']] >= FINDING_SEVERITY[options.failOn]))) return 'FINDING_THRESHOLD';
+  if (options.failOn !== 'NONE' && items.some((item) => item.ok && item.result.findings.some((finding) => typeof finding.severity === 'string' && FINDING_SEVERITY[finding.severity as ScanSeverityV2] >= FINDING_SEVERITY[options.failOn as ScanSeverityV2]))) return 'FINDING_THRESHOLD';
   if (summary.degraded > 0 && options.requireComplete) return 'REQUIRE_COMPLETE';
   if (summary.indeterminate > 0 || summary.inputErrors > 0 || items.some((item) => !item.ok && item.error.kind === 'INCOMPLETE')) return 'ITEM_FAILURE';
   return 'UNDER_THRESHOLD';

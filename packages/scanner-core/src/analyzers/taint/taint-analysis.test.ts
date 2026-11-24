@@ -178,4 +178,27 @@ describe('scanner-core taint analysis', () => {
     const connections = { Webhook: { main: [[{ node: 'A' }, { node: 'B' }]] } };
     expect(JSON.stringify(analyze(input, connections))).toBe(JSON.stringify(analyze(input, connections)));
   });
+
+  it('models real-world inbound/file triggers and non-data operational triggers', () => {
+    const parsed = parseWorkflowJson(JSON.stringify({
+      nodes: [
+        { id: 'gm', name: 'Gmail', type: 'n8n-nodes-base.gmailTrigger', parameters: {} },
+        { id: 'gd', name: 'Drive', type: 'n8n-nodes-base.googleDriveTrigger', parameters: {} },
+        { id: 'mcp', name: 'MCP', type: '@n8n/n8n-nodes-langchain.mcpTrigger', parameters: {} },
+        { id: 'err', name: 'Error', type: 'n8n-nodes-base.errorTrigger', parameters: {} },
+        { id: 'sub', name: 'Sub', type: 'n8n-nodes-base.executeWorkflowTrigger', parameters: {} },
+      ],
+      connections: {},
+    }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(seedTaintStates(parsed.workflow).map((state) => [...state.labels])).toEqual([
+      ['INBOUND_MESSAGE'],
+      ['EXTERNAL_FILE'],
+      ['INBOUND_MESSAGE'],
+      [],
+      [],
+    ]);
+    expect(analyzeWorkflowTaint(parsed.workflow).diagnostics).toEqual([]);
+  });
 });

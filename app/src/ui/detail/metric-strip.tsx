@@ -1,16 +1,18 @@
-import type { Entry } from '@hub/contracts';
+import { toNormalizedTag, type Entry } from '@hub/contracts';
 
 type MetricStripProps = { entry: Entry };
 type Metric = { label: string; value: string | number };
 
 export function MetricStrip({ entry }: MetricStripProps) {
+  const stickyNotes = entry.structure.annotationNodeCount > 0
+    ? entry.structure.annotationNodeCount
+    : Math.max(0, entry.structure.rawNodeCount - entry.structure.nodeCount);
+  const triggerLabel = toNormalizedTag('trigger', entry.structure.trigger || 'unknown', 0).label;
   const metrics: Metric[] = [
     { label: 'Active nodes', value: entry.structure.nodeCount },
-    ...(entry.structure.rawNodeCount > entry.structure.nodeCount
-      ? [{ label: 'Annotations', value: entry.structure.annotationNodeCount }]
-      : []),
+    ...(stickyNotes > 0 ? [{ label: 'Sticky notes', value: stickyNotes }] : []),
     { label: 'Connections', value: entry.structure.connectionCount },
-    { label: 'Trigger', value: entry.structure.trigger || 'Unknown' },
+    { label: 'Trigger', value: triggerLabel },
     { label: 'Complexity', value: entry.structure.complexity },
   ];
   const columns = metrics.length === 5 ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4';

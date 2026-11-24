@@ -1,7 +1,17 @@
 # Scanner implementation and verification status
 
+## November 21, 2026 — internal first-batch measurement
+
+The exact `n8n-nodes-base.noOp@1.0.0` candidate (`resource=ABSENT`, `operation=ABSENT`) has an accepted fixed retained-record projection/replay and diagnostic comparison. The bounded independent review of the actual measurement and compare-only repair is PASS in [FIXED-MEASUREMENT-FINAL-REVIEW.md](../audit/2026-11-14-semantic-expansion/FIXED-MEASUREMENT-FINAL-REVIEW.md). The original source-30 engine scan was reused; source-31 producer code corrected the classification of three `NO_SOURCE_BINDING` placeholder rows. The scan engine was not rerun, and no data was applied or published.
+
+Formal reviewed executable coverage is 1,445/144,043 (1.0031726637%), versus the retained 112/144,043 baseline (0.0777545594%): a gain of 1,333. Fully modelled workflows remain 0/9,669. The original 95%/90% targets remain MISSED. The accepted NoOp scope is 1,333 executable instances across 855 workflows; three disabled instances are excluded. Error and retry behavior remain UNKNOWN.
+
+The diagnostic comparison reports 22,499 known occurrences and 70 unavailable diagnostic arrays, so the population total is null. `DEGRADED` remains 10,119; status, assessment, finding and body-binding changes are all zero. Workflow association does not prove node-level causality. The public V2 scan does not activate the taint worklist.
+
+This is internal qualification only. Published npm `0.2.1`, hosted UI/site, V4 dataset, Action and public `main` are unchanged. The bounded independent review passed. Canonical `CURRENT-STATE.json` and `BACKUP-RECEIPT.json` track the final recovery seal. Overall programme completion and ETA remain unknown. See the [qualification evidence index](../audit/2026-11-14-semantic-expansion/README.md) and [documentation closure report](../audit/2026-11-14-semantic-expansion/DOCS-CLOSURE-IMPLEMENTATION.md).
+
 > Canonical public scanner and programme status. Last updated: November14,2026.
-> Website implementation and delivery are complete for the requested UI update. v0.3 semantic-model expansion remains planning only. Overall programme completion percentage and ETA remain null; original formal-coverage targets remain missed.
+> Website implementation and delivery are complete for the requested UI update. v0.3 semantic-model implementation is in internal first-batch qualification; the independently admitted exact NoOp candidate has not changed published artifacts. Overall programme completion percentage and ETA remain null; original formal-coverage targets remain missed.
 
 ## Immutable product release and hosted baseline — November 8, 2026 (historical)
 

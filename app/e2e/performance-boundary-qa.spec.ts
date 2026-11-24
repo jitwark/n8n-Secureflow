@@ -1,4 +1,4 @@
-import { firstLeanSubject } from './detail-subjects';
+import { firstLeanSubject, viewHref } from './detail-subjects';
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -111,6 +111,10 @@ async function stopGapSampling(page: Page): Promise<{ maxGapMs: number; sampleCo
   });
 }
 
+function hasArtifact(paths: Set<string>, basename: string): boolean {
+  return paths.has(`${basename}.gzbin`) || paths.has(basename);
+}
+
 test('library defers semantic vectors until an eligible typed query', async ({ page }) => {
   const paths = observeDataPaths(page);
   await page.goto(appPath('/library/'));
@@ -118,48 +122,44 @@ test('library defers semantic vectors until an eligible typed query', async ({ p
   await page.waitForLoadState('networkidle');
 
   const beforeQuery = [...paths].sort();
-  expect(beforeQuery).not.toContain('semantic-index.json');
+  expect(hasArtifact(paths, 'semantic-index.json')).toBe(false);
 
   await page.getByRole('combobox').first().fill('slack notification');
-  await expect.poll(() => paths.has('semantic-index.json'), { timeout: 15_000 }).toBe(true);
+  await expect.poll(() => hasArtifact(paths, 'semantic-index.json'), { timeout: 15_000 }).toBe(true);
   await emitBoundaryMetric(page, '/library/', paths, {
     phase: 'after-eligible-query',
-    semanticBeforeQuery: beforeQuery.includes('semantic-index.json'),
-    semanticAfterEligibleQuery: paths.has('semantic-index.json'),
+    semanticBeforeQuery: beforeQuery.some((p) => p === 'semantic-index.json' || p === 'semantic-index.json.gzbin'),
+    semanticAfterEligibleQuery: hasArtifact(paths, 'semantic-index.json'),
     beforeQueryDataPaths: beforeQuery,
   });
 });
 
 test('workflow detail stays payload-light until explicit canvas action', async ({ page }) => {
   const paths = observeDataPaths(page);
-  // A lean page, chosen by type: "payload-light until an explicit canvas
-  // action" is the lean contract, and the prerendered page renders its canvas
-  // inline by design. See `detail-subjects.ts`.
   await page.goto(appPath('/library/?rights=link_only'));
   await expect(page.getByRole('list', { name: 'Workflow results' }).getByRole('link').first())
     .toBeVisible({ timeout: 30_000 });
   paths.clear();
 
-  await page.goto(appPath(`/w/${firstLeanSubject().slug}/`));
-  await expect(page.locator('main h1')).toHaveCount(1);
-  await expect(page.getByRole('link', { name: /Open the interactive view/i })).toBeVisible();
+  const subject = firstLeanSubject();
+  await page.goto(appPath(viewHref(subject)));
+  await expect(page.getByRole('heading', { level: 1, name: subject.title })).toBeVisible({ timeout: 30_000 });
+  const loadCanvas = page.getByRole('button', { name: 'Load interactive canvas' });
+  await expect(loadCanvas).toBeVisible();
   await page.waitForLoadState('networkidle');
   const detailDataPaths = [...paths].sort();
   const deferredBeforeAction = detailDataPaths.filter((value) => /^(charts|previews)\//.test(value));
   expect(deferredBeforeAction, 'detail must not request chart or preview payloads before interaction').toEqual([]);
 
-  await page.getByRole('link', { name: /Open the interactive view/i }).click();
-  await expect(page.getByRole('button', { name: /Explore interactive canvas/i })).toBeVisible({ timeout: 30_000 });
-  await page.waitForLoadState('networkidle');
-  const shellDataPaths = [...paths].sort();
-  const shellDeferred = shellDataPaths.filter((value) => /^(charts|previews)\//.test(value));
-  expect(shellDeferred, 'interactive shell must still defer chart and preview payloads').toEqual([]);
+  await loadCanvas.click();
+  await expect(page.getByRole('group', { name: /Workflow diagram/ })).toBeVisible({ timeout: 30_000 });
+  const afterActionDataPaths = [...paths].sort();
 
   await emitBoundaryMetric(page, new URL(page.url()).pathname, paths, {
     phase: 'before-explicit-canvas-action',
     detailDataPaths,
-    shellDataPaths,
-    deferredPayloadCount: shellDeferred.length,
+    shellDataPaths: afterActionDataPaths,
+    deferredPayloadCount: deferredBeforeAction.length,
   });
 });
 
@@ -186,7 +186,9 @@ test('completed heavy scan stays within the existing main-thread-gap threshold',
   await fillWorkflow(page, heavyJson);
   await startGapSampling(page);
   await page.getByRole('button', { name: 'Scan workflow' }).click();
-  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15_000 });
+  await page.locator('#scanner-technical-details > summary').click();
+  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
 
   const timing = await stopGapSampling(page);
   console.log(`[PERF_BOUNDARY] ${JSON.stringify({ route: '/scanner/', phase: 'completed-heavy-scan', ...timing })}`);

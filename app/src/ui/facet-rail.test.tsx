@@ -23,18 +23,30 @@ describe('FacetRail', () => {
     expect(screen.getByText('Filters')).toBeDefined();
     expect(screen.getByText('Redistributable')).toBeDefined();
     expect(screen.getAllByText('1900')).toHaveLength(2);
-    expect(screen.getAllByText('Webhook')).toHaveLength(2);
+    expect(screen.getAllByText('Webhook')).toHaveLength(1);
     expect(screen.getAllByText('300').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole('button', { name: /LOW 1900/ })).toBeDefined();
     expect(screen.getByRole('button', { name: /Link-only 300/ })).toBeDefined();
     expect(screen.getByRole('button', { name: /AI 42/ })).toBeDefined();
   });
 
-  it('disables items with count === 0', () => {
-    render(<FacetRail counts={sampleCounts} filters={{}} onFilterChange={() => {}} />);
+  it('hides unselected items with count === 0 including Redistributable 0', () => {
+    render(
+      <FacetRail
+        counts={{ ...sampleCounts, rights: { redistributable: 0, link_only: 300 } }}
+        filters={{}}
+        onFilterChange={() => {}}
+      />,
+    );
 
-    const manualBtn = screen.getByRole('button', { name: /Manual 0/ });
-    expect(manualBtn.hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: /Manual 0/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Redistributable 0/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Postgres 0/i })).toBeNull();
+  });
+
+  it('omits the inner Filters heading when showHeader is false', () => {
+    render(<FacetRail counts={sampleCounts} filters={{}} onFilterChange={() => {}} showHeader={false} />);
+    expect(screen.queryByRole('heading', { name: 'Filters' })).toBeNull();
   });
 
   it('keeps a selected zero-count facet enabled so it can be removed', () => {
@@ -48,14 +60,19 @@ describe('FacetRail', () => {
     expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ trigger: [] }));
   });
 
-  it('gives facet buttons and the filter input accessible targets and visible states', () => {
+  it('gives facet buttons and the filter input accessible targets and subtle tinted selected states', () => {
     render(<FacetRail counts={sampleCounts} filters={{ trigger: ['webhook'] }} onFilterChange={() => {}} />);
 
     const selected = screen.getByRole('button', { name: /Webhook 300/ });
     expect(selected.className).toContain('min-h-11');
     expect(selected.className).toContain('focus-visible:ring-2');
     expect(selected.className).toContain('active:bg-raised');
-    expect(selected.className).toContain('ring-1');
+    expect(selected.className).toContain('border-accent-border');
+    expect(selected.className).toContain('bg-accent-dim');
+    expect(selected.className).toContain('text-accent-text');
+    expect(selected.className).toContain('font-semibold');
+    expect(selected.className).not.toContain('bg-ink');
+    expect(selected.className).not.toContain('bg-accent ');
 
     const input = screen.getByRole('textbox', { name: 'Filter integrations' });
     expect(input.className).toContain('h-11');

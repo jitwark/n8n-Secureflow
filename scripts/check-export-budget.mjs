@@ -10,22 +10,13 @@ const outDir = path.join(root, 'app', 'out');
 const PAGES_CEILING = 1024 * 1024 * 1024;
 
 const limits = {
-  // Raised 2026-08-26. Two measured changes:
-  //
-  //  - Publication stopped asking about redistribution rights, so hubs admit
-  //    12,923 entries rather than 287 and tag pagination went from ~52 pages to
-  //    982. That is the path a crawler takes into the long tail, so it stays.
-  //  - Every workflow gets a page (see `scripts/generate-lean-pages.tsx`),
-  //    which is ~13,000 more files at roughly 23 KB each.
-  //
-  // Measured after both: 470 MB and 7,990 files before the lean pages, about
-  // 760 MB and 21,000 after. The caps leave roughly a quarter of the Pages
-  // ceiling free for corpus growth. Re-derive with `du -sm app/out` before
-  // moving them again.
-  files: Number(process.env.EXPORT_MAX_FILES ?? 25_000),
-  bytes: Number(process.env.EXPORT_MAX_BYTES ?? 900 * 1024 * 1024),
-  htmlBytes: Number(process.env.EXPORT_MAX_HTML_BYTES ?? 560_000_000),
-  largestDataBytes: Number(process.env.EXPORT_MAX_DATA_FILE_BYTES ?? 40 * 1024 * 1024),
+  // Packed static export target: < 35 MiB total (with client-resolved
+  // /w/view/ + FNV-1a packed .gzbin buckets for details/charts + compressed
+  // search/semantic indexes and palette-quantized OG PNGs).
+  files: Number(process.env.EXPORT_MAX_FILES ?? 2_500),
+  bytes: Number(process.env.EXPORT_MAX_BYTES ?? 35 * 1024 * 1024),
+  htmlBytes: Number(process.env.EXPORT_MAX_HTML_BYTES ?? 10 * 1024 * 1024),
+  largestDataBytes: Number(process.env.EXPORT_MAX_DATA_FILE_BYTES ?? 10 * 1024 * 1024),
 };
 
 if (limits.bytes >= PAGES_CEILING) {

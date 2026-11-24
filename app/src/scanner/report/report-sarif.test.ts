@@ -69,17 +69,16 @@ function v2Model(json: string): ScannerReportModelV2 {
 }
 
 describe('SARIF report v2 authority', () => {
-  it('reports the real degraded status, both coverage notifications, the retained finding and the worker grade', () => {
+  it('reports COMPLETE status when catalogue-miss diagnostics have NONE effect, alongside retained redacted findings and grade', () => {
     const scan = v2Model(fixture('fallback.json'));
     const report = JSON.parse(buildSarifReport(scan));
     const [run] = report.runs;
 
     expect(run.invocations[0].executionSuccessful).toBe(true);
     const codes = run.invocations[0].toolExecutionNotifications.map((item: { descriptor: { id: string } }) => item.descriptor.id);
-    expect(codes).toEqual(expect.arrayContaining(['SEMANTIC_CATALOGUE_MISS', 'GENERIC_NODE_UNMODELED_CAPABILITY']));
     expect(codes).not.toContain('POLICY_EXECUTION_FAILED');
     expect(run.results.map((item: { ruleId: string }) => item.ruleId)).toContain('RAW_SECRET_INDICATOR');
-    expect(run.properties).toMatchObject({ analysisStatus: 'DEGRADED', riskGrade: scan.assessment!.grade, secureflow: expect.objectContaining({ analysisStatus: 'DEGRADED' }) });
+    expect(run.properties).toMatchObject({ analysisStatus: 'COMPLETE', riskGrade: scan.assessment!.grade, secureflow: expect.objectContaining({ analysisStatus: 'COMPLETE' }) });
     expect(JSON.stringify(report)).not.toContain(RAW_SECRET);
   });
 
@@ -101,6 +100,7 @@ describe('SARIF report v2 authority', () => {
     const withheldNotifications = withheld.runs[0].invocations[0].toolExecutionNotifications;
     expect(withheldNotifications.map((item: { descriptor: { id: string } }) => item.descriptor.id))
       .toEqual(['MALFORMED_NODE_PARAMETERS', 'SEMANTIC_CATALOGUE_MISS']);
-    expect(withheldNotifications.every((item: { level: string }) => item.level === 'error')).toBe(true);
+    expect(withheldNotifications.find((item: { descriptor: { id: string } }) => item.descriptor.id === 'MALFORMED_NODE_PARAMETERS')?.level).toBe('error');
+    expect(withheldNotifications.find((item: { descriptor: { id: string } }) => item.descriptor.id === 'SEMANTIC_CATALOGUE_MISS')?.level).toBe('warning');
   });
 });

@@ -1,6 +1,6 @@
 import { DEFAULT_SCANNER_LIMITS_V2, type ScannerLimitsV2 } from '@hub/contracts';
 import type { ScanWorkflowV2FailureCode, ScanWorkflowV2Result } from '@hub/scanner-core/v2';
-import { ADMITTED_PROFILE_V2, loadExplicitConfig, type ConfigLoadResult, type ScanConfigV2 } from './config';
+import { loadExplicitConfig, resolveAdmittedProfileV2, type AdmittedProfileEntryV2, type ConfigLoadResult, type ScanConfigV2 } from './config';
 import { SCAN_CONFIG_V2_MAX_CONCURRENCY } from './contracts';
 import { readInputBytes, type CliStdin, type InputReadHost, type ReadInputFailure, type ReadInputResult } from './input-read';
 import type { SelectedInputV2 } from './input-selection';
@@ -13,7 +13,7 @@ export type BatchItemV2 = Readonly<{ label: string; status: BatchItemStatusV2; r
 export type BatchResultV2 =
   | Readonly<{ ok: true; items: readonly BatchItemV2[]; cancelled: boolean; completed: number; failed: number; concurrency: number }>
   | Readonly<{ ok: false; code: 'INVALID_CONFIG' | 'CANCELLED'; message: string }>;
-export type BatchScanOptionsV2 = Readonly<{ target?: unknown; limits?: ScannerLimitsV2; approvedDomains?: readonly string[]; advisoryRequest?: unknown }>;
+export type BatchScanOptionsV2 = Readonly<{ profile?: Readonly<{ id: string; version: string }>; target?: unknown; limits?: ScannerLimitsV2; approvedDomains?: readonly string[]; advisoryRequest?: unknown }>;
 export type BatchScanV2 = (bytes: Uint8Array, item: SelectedInputV2, options?: BatchScanOptionsV2) => ScanWorkflowV2Result | PromiseLike<ScanWorkflowV2Result>;
 export type BatchReadV2 = (item: SelectedInputV2) => Uint8Array | ReadInputResult | PromiseLike<Uint8Array | ReadInputResult>;
 export type BatchRunnerInput = Readonly<{ items: readonly SelectedInputV2[]; config: ScanConfigV2; scan?: BatchScanV2; read?: BatchReadV2; stdin?: CliStdin; readHost?: InputReadHost; baseDirectory?: string; maxInputBytes?: number; limitsDocument?: ScannerLimitsV2; targetDocument?: unknown; approvedDomains?: readonly string[]; scanWorker?: ScanWorkerFactory; timeoutMs?: number; signal?: AbortSignal; sigint?: SigintSource; now?: () => number; advisoryRequest?: unknown; includeReadiness?: boolean }>;
@@ -31,7 +31,8 @@ export async function runBatchV2(input: BatchRunnerInput): Promise<BatchResultV2
   try { loaded = loadExplicitConfig(input?.config); } catch { return invalidConfig(); }
   if (!loaded.ok || !Array.isArray(input?.items) || input.items.length === 0 || input.items.length > 100_000) return invalidConfig();
   const config = loaded.config;
-  if (config.rules !== 'builtin' || config.catalogue !== 'builtin') return invalidConfig();
+  const expectedProfile = resolveAdmittedProfileV2(config.profile);
+  if (!expectedProfile || config.rules !== 'builtin' || config.catalogue !== 'builtin') return invalidConfig();
   if (config.limits !== 'builtin' && input.limitsDocument === undefined) return invalidConfig();
   const limitsDocument = input.limitsDocument;
   if (limitsDocument !== undefined && (
@@ -55,7 +56,7 @@ export async function runBatchV2(input: BatchRunnerInput): Promise<BatchResultV2
       const index = next++;
       if (index >= ordered.length) return;
       const current = ordered[index]!;
-      results[index] = combined.signal?.aborted ? cancelled(current.item.label) : await scanOne(current, scan, input, config, maxBytes, timeoutMs, combined.signal, input.now ?? Date.now);
+      results[index] = combined.signal?.aborted ? cancelled(current.item.label) : await scanOne(current, scan, input, expectedProfile, maxBytes, timeoutMs, combined.signal, input.now ?? Date.now);
     }
   };
   await Promise.all(Array.from({ length: concurrency }, () => work().catch(() => undefined)));
@@ -67,7 +68,7 @@ export async function runBatchV2(input: BatchRunnerInput): Promise<BatchResultV2
   return Object.freeze({ ok: true as const, items, cancelled: items.some(({ status }) => status === 'CANCELLED'), completed, failed: failedCount, concurrency });
 }
 
-async function scanOne(current: NormalizedInput, scan: BatchScanV2 | undefined, input: BatchRunnerInput, config: ScanConfigV2, maxBytes: number, timeoutMs: number, signal: AbortSignal | undefined, now: () => number): Promise<BatchItemV2> {
+async function scanOne(current: NormalizedInput, scan: BatchScanV2 | undefined, input: BatchRunnerInput, expectedProfile: AdmittedProfileEntryV2, maxBytes: number, timeoutMs: number, signal: AbortSignal | undefined, now: () => number): Promise<BatchItemV2> {
   if (current.invalid) return failed(current.item.label, 'INVALID_CONFIG');
   const deadline = timeoutMs === 0 ? now() : now() + timeoutMs;
   const remaining = (): number => Math.max(0, deadline - now());
@@ -95,15 +96,16 @@ async function scanOne(current: NormalizedInput, scan: BatchScanV2 | undefined, 
   if (read.byteLength > maxBytes) return failed(current.item.label, 'WORKFLOW_TOO_LARGE');
   const rawWorkflow = input.includeReadiness === true ? parseRawWorkflow(read) : undefined;
   let completed: WorkerHostRun<ScanWorkflowV2Result>;
+  const profileRef = Object.freeze({ id: expectedProfile.id, version: expectedProfile.version });
   if (scan !== undefined) {
     try {
-      completed = await runHostedScan(() => scan(read, current.item, { target: input.targetDocument, limits: input.limitsDocument, approvedDomains: input.approvedDomains, advisoryRequest: input.advisoryRequest }), { signal, timeoutMs: remaining(), now });
+      completed = await runHostedScan(() => scan(read, current.item, { profile: profileRef, target: input.targetDocument, limits: input.limitsDocument, approvedDomains: input.approvedDomains, advisoryRequest: input.advisoryRequest }), { signal, timeoutMs: remaining(), now });
     } catch { return failed(current.item.label, 'TOOL_INVARIANT_FAILED'); }
   } else {
     completed = await runScanInWorker<ScanWorkflowV2Result>(
       {
         bytes: read,
-        profile: { id: ADMITTED_PROFILE_V2.id, version: ADMITTED_PROFILE_V2.version },
+        profile: profileRef,
         ...(input.targetDocument === undefined ? {} : { target: input.targetDocument }),
         ...(input.limitsDocument === undefined ? {} : { limits: input.limitsDocument }),
         ...(input.approvedDomains === undefined ? {} : { approvedDomains: input.approvedDomains }),
@@ -117,15 +119,15 @@ async function scanOne(current: NormalizedInput, scan: BatchScanV2 | undefined, 
   if (completed.status === 'CRASH') return failed(current.item.label, 'WORKER_CRASH');
   if (completed.status === 'RESOURCE_LIMIT') return failed(current.item.label, 'WORKER_RESOURCE_LIMIT');
   if (completed.status !== 'COMPLETED') return failed(current.item.label, 'TOOL_INVARIANT_FAILED');
-  return toBatchItem(current.item.label, completed.value, config, rawWorkflow);
+  return toBatchItem(current.item.label, completed.value, expectedProfile, rawWorkflow);
 }
 
-function toBatchItem(label: string, result: ScanWorkflowV2Result, config: ScanConfigV2, rawWorkflow: unknown): BatchItemV2 {
+function toBatchItem(label: string, result: ScanWorkflowV2Result, expectedProfile: AdmittedProfileEntryV2, rawWorkflow: unknown): BatchItemV2 {
   try {
     if (!result || typeof result !== 'object' || typeof result.ok !== 'boolean') return failed(label, 'TOOL_INVARIANT_FAILED');
     if (!result.ok) return failed(label, safeScanCode(result.code));
     const profile = result.result && typeof result.result === 'object' ? result.result.profile : undefined;
-    if (!profile || profile.id !== config.profile || profile.version !== ADMITTED_PROFILE_V2.version) return failed(label, 'TOOL_INVARIANT_FAILED');
+    if (!profile || profile.id !== expectedProfile.id || profile.version !== expectedProfile.version) return failed(label, 'TOOL_INVARIANT_FAILED');
     return Object.freeze({ label, status: 'COMPLETED' as const, result: freezeValue(result), ...(rawWorkflow === undefined ? {} : { rawWorkflow }) });
   } catch { return failed(label, 'TOOL_INVARIANT_FAILED'); }
 }

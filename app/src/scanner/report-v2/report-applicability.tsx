@@ -35,20 +35,20 @@ export function ReportApplicability({ model }: ReportApplicabilityProps) {
     : 'Target context fields were supplied. This describes the declared context only and does not prove runtime configuration.';
 
   return (
-    <section aria-labelledby="scanner-v2-applicability-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-5">
+    <section aria-labelledby="scanner-v2-applicability-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-5">
       <h2 id="scanner-v2-applicability-heading" className="font-display text-lg font-semibold text-ink">Applicability and target context</h2>
       <p className="mt-1 text-sm leading-6 text-ink-muted">Applicability is evaluated only against explicit target facts and admitted advisory metadata. It is not a statement about runtime behavior.</p>
 
-      <div className="mt-4 rounded-control border border-hairline bg-raised/40 p-3 text-sm leading-6 text-ink">
+      <div className="mt-4 break-words rounded-control border border-hairline bg-raised/40 p-3 text-sm leading-6 text-ink">
         <span className="font-semibold">{targetMessage}</span>
       </div>
 
       <ReportAdvisoryStatus facts={model.v2.facts} />
 
       {findings.length > 0 && <div className="mt-4 divide-y divide-hairline">
-        {findings.map((finding) => <article key={finding.findingId} className="py-4 first:pt-0 last:pb-0">
+        {findings.map((finding) => <article key={finding.findingId} className="min-w-0 py-4 first:pt-0 last:pb-0">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <h3 className="font-display text-base font-semibold text-ink">{safeReportText(finding.ruleId, 140)}</h3>
+            <h3 className="break-words font-display text-base font-semibold text-ink">{safeReportText(finding.ruleId, 140)}</h3>
             <span className="self-start rounded-control border border-hairline bg-raised px-2.5 py-1 font-mono text-2xs font-semibold text-ink">Applicability: {finding.applicability}</span>
           </div>
           <p className="mt-2 text-sm leading-6 text-ink-muted">{rationale(finding.applicability)}</p>

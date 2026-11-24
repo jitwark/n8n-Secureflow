@@ -66,11 +66,23 @@ describe('ProvenanceCard', () => {
     expect(screen.getByText('Alice <[email]>')).toBeTruthy();
   });
 
-  it('renders metric badges when showMetrics is true', () => {
-    render(<ProvenanceCard entry={MOCK_ENTRY} showMetrics={true} />);
+  it('renders metric badges when showMetrics is true and distinguishes sticky notes and trigger normalization', () => {
+    const withNotes = {
+      ...MOCK_ENTRY,
+      structure: {
+        ...MOCK_ENTRY.structure,
+        nodeCount: 12,
+        rawNodeCount: 15,
+        annotationNodeCount: 3,
+        trigger: 'execute_workflow',
+      },
+    } as unknown as Entry;
+    render(<ProvenanceCard entry={withNotes} showMetrics={true} />);
     expect(screen.getByText('NODES:')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
-    expect(screen.getByText('Webhook')).toBeTruthy();
+    expect(screen.getByText('STICKY NOTES:')).toBeTruthy();
+    expect(screen.getByText('3')).toBeTruthy();
+    expect(screen.getByText('Execute Workflow')).toBeTruthy();
   });
 
   it('renders View on n8n.io link with target=_blank when link_only and n8n_official', () => {

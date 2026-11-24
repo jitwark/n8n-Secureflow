@@ -34,6 +34,7 @@ export function HomeFacts({ facts }: { facts: HomeFact[] }) {
       <div className="flex items-center justify-end px-1">
         <Link
           href="/analytics/"
+          prefetch={false}
           className="flex min-h-11 items-center rounded-control font-mono text-xs font-bold text-accent-text hover:underline focus-visible:outline-2 focus-visible:outline-accent-border"
         >
           See how the catalogue breaks down

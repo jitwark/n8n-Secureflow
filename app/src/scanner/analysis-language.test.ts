@@ -140,4 +140,39 @@ describe('analysis language', () => {
     expect(analysisStatusLabel('DEGRADED')).toBe('Partial analysis');
     expect(analysisStatusLabel(undefined)).toBeNull();
   });
+
+  it('treats COMPLETE status with NONE catalogue-miss diagnostics as Analysis complete and LIMITED as Partial analysis', () => {
+    const completeWithCatalogueMiss = analysisPresentation({
+      status: 'COMPLETE',
+      assessment: 'present',
+      evidenceComplete: true,
+      diagnostics: [
+        { id: 'd1', code: 'SEMANTIC_CATALOGUE_MISS', capabilityId: 'structural-policies', aggregateEffect: 'NONE', assessmentEligible: true, omitted: 0 },
+        { id: 'd2', code: 'GENERIC_NODE_UNMODELED_CAPABILITY', capabilityId: 'structural-policies', aggregateEffect: 'NONE', assessmentEligible: true, omitted: 0 },
+      ],
+      capabilities: [
+        { id: 'structural-policies', required: true, status: 'COMPLETED', seen: 2, analyzed: 2, skipped: 0, omitted: 0, diagnosticIds: ['d1', 'd2'] },
+      ],
+      limits: [{ omitted: 0, exhausted: false }],
+      omittedFindings: 0,
+      rejectedCandidates: 0,
+      collapsedCandidates: 0,
+    });
+    expect(completeWithCatalogueMiss.label).toBe('Analysis complete');
+    expect(completeWithCatalogueMiss.tone).toBe('complete');
+
+    const limited = analysisPresentation({
+      status: 'LIMITED',
+      assessment: 'present',
+      evidenceComplete: true,
+      diagnostics: [],
+      capabilities: [],
+      limits: [],
+      omittedFindings: 0,
+      rejectedCandidates: 0,
+      collapsedCandidates: 0,
+    });
+    expect(limited.label).toBe('Partial analysis');
+    expect(limited.tone).toBe('warning');
+  });
 });

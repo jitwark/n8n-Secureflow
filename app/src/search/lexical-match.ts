@@ -1,8 +1,13 @@
-import MiniSearch, { type Query } from 'minisearch';
+import MiniSearch, { type Query, type SearchOptions } from 'minisearch';
 import { aliasesOf } from './aliases';
 import type { SearchDocument } from './worker-messages-doc';
 
 export type OrdinalMatch = { ordinal: number; bm25: number; semantic: number };
+
+const SPARSE_DIRECT_THRESHOLD = 15;
+const ALIAS_FALLBACK_WEIGHT = 0.55;
+const SEMANTIC_ONLY_MIN_SCORE = 0.55;
+const SEMANTIC_ONLY_LEXICAL_CAP = 25;
 
 export type LexicalMatchInput = {
   tokens: string[];
@@ -33,10 +38,11 @@ export type LexicalMatchInput = {
 function searchEveryTier(
   indexes: MiniSearch<SearchDocument>[],
   query: Query,
+  searchOptions?: SearchOptions,
 ): Array<{ id: string; score: number }> {
   const merged: Array<{ id: string; score: number }> = [];
   for (const index of indexes) {
-    const results = index.search(query);
+    const results = index.search(query, searchOptions);
     const max = results.reduce((most, result) => Math.max(most, result.score), 0);
     if (max <= 0) continue;
     for (const result of results) merged.push({ id: result.id as string, score: result.score / max });
@@ -44,19 +50,39 @@ function searchEveryTier(
   return merged;
 }
 
-function queryForToken(token: string): Query {
+function directQueryForToken(token: string): Query {
   const terms = (MiniSearch.getDefault('tokenize') as (value: string) => string[])(token).filter(Boolean);
-  const aliases = aliasesOf(token.toLowerCase());
-  if (terms.length <= 1) return { combineWith: 'OR', queries: [token, ...aliases] };
+  if (terms.length <= 1) return token;
 
   // The outer query tokenizer keeps a whitespace-delimited group together.
   // MiniSearch then splits punctuation inside that group; require all of those
   // terms so common partial words cannot turn one compound OOV token into a
-  // broad OR search. Alias expansions remain OR alternatives to the group.
-  return {
-    combineWith: 'OR',
-    queries: [{ combineWith: 'AND', queries: terms }, ...aliases],
-  };
+  // broad OR search.
+  return { combineWith: 'AND', queries: terms };
+}
+
+function searchUnquotedToken(
+  indexes: MiniSearch<SearchDocument>[],
+  token: string,
+): Array<{ id: string; score: number }> {
+  const directQuery = directQueryForToken(token);
+  // Search direct exact/prefix matches first without fuzzy/alias expansion so
+  // crisp terms (e.g. "gmail", "webhook") stay tightly bounded instead of
+  // spilling into broad synonyms ("email", "http", "api", "trigger").
+  const direct = searchEveryTier(indexes, directQuery, { fuzzy: false, prefix: true });
+  const directIds = new Set(direct.map((hit) => hit.id));
+  if (directIds.size >= SPARSE_DIRECT_THRESHOLD) return direct;
+
+  const aliases = aliasesOf(token.toLowerCase());
+  const fallbackQuery: Query = aliases.length > 0
+    ? { combineWith: 'OR', queries: [directQuery, ...aliases] }
+    : directQuery;
+  const fallback = searchEveryTier(indexes, fallbackQuery);
+  const merged = [...direct];
+  for (const hit of fallback) {
+    if (!directIds.has(hit.id)) merged.push({ id: hit.id, score: hit.score * ALIAS_FALLBACK_WEIGHT });
+  }
+  return merged;
 }
 
 /**
@@ -93,7 +119,7 @@ export function matchTokens({
   const matched: OrdinalMatch[] = [];
   const termSets = tokens.map((token) => {
     const quoted = token.startsWith('"') && token.endsWith('"');
-    return searchEveryTier(indexes, quoted ? token : queryForToken(token));
+    return quoted ? searchEveryTier(indexes, token) : searchUnquotedToken(indexes, token);
   });
 
   const docScore = new Map<string, number>();
@@ -147,11 +173,11 @@ export function matchTokens({
   // to keep semantic-only expansion working for genuine intent-only queries.
   const hasVocabularyEvidence = termSets.some((results) => results.length > 0);
 
-  if (semanticScores.size > 0 && hasVocabularyEvidence) {
+  if (semanticScores.size > 0 && hasVocabularyEvidence && matched.length < SEMANTIC_ONLY_LEXICAL_CAP) {
     const existing = new Set(matched.map((item) => item.ordinal));
     [...semanticScores.entries()]
       .sort((left, right) => right[1] - left[1])
-      .filter(([, score]) => score >= 0.08)
+      .filter(([, score]) => score >= SEMANTIC_ONLY_MIN_SCORE)
       .slice(0, 150)
       .forEach(([ordinal, semantic]) => {
         if (!existing.has(ordinal)) matched.push({ ordinal, bm25: 0, semantic });

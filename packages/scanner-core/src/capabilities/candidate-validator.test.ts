@@ -14,7 +14,7 @@ import { createEdgeIdentityDigest, createNodeIdentityDigest, encodeIdentityTuple
 import { SAFE_FACT_EVIDENCE_MAPPINGS_V2, SAFE_FACT_REGISTRY_V2 } from '../facts/safe-fact-registry';
 import { betaHardenedRuleCatalog } from '../policy/rule-catalog';
 import { RULE_PACK_DIGEST_V2, validateCapabilityCandidate as validateAdmittedCapabilityCandidate } from './candidate-validator';
-import { BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST } from './profile-manifest';
+import { BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST, STANDARD_PROFILE_MANIFEST } from './profile-manifest';
 import type { CapabilityCandidateV2 } from './scheduler';
 import { createCapabilityCandidateAdmissionSnapshotV2, isScannerAdmissionSnapshotV2 } from '../admission/snapshot';
 
@@ -173,17 +173,19 @@ describe('capability candidate admission', () => {
     try { expect(validateCapabilityCandidate({ ...empty(), facts: [largeFact] }, capability, registries, { ...DEFAULT_SCANNER_LIMITS_V2, maxEvidenceBytes: evidence + 16 })).toMatchObject({ ok: false, reason: 'LIMIT_EXCEEDED' }); } finally { encode.mockRestore(); }
   });
 
-  it('refuses legacy taint facts even alongside complete canonical field evidence', () => {
+  it('validates TAINTED_* v2 summary fallback alongside v3 coverage and enforces sink class match', () => {
     const taintRule = { ...rule, ruleId: 'TAINTED_SQL_QUERY', capabilityId: 'taint-integrity', effect: 'REPORT_ONLY' as const, severity: 'HIGH' as const, confidence: 'MEDIUM' as const, evidenceSchemaId: 'v1.taint', cweIds: ['CWE-89'] };
     const taintDataflowProperties = { flowKind: 'TAINT_SINK', sink: 'SQL', parameterPath: '/query', referenceRoot: '$json', propertyPathComplete: true, humanGatePresent: false, humanGateDominates: false, taintLabels: ['WEBHOOK_BODY'], sourceNodeId: 'w', sourceNodeName: 'Webhook' };
+    const wrongSinkProperties = { ...taintDataflowProperties, sink: 'COMMAND' };
     const taintFact = fact(undefined, 'dataflow.summary.v2', taintDataflowProperties);
+    const wrongSinkFact = fact(undefined, 'dataflow.summary.v2', wrongSinkProperties);
     const taintMetadata = BETA_HARDENED_PROFILE_MANIFEST.capabilities.find((item) => item.id === 'taint-integrity')!;
     const taintCapability = { ...taintMetadata, run: capability.run };
     const taintRules = new Map(taintCapability.ruleIds.map((ruleId) => [ruleId, ruleId === taintRule.ruleId ? taintRule : canonicalRules.get(ruleId)!]));
     const canonical = fieldFlowFacts({ 'dataflow.coverage.v1': { capabilityId: 'taint-integrity' } });
     expect(validateCapabilityCandidate({ ...empty(), facts: canonical }, taintCapability, { facts, rules: taintRules })).toMatchObject({ ok: true });
-    const taintCandidate = validateCapabilityCandidate({ ...empty(), facts: [...canonical, taintFact], findings: [finding(taintRule.ruleId, [taintFact.factId])] }, taintCapability, { facts, rules: taintRules }, DEFAULT_SCANNER_LIMITS_V2);
-    expect(taintCandidate).toMatchObject({ ok: false });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [...canonical, taintFact], findings: [finding(taintRule.ruleId, [taintFact.factId])] }, taintCapability, { facts, rules: taintRules }, DEFAULT_SCANNER_LIMITS_V2)).toMatchObject({ ok: true });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [...canonical, wrongSinkFact], findings: [finding(taintRule.ruleId, [wrongSinkFact.factId])] }, taintCapability, { facts, rules: taintRules }, DEFAULT_SCANNER_LIMITS_V2)).toMatchObject({ ok: false, reason: 'DANGLING_REFERENCE' });
   });
 
   it.each([
@@ -216,14 +218,16 @@ describe('capability candidate admission', () => {
   });
 
   it('preserves the separate v2 agent-control evidence and human-gate requirements', () => {
-    const agentRule = { ...rule, ruleId: 'AI_AGENT_UNGATED_TOOL', capabilityId: 'agentic-control', effect: 'REPORT_ONLY' as const, severity: 'MEDIUM' as const, confidence: 'LOW' as const, evidenceSchemaId: 'v1.agent-control', cweIds: ['CWE-269'], owaspAgenticIds: ['Excessive Agency'] };
+    const agentMeta = BETA_HARDENED_PROFILE_MANIFEST.capabilities.find((item) => item.id === 'agentic-control')!;
+    const agentCap = { ...agentMeta, run: capability.run };
+    const agentRules = new Map(agentCap.ruleIds.map((ruleId) => [ruleId, canonicalRules.get(ruleId)!]));
     const nodeFact = fact(undefined, 'node.capability.v2', undefined, { capabilities: ['AI_AGENT'], toolCount: 1, contextCount: 1 });
     const agentFlow = fact(undefined, 'dataflow.summary.v2', { flowKind: 'AGENT_INFLUENCE', propertyPathComplete: true, humanGatePresent: false, humanGateDominates: false, taintLabels: ['WEBHOOK_BODY'] });
-    const agentDependencies = ['graph-semantics', 'taint-confidentiality', 'taint-integrity']; const agentCandidate = validateCapabilityCandidate({ ...empty(), facts: [nodeFact, agentFlow], findings: [finding(agentRule.ruleId, [nodeFact.factId, agentFlow.factId])] }, { ...capability, id: 'agentic-control', required: false, dependsOn: agentDependencies, ruleIds: [agentRule.ruleId] }, { facts, rules: new Map([[agentRule.ruleId, agentRule]]) }, DEFAULT_SCANNER_LIMITS_V2);
+    const agentCandidate = validateCapabilityCandidate({ ...empty(), facts: [nodeFact, agentFlow], findings: [finding('AI_AGENT_UNGATED_TOOL', [nodeFact.factId, agentFlow.factId])] }, agentCap, { facts, rules: agentRules }, DEFAULT_SCANNER_LIMITS_V2);
     expect(agentCandidate).toMatchObject({ ok: true });
 
     const gatedAgentFlow = fact(undefined, 'dataflow.summary.v2', { flowKind: 'AGENT_INFLUENCE', propertyPathComplete: true, humanGatePresent: true, humanGateDominates: true, taintLabels: ['WEBHOOK_BODY'] });
-    expect(validateCapabilityCandidate({ ...empty(), facts: [nodeFact, gatedAgentFlow] }, { ...capability, id: 'agentic-control', required: false, dependsOn: agentDependencies, ruleIds: [agentRule.ruleId] }, { facts, rules: new Map([[agentRule.ruleId, agentRule]]) }, DEFAULT_SCANNER_LIMITS_V2)).toMatchObject({ ok: false, reason: 'MALFORMED_CANDIDATE' });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [nodeFact, gatedAgentFlow] }, agentCap, { facts, rules: agentRules }, DEFAULT_SCANNER_LIMITS_V2)).toMatchObject({ ok: false, reason: 'MALFORMED_CANDIDATE' });
   });
 
   it('verifies canonical trace ids and canonical duplicate finding identity', () => {
@@ -566,5 +570,30 @@ describe('capability candidate admission', () => {
     Object.defineProperty(hostileLimits, 'maxEvidenceBytes', { get: () => { invoked = true; throw new Error('limit-secret'); } });
     expect(validateCapabilityCandidate(admit(empty()), capability, registries, hostileLimits)).toMatchObject({ ok: false, reason: 'UNSAFE_INPUT' });
     expect(invoked).toBe(false);
+  });
+
+  it('validates v3 promoted SCORING rules, recovered POTENTIAL expressions, and new v0.3 rules', () => {
+    const exprMeta = STANDARD_PROFILE_MANIFEST.capabilities.find((item) => item.id === 'expression-security')!;
+    const exprCap = { ...exprMeta, run: capability.run };
+    const exprScoringRules = new Map(exprCap.ruleIds.map((id) => [id, { ...canonicalRules.get(id)!, effect: 'SCORING' as const }]));
+    const recoveredFact = fact(undefined, 'code.indicator.v2', { language: 'EXPRESSION', indicator: 'EVAL', start: 0, end: 4, parseState: 'RECOVERED' });
+    const recoveredPotential = { ruleId: 'EXPRESSION_SANDBOX_ESCAPE', evidenceClass: 'SUSPICIOUS_SYNTAX' as const, conclusion: 'POTENTIAL' as const, applicability: 'APPLICABLE' as const, subject: sourceSubject, factRefs: [recoveredFact.factId], traceRefs: [], remediationId: 'r' };
+    const recoveredObserved = { ...recoveredPotential, conclusion: 'OBSERVED' as const };
+    expect(validateCapabilityCandidate({ ...empty(), facts: [recoveredFact], findings: [recoveredPotential] }, exprCap, { facts, rules: exprScoringRules })).toMatchObject({ ok: true });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [recoveredFact], findings: [recoveredObserved] }, exprCap, { facts, rules: exprScoringRules })).toMatchObject({ ok: false, reason: 'FORBIDDEN_CONTENT' });
+    const exprReportOnlyRules = new Map(exprCap.ruleIds.map((id) => [id, { ...canonicalRules.get(id)!, effect: 'REPORT_ONLY' as const }]));
+    expect(validateCapabilityCandidate(empty(), exprCap, { facts, rules: exprReportOnlyRules })).toMatchObject({ ok: false, reason: 'MALFORMED_CANDIDATE' });
+
+    const egressMeta = STANDARD_PROFILE_MANIFEST.capabilities.find((item) => item.id === 'agentic-control')!;
+    const egressCap = { ...egressMeta, run: capability.run };
+    const egressRules = new Map(egressCap.ruleIds.map((id) => [id, { ...canonicalRules.get(id)!, effect: 'SCORING' as const }]));
+    const agentNode = fact(undefined, 'node.capability.v2', undefined, { capabilities: ['AI_AGENT'], toolCount: 1, contextCount: 0 });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [agentNode], findings: [finding('AGENT_EGRESS_UNRESTRICTED', [agentNode.factId])] }, egressCap, { facts, rules: egressRules })).toMatchObject({ ok: true });
+
+    const graphMeta = STANDARD_PROFILE_MANIFEST.capabilities.find((item) => item.id === 'graph-semantics')!;
+    const graphCap = { ...graphMeta, run: capability.run };
+    const graphRules = new Map(graphCap.ruleIds.map((id) => [id, { ...canonicalRules.get(id)!, effect: 'SCORING' as const }]));
+    const triggerFlow = fact(undefined, 'dataflow.summary.v2', { flowKind: 'TRIGGER_SINK', sink: 'COMMAND', sourceNodeId: 'w1', sourceNodeName: 'Webhook', propertyPathComplete: true, humanGatePresent: false, humanGateDominates: false, taintLabels: ['WEBHOOK_BODY'] });
+    expect(validateCapabilityCandidate({ ...empty(), facts: [triggerFlow], findings: [{ ...finding('UNAUTHENTICATED_TRIGGER_TO_SINK', [triggerFlow.factId]), evidenceClass: 'POTENTIAL_DATAFLOW' }] }, graphCap, { facts, rules: graphRules })).toMatchObject({ ok: true });
   });
 });

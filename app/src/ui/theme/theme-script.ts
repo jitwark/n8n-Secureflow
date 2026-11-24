@@ -33,6 +33,5 @@ export function getThemeToggleScript(): string {
     + `b.setAttribute('aria-pressed',String(dark));`
     + `b.setAttribute('aria-label','Switch to '+(dark?'light':'dark')+' theme');`
     + `b.textContent=dark?'Light':'Dark';`
-    + `b.className=b.className.replace(dark?'bg-raised text-ink':'bg-accent text-accent-ink',dark?'bg-accent text-accent-ink':'bg-raised text-ink');`
     + `window.dispatchEvent(new Event('secureflowthemechange'));});})();`;
 }

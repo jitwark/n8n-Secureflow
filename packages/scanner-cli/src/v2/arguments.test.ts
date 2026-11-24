@@ -35,15 +35,43 @@ describe('v2 CLI grammar', () => {
     });
     const bare = parseArgumentsV2(['--schema', 'v2', 'scan', 'wf.json', '--profile', 'beta-default']);
     expect(bare).toMatchObject({ ok: true, command: { profile: 'beta-default', cliOverrides: { profile: 'beta-default' } } });
+    const strictAlias = parseArgumentsV2(['scan', 'wf.json', '--profile', 'ci']);
+    expect(strictAlias).toMatchObject({ ok: true, command: { profile: 'strict', cliOverrides: { profile: 'ci' } } });
+    const hardened = parseArgumentsV2(['scan', 'wf.json', '--profile', 'beta-hardened']);
+    expect(hardened).toMatchObject({ ok: true, command: { profile: 'beta-hardened', cliOverrides: { profile: 'beta-hardened' } } });
     const defaults = parseArgumentsV2(['--schema', 'v2', 'scan', 'wf.json']);
-    expect(defaults).toMatchObject({ ok: true, command: { profile: 'beta-default' } });
+    expect(defaults).toMatchObject({ ok: true, command: { profile: 'standard', format: 'json' } });
     if (!pinned.ok || pinned.command.kind !== 'scan') throw new Error('pinned profile parse failed');
     const resolved = loadExplicitConfig({ schemaVersion: 'n8n-scan-config-v2' }, { cli: pinned.command.cliOverrides });
     expect(resolved).toMatchObject({ ok: true, config: { profile: 'beta-default' } });
-    for (const invalid of ['beta-hardened', 'beta-default@9.9.9', 'BETA-DEFAULT']) {
+    for (const invalid of ['unknown-profile', 'beta-default@9.9.9', 'BETA-DEFAULT', 'STANDARD']) {
       expect(parseArgumentsV2(['--schema', 'v2', 'scan', 'wf.json', '--profile', invalid]))
         .toMatchObject({ ok: false, error: { code: 'PROFILE_NOT_ADMITTED', argument: '--profile' } });
     }
+  });
+
+  it('parses v0.3 formats, case-insensitive severity/confidence/fail-on flags, and baseline paths', () => {
+    const parsed = parseArgumentsV2([
+      'scan', 'wf.json', '--format', 'pretty', '--min-severity', 'high', '--min-confidence', 'medium', '--fail-on', 'none', '--baseline', 'ci/baseline.json',
+    ]);
+    expect(parsed).toMatchObject({
+      ok: true,
+      command: {
+        kind: 'scan',
+        format: 'pretty',
+        formatSpecified: true,
+        minSeverity: 'HIGH',
+        minConfidence: 'MEDIUM',
+        failOn: 'NONE',
+        baseline: 'ci/baseline.json',
+      },
+    });
+    const md = parseArgumentsV2(['scan', 'wf.json', '--format', 'markdown']);
+    expect(md).toMatchObject({ ok: true, command: { format: 'markdown', formatSpecified: true } });
+    expect(parseArgumentsV2(['scan', 'wf.json'])).toMatchObject({ ok: true, command: { format: 'json', formatSpecified: false } });
+    expect(parseArgumentsV2(['scan', 'wf.json', '--min-severity', 'NONE'])).toMatchObject({ ok: false, error: { code: 'INVALID_VALUE', argument: '--min-severity' } });
+    expect(parseArgumentsV2(['scan', 'wf.json', '--min-confidence', 'CRITICAL'])).toMatchObject({ ok: false, error: { code: 'INVALID_VALUE', argument: '--min-confidence' } });
+    expect(parseArgumentsV2(['scan', 'wf.json', '--baseline', '../secret.json'])).toMatchObject({ ok: false, error: { code: 'REMOTE_PATH', argument: '--baseline' } });
   });
 
   it('rejects duplicate, unknown, remote, and non-built-in artifact options without echoing values', () => {
@@ -94,9 +122,11 @@ describe('v2 CLI grammar', () => {
       .toMatchObject({ ok: false, error: { code: 'UNKNOWN_OPTION', argument: '--audit-supply-chain' } });
   });
 
-  it('keeps v1 optional-scan shorthand on the legacy route', () => {
+  it('routes bare legacy shorthand to v1 and routes scan subcommands to v2', () => {
     expect(parseCliArguments(['workflow.json'])).toEqual({ mode: 'v1', argv: ['workflow.json'] });
-    expect(parseCliArguments(['scan', '-', '--format', 'sarif'])).toEqual({ mode: 'v1', argv: ['scan', '-', '--format', 'sarif'] });
+    expect(parseCliArguments(['-', '--format', 'sarif'])).toEqual({ mode: 'v1', argv: ['-', '--format', 'sarif'] });
+    const scanRouted = parseCliArguments(['scan', '-', '--format', 'sarif']);
+    expect(scanRouted).toMatchObject({ mode: 'v2', result: { ok: true, command: { kind: 'scan', format: 'sarif', profile: 'standard' } } });
     const routed = parseCliArguments(['--schema', 'v2', 'rules']);
     expect(routed.mode).toBe('v2');
     if (routed.mode === 'v2') expect(routed.result).toMatchObject({ ok: true, command: { kind: 'rules' } });

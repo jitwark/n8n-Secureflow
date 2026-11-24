@@ -108,7 +108,7 @@ function Available({ model }: { model: Extract<ReportPrerequisitesModel, { statu
 }
 
 export function ReportPrerequisites({ model }: { model: ReportPrerequisitesModel }) {
-  return <section aria-labelledby="prerequisites-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-5">
+  return <section aria-labelledby="prerequisites-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-5">
     <h2 id="prerequisites-heading" className="font-display text-lg font-semibold text-ink">Prerequisites and provenance</h2>
     <p className="mt-2 text-sm text-ink-muted">What this workflow export declares that may need credential, package, environment or linked-workflow setup.</p>
     {model.status === 'AVAILABLE' ? <Available model={model} /> : <div role="alert" className="mt-4 rounded-control border border-sev-high bg-raised p-3 text-sm text-sev-high">

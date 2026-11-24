@@ -4,15 +4,102 @@ All notable changes to n8n SecureFlow — the scanner, the CLI, the catalogue si
 pipeline that builds it.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-The published release in this repository is [v0.2.1](https://github.com/jitwark/sfscanner/releases/tag/v0.2.1).
+The published release in this repository is [v0.3.0](https://github.com/jitwark/sfscanner/releases/tag/v0.3.0).
 See [programme status](docs/scanner/programme-status.md) for verified delivery and coverage limits.
 
 Entries are grouped by observable behavior. Historical audit IDs are retained as
 evidence labels; the private audit records are not part of the public repository.
 
+## [0.3.0] — 2026-11-24
+
+A lean closure release: six product lines were retired rather than repaired, and the scanner core,
+the CLI and the static export were rebuilt around what is actually shipped.
+
+### Retired
+
+- **The Excel, SQLite, PostgreSQL, CSV and NDJSON public data exports are gone**, along with the
+  18-relation V4 dataset ceremony that produced them. Each carried its own staging, qualification,
+  rollback and privacy path, and none of them was the thing people used. The static export and the
+  npm package are the product.
+- **The formal 95%/90% node-modelling admission programme is retired** rather than left permanently
+  missed. Its measured result (1,445 of 144,043 reviewed executable instances) is preserved as
+  history; it is no longer a release gate that can never pass.
+- The staged-release family (`stage-release`, `release-verify`, `rollback-release`,
+  `rehearse-release-rollback`) and `prepare:release-data` went with the ceremony they staged. A
+  rollback is now an owner-controlled host and git operation.
+- Removed the historical `docs/audit/` (126.4 MiB) and `docs/audits/` (25.4 MiB) trees from the
+  working branch. Their conclusions live on in the docs that cite them as evidence; the raw
+  per-packet records are recoverable from git history.
+
+### Scanner core
+
+- **`standard@3.0.0` is the default profile; `strict@3.0.0` (alias `ci`) is its stricter sibling.**
+  `beta-default@2.0.0` and `beta-hardened@2.0.0` are retained and admitted, so all four profiles are
+  admitted and selectable and `profiles` reports each one's real admission state.
+- **Severity scoring is monotonic**: adding a finding can no longer lower a workflow's score.
+- **Unmodeled node types no longer degrade an analysis.** They are recorded as catalogue-coverage
+  facts with aggregate effect `NONE`, and `DEGRADED` is reserved for genuinely lost optional work.
+  On the v0.3 corpus that took unmodeled-trigger degradation from **15,477** workflows to **0**.
+- 21 rules ship across structural policies, taint integrity, graph semantics, expression security,
+  agentic control, and JavaScript/Python analysis, including the graph and taint rules that let the
+  corpus scan report findings the v2 baseline structurally could not. 19 of the 21 fired on the
+  corpus; EXPRESSION_SANDBOX_ESCAPE and UNAPPROVED_DOMAIN matched nothing, the latter because
+  its allowlist is empty by default.
+
+### Corpus scan — v0.3 results
+
+- Scanned 18,320 templates and 298,708 nodes: **15,220 `COMPLETE` (83.08%)**, 1,285 `DEGRADED`,
+  1,798 `INDETERMINATE`, and 17 failed scans reported rather than hidden.
+- **63,064 findings** across 14,037 templates; **7,210** templates graded High or Critical.
+- Top rules by affected templates: `N8N_CODE_NODE` 7,513, `WEBHOOK_EXPOSURE` 4,771,
+  `UNAUTHENTICATED_TRIGGER_TO_SINK` 3,319, `TAINTED_AI_PROMPT` 2,655, `EXPRESSION_ENV_EXPOSURE`
+  2,202, `TAINTED_REQUEST_URL` 2,174. Taint flows affect 4,366 templates (23.83%).
+- Every figure is recorded in `app/src/catalogue/v03-corpus-metrics.json`.
+
+### CLI and MCP
+
+- **Output redesigned** around `pretty`, `markdown`, `table`, `json`, `ndjson` and `sarif`, with
+  `pretty` on a TTY and `json` otherwise. Triage flags `--min-severity`, `--min-confidence` and
+  `--baseline` are new: they filter what is *reported* without changing the `--fail-on` threshold
+  that decides the exit code.
+- **The packed package is 1.07 MiB unpacked** (44 files), down from 22.6 MiB, with the same
+  `sfscanner` and `sfscanner-mcp` bins. `npm audit --audit-level=moderate` reports 0 vulnerabilities.
+- `--schema v2` is now optional: the default route is the versioned grammar, and the marker exists so
+  a recorded invocation states its grammar rather than inheriting it.
+
+### Web app and static export
+
+- **The per-entry `/w/<slug>/` detail route was replaced** by a single client-resolved
+  `/w/view/?id=...` route, with detail payloads, charts and previews packed into 132 `.gzbin` buckets.
+- **The export is 33,723,431 bytes across 755 files (32.16 MiB), including 50 HTML documents**,
+  against a 35 MiB budget. Search and semantic indexes are compressed rather than shipped raw, and
+  OG images are palette-quantized.
+- `docs/perf/budgets.json` was re-based onto real numbers: `files` 18,000 → 1,500, `rawBytes`
+  943,718,400 → 36,700,160, `htmlBytes` 560,000,000 → 10,485,760. The old caps passed this export
+  trivially and would have let per-entry pages return without warning.
+
+### Search
+
+- Search precision improved on the library surface, with the quality gate's ranking figures measured
+  against the promoted corpus rather than a stale snapshot.
+
+### Security
+
+- **Next.js upgraded to 16.4.6**, taking `npm audit --audit-level=moderate` to 0 vulnerabilities.
+- The scanner remains offline by construction: no HTTP, DNS, sockets, telemetry or remote imports,
+  and external rule packs are refused rather than admitted.
+
+### Documentation
+
+- Regenerated `docs/scanner/generated/*.md` from current rules, diagnostics, limits, schemas and CLI.
+- Brought `docs/CLI.md` and `docs/scanner/cli-v2.md` back into parity with the help authority: all 34
+  supported options, 4 commands and 6 exit codes are now machine-checked.
+- Removed documentation references to deleted scripts and retired packages, and corrected command
+  references that named `npm run` aliases which no longer exist.
+
 ## [Unreleased]
 
-No additional implementation is queued for this website update.
+No additional implementation is queued for this release.
 
 ## [site-2026-11-08-ui] — 2026-11-14
 

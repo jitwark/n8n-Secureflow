@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type { Route } from 'next';
 import { Breadcrumbs } from '../../src/ui/breadcrumbs';
 import { getHubIndex } from '../../src/catalogue/hub-index';
 import { MAX_STATIC_HUBS_PER_KIND, libraryTagHref, publishedHubsForKind } from '../../src/catalogue/hub-route';
@@ -38,7 +39,7 @@ export default function TagsIndexPage() {
           path: '/tags/',
           description,
           collection: true,
-          items: hubs.map((hub) => ({ name: hub.title, path: `/tags/${hub.slug}/` })),
+          items: hubs.map((hub) => ({ name: hub.title, path: libraryTagHref(hub.slug) })),
         })}
       />
       <header className="space-y-3">
@@ -54,7 +55,7 @@ export default function TagsIndexPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {hubs.map((hub) => (
           <div key={hub.slug} className="p-4 rounded-lg bg-panel border border-hairline space-y-3">
-            <Link href={libraryTagHref(hub.slug)} className="flex items-center justify-between group">
+            <Link href={libraryTagHref(hub.slug) as Route} prefetch={false} className="flex items-center justify-between group">
               <span className="font-medium text-ink group-hover:text-accent-text transition-colors">
                 {hub.title}
               </span>

@@ -105,7 +105,6 @@ describe('frozen version-presence vectors (Q02.0a)', () => {
   it('V3 keeps a malformed typeVersion indeterminate and resolves nothing', () => {
     const workflow = workflowOf({ id: 'v3', name: 'V3', type: 'n8n-nodes-base.httpRequest', typeVersion: true, parameters: {} });
     const node = workflow.nodes[0]!;
-
     expect(node.scoringEligibility).toBe('INDETERMINATE');
     expect(node.typeVersion).toBeUndefined();
     expect(workflow.ambiguities).toContainEqual(expect.objectContaining({

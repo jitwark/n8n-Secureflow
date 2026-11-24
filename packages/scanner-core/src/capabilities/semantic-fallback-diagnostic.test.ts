@@ -39,11 +39,11 @@ describe('generic fallback coverage diagnostics', () => {
     ]);
     for (const code of ['SEMANTIC_CATALOGUE_MISS', 'GENERIC_NODE_UNMODELED_CAPABILITY']) {
       expect(result.analysis.diagnostics).toContainEqual(expect.objectContaining({
-        code, aggregateEffect: 'DEGRADED', assessmentEligible: true,
+        code, aggregateEffect: 'NONE', assessmentEligible: true,
         location: expect.objectContaining({ pointer: '/nodes/1' }),
       }));
     }
-    expect(result.analysis.status).toBe('DEGRADED');
+    expect(result.analysis.status).toBe('COMPLETE');
     expect(result.assessment).not.toBeNull();
     expect(result.findings.map(({ ruleId }) => ruleId)).toContain('RAW_SECRET_INDICATOR');
     expect(JSON.stringify(result)).not.toContain(SECRET);
@@ -63,7 +63,7 @@ describe('generic fallback coverage diagnostics', () => {
       'SEMANTIC_CATALOGUE_MISS',
       'GENERIC_NODE_UNMODELED_CAPABILITY',
     ]);
-    expect(result.analysis.status).toBe('DEGRADED');
+    expect(result.analysis.status).toBe('COMPLETE');
     expect(result.assessment).not.toBeNull();
   });
 
@@ -78,7 +78,10 @@ describe('generic fallback coverage diagnostics', () => {
       'SEMANTIC_CATALOGUE_MISS',
     ]);
     expect(result.analysis.diagnostics).toContainEqual(
-      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'INDETERMINATE', assessmentEligible: false }),
+      expect.objectContaining({ code: 'MALFORMED_NODE_PARAMETERS', aggregateEffect: 'INDETERMINATE', assessmentEligible: false }),
+    );
+    expect(result.analysis.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true }),
     );
   });
 

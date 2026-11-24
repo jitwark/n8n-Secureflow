@@ -17,7 +17,7 @@ describe('getThemeToggleScript', () => {
     document.body.innerHTML = `<button type="button" ${THEME_TOGGLE_ATTRIBUTE}
       aria-pressed="${theme === 'dark'}"
       aria-label="Switch to ${theme === 'dark' ? 'light' : 'dark'} theme"
-      class="min-h-11 ${theme === 'dark' ? 'bg-accent text-accent-ink' : 'bg-raised text-ink'}"
+      class="min-h-11 border border-hairline bg-panel text-ink hover:bg-raised"
       ><span aria-hidden="true">${theme === 'dark' ? 'Light' : 'Dark'}</span></button>`;
     new Function(getThemeToggleScript())();
     return document.querySelector('button')!;
@@ -57,7 +57,7 @@ describe('getThemeToggleScript', () => {
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(button.getAttribute('aria-label')).toBe('Switch to dark theme');
     expect(button.textContent).toBe('Dark');
-    expect(button.className).toContain('bg-raised');
+    expect(button.className).toContain('bg-panel');
     expect(button.className).not.toContain('bg-accent');
   });
 

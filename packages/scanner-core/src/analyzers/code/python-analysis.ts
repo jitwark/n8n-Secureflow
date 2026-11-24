@@ -32,17 +32,73 @@ function analyzeNode(node: NormalizedWorkflowNode, result: PythonAnalysisResult)
   } catch { return addDiagnostic(result, 'PYTHON_PARSE_FAILED', 'PARSER', node); }
 }
 function analyzeTree(root: CstNode, source: string, node: NormalizedWorkflowNode) {
-  const findings: ScanFinding[] = [], bindings = collectBindings(root, source), stack = [root];
+  const findings: ScanFinding[] = [], bindings = collectBindings(root, source);
+  const stack: Array<{ node: CstNode; skipMember?: boolean; skipVar?: boolean }> = [{ node: root }];
   let visited = 0, parseFailed = false, findingLimitExceeded = false;
   while (stack.length > 0) {
-    const current = stack.pop(); if (!current) continue;
+    const entry = stack.pop(); if (!entry) continue;
+    const current = entry.node;
     visited += 1; if (visited > MAX_PYTHON_CST_NODES) return { findings, parseFailed, limitExceeded: true };
     if (current.type.isError) parseFailed = true;
-    const indicator = current.name === 'CallExpression' ? indicatorForCall(current, source, bindings) : undefined;
+    let indicator: CallIndicator | undefined;
+    let matchedCall = false;
+    if (current.name === 'CallExpression') {
+      indicator = indicatorForCall(current, source, bindings);
+      matchedCall = indicator !== undefined;
+    } else if (current.name === 'MemberExpression' && !entry.skipMember) {
+      indicator = indicatorForMember(current, source, bindings);
+    } else if (current.name === 'VariableName' && !entry.skipVar) {
+      indicator = indicatorForVar(current, source, bindings);
+    }
     if (indicator) { if (findings.length < MAX_FINDINGS_PER_SOURCE) findings.push(createFinding(node, current, indicator)); else findingLimitExceeded = true; }
-    stack.push(...directChildren(current).reverse());
+    pushChildren(stack, current, matchedCall);
   }
   return { findings, parseFailed, limitExceeded: findingLimitExceeded };
+}
+function pushChildren(stack: Array<{ node: CstNode; skipMember?: boolean; skipVar?: boolean }>, current: CstNode, matchedCall: boolean): void {
+  const children = directChildren(current), skipVars = nonReadVariableIndices(current, children);
+  for (let index = children.length - 1; index >= 0; index -= 1) {
+    const child = children[index]!;
+    const skipMember = current.name === 'CallExpression' && matchedCall && index === 0;
+    const skipVar = skipVars.has(index) || (current.name === 'MemberExpression' && index === 0) || (current.name === 'CallExpression' && index === 0 && child.name === 'VariableName');
+    stack.push({ node: child, ...(skipMember ? { skipMember: true } : {}), ...(skipVar ? { skipVar: true } : {}) });
+  }
+}
+function nonReadVariableIndices(current: CstNode, children: CstNode[]): Set<number> {
+  const skip = new Set<number>();
+  if (current.name === 'ImportStatement' || current.name === 'DeleteStatement' || current.name === 'GlobalStatement' || current.name === 'NonlocalStatement') {
+    children.forEach((_child, index) => skip.add(index));
+    return skip;
+  }
+  if (current.name === 'FunctionDefinition' || current.name === 'ClassDefinition') {
+    const nameIndex = children.findIndex((child) => child.name === 'VariableName');
+    if (nameIndex >= 0) skip.add(nameIndex);
+  } else if (current.name === 'AssignStatement') {
+    const opIndex = children.findIndex((child) => child.name === 'AssignOp' || child.name === 'UpdateOp');
+    for (let index = 0; index < (opIndex < 0 ? 1 : opIndex); index += 1) if (children[index]?.name === 'VariableName') skip.add(index);
+  } else if (current.name === 'ForStatement') {
+    const inIndex = children.findIndex((child) => child.name === 'in');
+    for (let index = 0; index < inIndex; index += 1) if (children[index]?.name === 'VariableName') skip.add(index);
+  } else if (current.name === 'ParamList') {
+    children.forEach((child, index) => { if (child.name === 'VariableName' && children[index - 1]?.name !== 'AssignOp') skip.add(index); });
+  } else if (current.name === 'ArgList') {
+    children.forEach((child, index) => { if (child.name === 'VariableName' && children[index + 1]?.name === 'AssignOp') skip.add(index); });
+  }
+  children.forEach((child, index) => { if (child.name === 'VariableName' && children[index - 1]?.name === 'as') skip.add(index); });
+  return skip;
+}
+function indicatorForVar(varNode: CstNode, source: string, bindings: BindingScope): CallIndicator | undefined {
+  const binding = bindingAt(bindings, source.slice(varNode.from, varNode.to), varNode.from);
+  return binding?.module === 'os' && binding.member === 'environ' ? { indicator: 'ENVIRONMENT_ACCESS', member: 'environ' } : undefined;
+}
+function indicatorForMember(memberNode: CstNode, source: string, bindings: BindingScope): CallIndicator | undefined {
+  const [module, operator, property] = directChildren(memberNode);
+  if (!module || !operator || module.name !== 'VariableName') return undefined;
+  const binding = bindingAt(bindings, source.slice(module.from, module.to), module.from);
+  if (binding?.module === 'os' && binding.member === 'environ') return { indicator: 'ENVIRONMENT_ACCESS', member: 'environ' };
+  if (operator.name !== '.' || !property) return undefined;
+  const member = source.slice(property.from, property.to), moduleName = resolveModuleName(module, source, bindings);
+  return moduleName === 'os' && (member === 'environ' || member === 'getenv') ? { indicator: 'ENVIRONMENT_ACCESS', member } : undefined;
 }
 function indicatorForCall(call: CstNode, source: string, bindings: BindingScope): CallIndicator | undefined {
   const [callee, args] = directChildren(call); if (!callee || !args || args.name !== 'ArgList') return undefined;
@@ -50,11 +106,25 @@ function indicatorForCall(call: CstNode, source: string, bindings: BindingScope)
     const name = source.slice(callee.from, callee.to), binding = bindingAt(bindings, name, callee.from);
     if (binding === undefined) { if (name === 'eval') return { indicator: 'EVAL' }; if (name === 'exec') return { indicator: 'EXEC' }; if (name === '__import__') return { indicator: 'DYNAMIC_IMPORT' }; }
     if (binding?.module === 'importlib' && binding.member === 'import_module') return { indicator: 'DYNAMIC_IMPORT' };
+    if (binding?.module === 'os' && (binding.member === 'getenv' || binding.member === 'environ')) return { indicator: 'ENVIRONMENT_ACCESS', member: binding.member };
     const importedMember = processBinding(binding); return importedMember ? { indicator: 'SHELL_SUBPROCESS', member: importedMember } : undefined;
   }
-  const getattrMember = staticGetattrMember(callee, source, bindings); if (getattrMember) return { indicator: 'SHELL_SUBPROCESS', member: getattrMember };
+  const getattrMember = staticGetattrMember(callee, source, bindings);
+  if (getattrMember === 'getenv' || getattrMember === 'environ') return { indicator: 'ENVIRONMENT_ACCESS', member: getattrMember };
+  if (getattrMember) return { indicator: 'SHELL_SUBPROCESS', member: getattrMember };
   if (isDynamicImportMember(callee, source, bindings)) return { indicator: 'DYNAMIC_IMPORT' };
+  const envMember = environmentCallMember(callee, source, bindings);
+  if (envMember) return { indicator: 'ENVIRONMENT_ACCESS', member: envMember };
   const member = processMember(callee, source, bindings); return member ? { indicator: 'SHELL_SUBPROCESS', member } : undefined;
+}
+function environmentCallMember(callee: CstNode, source: string, bindings: BindingScope): string | undefined {
+  if (callee.name !== 'MemberExpression') return undefined;
+  const [module, operator, property] = directChildren(callee);
+  if (!module || !operator || !property || operator.name !== '.' || module.name !== 'VariableName') return undefined;
+  const binding = bindingAt(bindings, source.slice(module.from, module.to), module.from);
+  if (binding?.module === 'os' && binding.member === 'environ') return 'environ';
+  const member = source.slice(property.from, property.to), moduleName = resolveModuleName(module, source, bindings);
+  return moduleName === 'os' && (member === 'getenv' || member === 'environ') ? member : undefined;
 }
 function processMember(callee: CstNode, source: string, bindings: BindingScope): string | undefined {
   if (callee.name !== 'MemberExpression') return undefined;
@@ -70,7 +140,7 @@ function staticGetattrMember(callee: CstNode, source: string, bindings: BindingS
   if (bindingAt(bindings, 'getattr', getattr.from) !== undefined) return undefined;
   const values = directChildren(args).filter((child) => child.name === 'VariableName' || child.name === 'String' || child.name === 'BinaryExpression'); if (values.length !== 2) return undefined;
   const moduleName = resolveModuleName(values[0], source, bindings), member = staticString(values[1], source);
-  return member && ((moduleName === 'subprocess' && SUBPROCESS_METHODS.has(member)) || (moduleName === 'os' && isOsProcessMember(member))) ? member : undefined;
+  return member && ((moduleName === 'subprocess' && SUBPROCESS_METHODS.has(member)) || (moduleName === 'os' && (isOsProcessMember(member) || member === 'getenv' || member === 'environ'))) ? member : undefined;
 }
 function isDynamicImportMember(callee: CstNode, source: string, bindings: BindingScope): boolean {
   if (callee.name !== 'MemberExpression') return false;
@@ -97,10 +167,21 @@ function collectBindings(root: CstNode, source: string): BindingScope {
   while (stack.length > 0 && visited <= MAX_PYTHON_CST_NODES) {
     const item = stack.pop(); if (!item) continue;
     const { node: current, scope } = item; visited += 1;
-    if (current.name === 'FunctionDefinition' || current.name === 'ClassDefinition') { const name = directChildren(current).find((child) => child.name === 'VariableName'); if (name) addBinding(scope.bindings, source.slice(name.from, name.to), current.from, null); const childScope: BindingScope = { from: current.from, to: current.to, parent: scope, bindings: new Map(), children: [] }; scope.children.push(childScope); stack.push(...directChildren(current).reverse().map((node) => ({ node, scope: childScope }))); continue; }
+    if (current.name === 'FunctionDefinition' || current.name === 'ClassDefinition' || current.name === 'LambdaExpression') {
+      if (current.name !== 'LambdaExpression') {
+        const name = directChildren(current).find((child) => child.name === 'VariableName');
+        if (name) addBinding(scope.bindings, source.slice(name.from, name.to), current.from, null);
+      }
+      const childScope: BindingScope = { from: current.from, to: current.to, parent: scope, bindings: new Map(), children: [] };
+      scope.children.push(childScope);
+      stack.push(...directChildren(current).reverse().map((node) => ({ node, scope: childScope })));
+      continue;
+    }
     if (current.name === 'ImportStatement') registerImport(current, source, scope.bindings);
-    if (current.name === 'AssignStatement') { const target = directChildren(current)[0]; if (target?.name === 'VariableName') addBinding(scope.bindings, source.slice(target.from, target.to), current.from, null); }
-    if (current.name === 'ParamList') for (const child of directChildren(current)) if (child.name === 'VariableName') addBinding(scope.bindings, source.slice(child.from, child.to), current.from, null);
+    if (current.name === 'AssignStatement' || current.name === 'ForStatement' || current.name === 'ParamList' || current.name === 'WithStatement') {
+      const children = directChildren(current);
+      for (const index of nonReadVariableIndices(current, children)) { const child = children[index]; if (child?.name === 'VariableName') addBinding(scope.bindings, source.slice(child.from, child.to), current.from, null); }
+    }
     stack.push(...directChildren(current).reverse().map((node) => ({ node, scope })));
   }
   return bindings;
@@ -111,9 +192,14 @@ function registerImport(statement: CstNode, source: string, bindings: Map<string
   if (importedModule?.name === 'VariableName') registerImportedNames(children.slice(keyword + 1), source, bindings, source.slice(importedModule.from, importedModule.to), statement.from); else registerImportedModules(children.slice(keyword + 1), source, bindings, statement.from);
 }
 function registerImportedModules(children: CstNode[], source: string, bindings: Map<string, BindingEvent[]>, at: number): void {
-  let moduleName: string | undefined;
-  for (let index = 0; index < children.length; index += 1) { const child = children[index]; if (child.name !== 'VariableName') continue; const name = source.slice(child.from, child.to); if (children[index - 1]?.name === 'as') { if (moduleName) registerBinding(bindings, name, moduleName, undefined, at); moduleName = undefined; } else if (moduleName) { registerBinding(bindings, moduleName, moduleName, undefined, at); moduleName = name; } else moduleName = name; }
-  if (moduleName) registerBinding(bindings, moduleName, moduleName, undefined, at);
+  for (let index = 0; index < children.length;) {
+    if (children[index]?.name !== 'VariableName') { index += 1; continue; }
+    const parts = [source.slice(children[index]!.from, children[index]!.to)]; index += 1;
+    while (children[index]?.name === '.' && children[index + 1]?.name === 'VariableName') { parts.push(source.slice(children[index + 1]!.from, children[index + 1]!.to)); index += 2; }
+    let local = parts[0]!, moduleName = parts[0]!;
+    if (children[index]?.name === 'as' && children[index + 1]?.name === 'VariableName') { local = source.slice(children[index + 1]!.from, children[index + 1]!.to); moduleName = parts.join('.'); index += 2; }
+    registerBinding(bindings, local, moduleName, undefined, at);
+  }
 }
 function registerImportedNames(children: CstNode[], source: string, bindings: Map<string, BindingEvent[]>, moduleName: string, at: number): void {
   let imported: string | undefined;

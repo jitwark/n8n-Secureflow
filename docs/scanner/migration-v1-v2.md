@@ -3,7 +3,7 @@
 > Status: compatibility boundary and migration plan; no public identity or release promotion
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer; public and compatibility changes remain owner-gated
-> Source of truth: [`packages/scanner-core/src/compat/v1-projector.ts`](../../packages/scanner-core/src/compat/v1-projector.ts), [`packages/scanner-core/src/compat/v1-registry.ts`](../../packages/scanner-core/src/compat/v1-registry.ts), [`openspec/changes/world-class-scanner-cli/v1-projection-ledger.md`](../../openspec/changes/world-class-scanner-cli/v1-projection-ledger.md), and [`openspec/changes/world-class-scanner-cli/specs/scanner-community-hub-migration/spec.md`](../../openspec/changes/world-class-scanner-cli/specs/scanner-community-hub-migration/spec.md)
+> Source of truth: [`packages/scanner-core/src/compat/v1-projector.ts`](../../packages/scanner-core/src/compat/v1-projector.ts) and [`packages/scanner-core/src/compat/v1-registry.ts`](../../packages/scanner-core/src/compat/v1-registry.ts)
 
 This document makes the v1/v2 boundary explicit. It does not rewrite [native v1 architecture](architecture.md),
 [v1 policy inventory](policy-inventory.md), or historical v1 evidence. V2 is an explicit, versioned
@@ -25,9 +25,11 @@ Native v1 identity is authoritative for native v1 output. The v1 source identity
 [`admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts) and entered through
 [`scanWorkflowV2`](../../packages/scanner-core/src/v2/scan-workflow.ts).
 
-The defined `beta-hardened@2.0.0` manifest is not admitted or selectable on the v2 path. This does
-not remove or downgrade native v1 hardened behavior. A source file, profile name, or rule catalogue
-entry does not itself authorize v2 admission.
+In v0.3 all four profiles — `standard@3.0.0` (default), `strict@3.0.0` (alias `ci`),
+`beta-default@2.0.0`, and `beta-hardened@2.0.0` — are admitted and selectable on the versioned path,
+and `profiles` reports each one's admission status. Selecting `beta-hardened@2.0.0` does not upgrade
+native v1 hardened behavior: its rules are report-only and cannot change a v2 assessment. A source
+file, profile name, or rule catalogue entry does not itself authorize admission; the registry does.
 
 ## Selecting a surface
 
@@ -66,8 +68,8 @@ The projected v1 identity rule is deliberately truthful:
 
 ### Compatibility fields
 
-The field-by-field normative source is the
-[v1 projection ledger](../../openspec/changes/world-class-scanner-cli/v1-projection-ledger.md). The
+The field-by-field normative source is
+[`v1-projector.ts`](../../packages/scanner-core/src/compat/v1-projector.ts). The
 projection keeps these boundaries:
 
 | V1 field or group | V2 source and projection rule |

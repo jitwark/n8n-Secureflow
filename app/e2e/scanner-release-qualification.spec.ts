@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { appPath } from './app-paths';
-import { firstPrerenderedSubject } from './detail-subjects';
+import { firstPrerenderedSubject, viewHref } from './detail-subjects';
 
 const cleanJson = fs.readFileSync(path.join(__dirname, 'fixtures', 'clean.json'), 'utf8');
 const CREDENTIAL_CANARY = 'credential-secret-canary-b7d1';
@@ -30,10 +30,19 @@ async function fillWorkflow(page: Page, value: string): Promise<void> {
   }, value);
 }
 
+async function expandTechnicalDetails(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15_000 });
+  const details = page.locator('#scanner-technical-details');
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await details.locator('> summary').click();
+  }
+  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+}
+
 async function scan(page: Page, workflow: string): Promise<void> {
   await fillWorkflow(page, workflow);
   await page.getByRole('button', { name: 'Scan workflow' }).click();
-  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+  await expandTechnicalDetails(page);
 }
 
 const FRAMEWORK_PREFETCH_PATHS = ['/', '/library/', '/takedown/'] as const;
@@ -153,7 +162,7 @@ test.describe('scanner first-release browser qualification', () => {
       const retry = page.getByRole('button', { name: 'Retry scan' });
       await expect(retry).toBeVisible();
       await retry.click();
-      await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+      await expandTechnicalDetails(page);
       await expect(page.getByLabel('Analysis status: Analysis complete')).toBeVisible();
       expect(pageErrors).toEqual([]);
     });
@@ -198,22 +207,19 @@ test.describe('scanner first-release browser qualification', () => {
     expect(run.results).toEqual([]);
   });
 
-  test('hydrated workflow pages download a non-empty SVG', async ({ page }) => {
+  test('detail view hydrates packed chart canvas into a non-empty SVG diagram', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const subject = firstPrerenderedSubject();
-    await page.goto(appPath(`/w/${subject.slug}/`));
-    const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Download vector SVG' }).click();
-    const file = await download;
-    expect(file.suggestedFilename()).toMatch(/-diagram\.svg$/);
-    const filePath = await file.path();
-    expect(filePath, 'the SVG download produced a file').not.toBeNull();
-    const bytes = fs.readFileSync(filePath!);
-    const svg = bytes.toString('utf8');
-    expect(bytes.length).toBeGreaterThan(1_024);
-    expect(svg).toContain('<svg');
-    expect(svg).toContain('</svg>');
-    expect(svg).not.toContain('\u0000');
+    await page.goto(appPath(viewHref(subject)));
+    await expect(page.getByRole('heading', { level: 1, name: subject.title })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Load interactive canvas' }).click();
+    const diagram = page.getByRole('group', { name: /Workflow diagram/ });
+    await expect(diagram).toBeVisible({ timeout: 30_000 });
+    const svgMarkup = await diagram.evaluate((el) => el.outerHTML);
+    expect(Buffer.byteLength(svgMarkup, 'utf8')).toBeGreaterThan(1_024);
+    expect(svgMarkup).toContain('<svg');
+    expect(svgMarkup).toContain('</svg>');
+    expect(svgMarkup).not.toContain('\u0000');
   });
 
   test('a clean scanner run has no unexpected request failures or HTTP error responses', async ({ page, baseURL }) => {

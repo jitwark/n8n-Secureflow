@@ -22,8 +22,9 @@ const safe = workflow([]);
 const risky = workflow([node('command', 'Run command', 'n8n-nodes-base.executeCommand', { command: `echo ${secretSentinel}` }, 1)]);
 // The `indeterminate` class name predates the generic fallback and stays for fixture-matrix
 // stability (the class set is pinned by `scripts/check-scanner-v2-parity.test.mjs`): the workflow is
-// still the uncatalogued-namespace case, and it now grades DEGRADED under the labelled fallback
-// instead of withholding the verdict. A genuinely unreadable node is exercised in
+// still the uncatalogued-namespace case, and under Phase 2.1 it grades COMPLETE while emitting
+// labelled NONE advisory diagnostics (`SEMANTIC_CATALOGUE_MISS`, `GENERIC_NODE_UNMODELED_CAPABILITY`)
+// instead of degrading or withholding the verdict. A genuinely unreadable node is exercised in
 // `v2/generic-node-fallback.test.ts`.
 const indeterminate = workflow([node('custom', 'Custom', '@example/custom-node.unknown')]);
 const unicodeBom = `\uFEFF${workflow([node('安全', '安全', 'n8n-nodes-base.manualTrigger', {}, 1)])}`;
@@ -45,7 +46,7 @@ const maxBoundExceeded = workflow([node('max', 'Max', 'n8n-nodes-base.manualTrig
 export const V2_ADAPTER_FIXTURE_MATRIX: readonly V2AdapterFixture[] = Object.freeze([
   Object.freeze({ id: 'safe-workflow', kind: 'valid', fixtureClass: 'safe', json: safe, expectedStatus: 'COMPLETE' }),
   Object.freeze({ id: 'risky-workflow', kind: 'valid', fixtureClass: 'risky', json: risky, expectedStatus: 'COMPLETE' }),
-  Object.freeze({ id: 'indeterminate-workflow', kind: 'valid', fixtureClass: 'indeterminate', json: indeterminate, expectedStatus: 'DEGRADED' }),
+  Object.freeze({ id: 'indeterminate-workflow', kind: 'valid', fixtureClass: 'indeterminate', json: indeterminate, expectedStatus: 'COMPLETE' }),
   Object.freeze({ id: 'unicode-bom-workflow', kind: 'valid', fixtureClass: 'unicode-bom', json: unicodeBom, expectedStatus: 'COMPLETE' }),
   Object.freeze({ id: 'duplicate-workflow', kind: 'valid', fixtureClass: 'duplicate', json: duplicate, expectedStatus: 'INDETERMINATE' }),
   Object.freeze({ id: 'ambiguous-workflow', kind: 'valid', fixtureClass: 'ambiguous', json: ambiguous, expectedStatus: 'INDETERMINATE' }),

@@ -1,6 +1,6 @@
 'use client';
 
-import type { Entry, SvgPreviewArtifact } from '@hub/contracts';
+import { normalizeDiscoverySlug, type Entry, type SvgPreviewArtifact } from '@hub/contracts';
 import { Breadcrumbs } from '../breadcrumbs';
 import { LicenceBadge } from '../primitives/badge';
 import { GradePill } from '../primitives/pill';
@@ -11,16 +11,18 @@ import { Duplicates } from './duplicates';
 import { AboutSection } from './about-section';
 import { ProvenanceCard } from './provenance-card';
 import { CompactVectorDiagram } from './compact-vector-diagram';
+import { ChartLoader } from './chart-loader';
 import { detailHref } from '../../catalogue/detail-href';
 
 type LayoutWorkbenchProps = {
   entry: Entry;
   preview?: SvgPreviewArtifact | null;
+  packedChartAvailable?: boolean;
   related?: Entry[];
   staticDownloadHref?: string;
 };
 
-export function LayoutWorkbench({ entry, preview = null, related = [], staticDownloadHref }: LayoutWorkbenchProps) {
+export function LayoutWorkbench({ entry, preview = null, packedChartAvailable = false, related = [], staticDownloadHref }: LayoutWorkbenchProps) {
   const sourceLabel = entry.source.kind === 'n8n_official' ? 'n8n.io' : entry.source.repo ?? 'GitHub';
 
   return (
@@ -65,9 +67,9 @@ export function LayoutWorkbench({ entry, preview = null, related = [], staticDow
               <h2 id="canvas-heading" className="font-display text-base font-semibold text-ink">
                 Workflow canvas
               </h2>
-              <span className="font-mono text-2xs text-ink-muted">Vector Preview</span>
+              <span className="font-mono text-2xs text-ink-muted">{preview ? 'Vector Preview' : 'Interactive Canvas'}</span>
             </div>
-            <CompactVectorDiagram preview={preview} title={entry.title} />
+            {preview ? <CompactVectorDiagram preview={preview} title={entry.title} /> : <ChartLoader entry={entry} packedChartAvailable={packedChartAvailable} />}
           </section>
 
           <div id="security" className="rounded-panel border border-hairline bg-panel p-5">
@@ -98,7 +100,7 @@ export function LayoutWorkbench({ entry, preview = null, related = [], staticDow
 
 function defaultBreadcrumbs(entry: Entry) {
   const primary = entry.structure.integrations[0] ?? 'Workflows';
-  const slug = primary.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const slug = normalizeDiscoverySlug(primary);
   return [
     { label: 'Home', href: '/' },
     { label: 'Integrations', href: '/integrations/' },

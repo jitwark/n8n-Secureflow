@@ -1,5 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
+import { SAFE_FACT_PATH_PATTERN, SAFE_FACT_PROSE_PATTERN, SAFE_FACT_SECRET_PATTERN } from '@hub/contracts/scanner-v2-field-flow-validation';
 import { segmentExpressionIslands } from '../analyzers/expression/expression-islands';
 import type { AnalysisDiagnostic, ScanFinding } from '../policy/policy';
 import { canonicalizeJson } from '../canonical-json';
@@ -82,7 +83,13 @@ export function candidateFinding(
   const factRefs = findingFactRefs(finding, node, add);
   if (factRefs === undefined) return undefined;
   const conclusion = rule.effect === 'SCORING' && node.scoringEligibility === 'INDETERMINATE' ? 'UNKNOWN' : 'OBSERVED';
-  const evidenceClass = finding.policyId.startsWith('TAINTED_') ? 'POTENTIAL_DATAFLOW' : finding.policyId.includes('DYNAMIC_EXECUTION') ? 'SUSPICIOUS_SYNTAX' : ['RAW_AUTH_HEADER', 'RAW_SECRET_INDICATOR', 'UNAPPROVED_DOMAIN', 'UNKNOWN_NODE_PACKAGE', 'WEBHOOK_EXPOSURE'].includes(finding.policyId) ? 'CONFIGURATION' : 'CAPABILITY';
+  const evidenceClass = finding.policyId.startsWith('TAINTED_') || finding.policyId === 'UNAUTHENTICATED_TRIGGER_TO_SINK'
+    ? 'POTENTIAL_DATAFLOW'
+    : finding.policyId.includes('DYNAMIC_EXECUTION') || finding.policyId.startsWith('EXPRESSION_')
+      ? 'SUSPICIOUS_SYNTAX'
+      : ['RAW_AUTH_HEADER', 'RAW_SECRET_INDICATOR', 'UNAPPROVED_DOMAIN', 'UNKNOWN_NODE_PACKAGE', 'WEBHOOK_EXPOSURE'].includes(finding.policyId)
+        ? 'CONFIGURATION'
+        : 'CAPABILITY';
   return { ruleId: finding.policyId, evidenceClass, conclusion, applicability: 'APPLICABLE', subject, factRefs, traceRefs: [], remediationId: 'r' };
 }
 
@@ -115,7 +122,9 @@ function findingFactRefs(finding: ScanFinding, node: SecurityNodeV2, add: (kind:
   if (finding.policyId === 'WEBHOOK_EXPOSURE') return [add('ingress.v2', { authentication: typeof e.authentication === 'string' ? e.authentication : null, authenticationState: 'MISSING', legacyAuthenticated: false })];
   if (finding.policyId === 'JAVASCRIPT_DYNAMIC_EXECUTION' || finding.policyId === 'PYTHON_DYNAMIC_EXECUTION') return [add('code.indicator.v2', { language: finding.policyId.startsWith('JAVA') ? 'JAVASCRIPT' : 'PYTHON', indicator: String(e.indicator), ...(typeof e.member === 'string' ? { member: e.member } : {}), start: Number(e.start), end: Number(e.end), parseState: 'VERIFIED' }, source)];
   if (finding.policyId.startsWith('TAINTED_')) return [add('dataflow.summary.v2', taintProperties(finding), source)];
+  if (finding.policyId === 'UNAUTHENTICATED_TRIGGER_TO_SINK') return [add('dataflow.summary.v2', triggerSinkProperties(finding), source)];
   if (finding.policyId === 'AI_AGENT_UNGATED_TOOL') return [add('node.capability.v2', nodeCapability(node, e)), add('dataflow.summary.v2', { flowKind: 'AGENT_INFLUENCE', propertyPathComplete: true, humanGatePresent: e.humanGatePresent === true, humanGateDominates: e.humanGateDominates === true, taintLabels: labels(e.taintLabels) }, source)];
+  if (finding.policyId === 'AGENT_EGRESS_UNRESTRICTED') return [add('node.capability.v2', nodeCapability(node, e))];
   return undefined;
 }
 function destinationEvidence(finding: ScanFinding, node: SecurityNodeV2): Readonly<{ properties: FactProperties; source: SecurityNodeV2['ref']['source'] }> {
@@ -185,7 +194,39 @@ function nodeCapability(node: SecurityNodeV2, evidence: Record<string, unknown>)
 
 function taintProperties(finding: ScanFinding): FactProperties {
   const e = finding.evidence; const sink = finding.policyId === 'TAINTED_SQL_QUERY' ? 'SQL' : finding.policyId === 'TAINTED_COMMAND' ? 'COMMAND' : finding.policyId === 'TAINTED_REQUEST_URL' ? 'SSRF' : finding.policyId === 'TAINTED_FILE_PATH' ? 'PATH' : finding.policyId === 'TAINTED_CODE_INPUT' ? 'CODE' : finding.policyId === 'TAINTED_REQUEST_HEADER' ? 'HEADER' : 'PROMPT';
-  return { flowKind: 'TAINT_SINK', sink, parameterPath: pointer(String(e.parameterPath ?? '')), referenceRoot: String(e.referenceRoot ?? 'DYNAMIC_NODE'), ...(typeof e.propertyPath === 'string' ? { propertyPath: pointer(e.propertyPath) } : {}), ...(typeof e.sourceNodeId === 'string' ? { sourceNodeId: e.sourceNodeId } : {}), ...(typeof e.sourceNodeName === 'string' ? { sourceNodeName: e.sourceNodeName } : {}), propertyPathComplete: e.propertyPathComplete === true, humanGatePresent: false, humanGateDominates: false, taintLabels: labels(e.taintLabels) };
+  return { flowKind: 'TAINT_SINK', sink, parameterPath: pointer(String(e.parameterPath ?? '')), referenceRoot: String(e.referenceRoot ?? 'DYNAMIC_NODE'), ...(typeof e.propertyPath === 'string' ? { propertyPath: pointer(e.propertyPath) } : {}), ...(typeof e.sourceNodeId === 'string' ? { sourceNodeId: safeSourceNodeId(e.sourceNodeId) } : {}), ...(typeof e.sourceNodeName === 'string' ? { sourceNodeName: safeSourceNodeName(e.sourceNodeName) } : {}), propertyPathComplete: e.propertyPathComplete === true, humanGatePresent: false, humanGateDominates: false, taintLabels: labels(e.taintLabels) };
+}
+
+function triggerSinkProperties(finding: ScanFinding): FactProperties {
+  const e = finding.evidence;
+  const sink = e.sinkCategory === 'SQL' ? 'SQL' : e.sinkCategory === 'CODE' ? 'CODE' : e.sinkCategory === 'FILE_WRITE' ? 'PATH' : e.sinkCategory === 'HTTP_EGRESS' ? 'SSRF' : e.sinkCategory === 'AI_AGENT' ? 'PROMPT' : 'COMMAND';
+  const triggerType = typeof e.triggerType === 'string' ? e.triggerType : '';
+  const taintLabels = triggerType.includes('form') || triggerType.includes('chat') ? ['INBOUND_MESSAGE'] : ['WEBHOOK_BODY'];
+  return {
+    flowKind: 'TRIGGER_SINK',
+    sink,
+    sourceNodeId: safeSourceNodeId(e.triggerNodeId),
+    sourceNodeName: safeSourceNodeName(e.triggerNodeName),
+    propertyPathComplete: true,
+    humanGatePresent: false,
+    humanGateDominates: false,
+    taintLabels,
+  };
+}
+
+const SOURCE_NODE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/;
+const CODE_LIKE_PATTERN = /\b(?:require|import|export|const|let|var|function|return|class)\b|\bprocess\.env\b|\bconsole\.[A-Za-z_$][\w$]*\s*\(|\b[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\s*\(|\(\s*["']/;
+const INVISIBLE_DISPLAY_PATTERN = /(?![\u200C\u200D])[\p{C}\p{Zl}\p{Zp}]/u;
+
+function safeSourceNodeId(raw: unknown): string {
+  if (typeof raw !== 'string' || !SOURCE_NODE_ID_PATTERN.test(raw) || SAFE_FACT_SECRET_PATTERN.test(raw)) return 'REDACTED';
+  return raw;
+}
+
+function safeSourceNodeName(raw: unknown): string {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 256) return 'REDACTED';
+  if (SAFE_FACT_SECRET_PATTERN.test(raw) || SAFE_FACT_PROSE_PATTERN.test(raw) || SAFE_FACT_PATH_PATTERN.test(raw) || CODE_LIKE_PATTERN.test(raw) || INVISIBLE_DISPLAY_PATTERN.test(raw)) return 'REDACTED';
+  return raw;
 }
 
 function labels(value: unknown): readonly string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []; }

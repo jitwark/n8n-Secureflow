@@ -30,6 +30,9 @@ The block below is machine-checked against the help authority. Do not add a comm
 | `--format` | Select json, ndjson, sarif, or table output. |
 | `--profile` | Select an admitted profile. |
 | `--fail-on` | Set the finding threshold. |
+| `--min-severity` | Filter reported findings to this severity or higher. |
+| `--min-confidence` | Filter reported findings to this confidence or higher. |
+| `--baseline` | Suppress finding IDs present in a prior JSON scan or baseline file. |
 | `--require-complete` | Fail on degraded analysis. |
 | `--audit-supply-chain` | Emit validated supply-chain request metadata; JSON or NDJSON only. |
 | `--include-readiness` | Include preflight readiness assessment in json, ndjson, or table output. |
@@ -147,16 +150,23 @@ pack exits 2 with no machine envelope and no scan, and every accepted run carrie
 
 ## Profiles, limits, and privacy
 
-`beta-default@2.0.0` is admitted and selectable. `beta-hardened@2.0.0` is defined and advertised for truthful visibility, but is not admitted or selectable. Hardened availability requires a separately versioned authority change; its source files alone do not enable it.
+`standard@3.0.0` is the default, `strict@3.0.0` is its stricter sibling (alias `ci`), and
+`beta-default@2.0.0` and `beta-hardened@2.0.0` are retained. standard@3.0.0 (default), strict@3.0.0
+(alias: ci), beta-default@2.0.0, and beta-hardened@2.0.0 are admitted and selectable.
 
-The parsed command's `profile` field is the canonical admitted id `beta-default` for both admitted spellings; `beta-default@2.0.0` is admitted input only and stays in the raw CLI override so the invocation's profile source is still `CLI`. The pinned spelling selects the same run as the bare id, and `beta-hardened` remains a usage error.
+The parsed command's `profile` field is the canonical admitted id. `standard` and `strict` are the
+v0.3 profiles with monotonic severity scoring; `ci` is accepted as an alias for `strict` and is
+recorded as `strict` in the invocation, while the raw CLI override keeps the spelling the caller
+used so the invocation's profile source is still `CLI`. The pinned spellings (`standard@3.0.0`,
+`strict@3.0.0`, `beta-default@2.0.0`, `beta-hardened@2.0.0`) select the same run as their bare
+forms; any other pinned spelling is a usage error.
 
 The v2 authority guarantees:
 
 - v2 is offline and never initiates network requests (HTTP, DNS, sockets, telemetry, or remote imports).
 - Labels and output identities never contain absolute paths or workflow source content.
 - File output uses a same-directory temporary file and atomic replace; failures and cancellation preserve the prior file.
-- beta-default@2.0.0 is admitted; beta-hardened@2.0.0 is defined but not admitted or selectable.
+- standard@3.0.0 (default), strict@3.0.0 (alias: ci), beta-default@2.0.0, and beta-hardened@2.0.0 are admitted and selectable.
 - No shipped path admits an external rule pack: --rules and --catalogue accept only builtin, and --allow-unsigned-development-rules is refused because Ed25519 trust-store admission is deferred.
 - No shipped path produces a redacted artifact: maxRedactionPatches and maxRedactedArtifactBytes bound redaction-v2, which is development-only and unwired.
 - Published on npm as sfscanner.

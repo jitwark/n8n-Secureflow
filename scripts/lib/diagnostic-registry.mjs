@@ -14,10 +14,10 @@ import { resolve } from 'node:path';
  * every cell is validated against them and an out-of-domain cell fails generation instead of
  * silently extending a type.
  */
-export const DIAGNOSTIC_REGISTRY_SOURCE = 'openspec/changes/world-class-scanner-cli/diagnostic-and-exit-registry.md';
+export const DIAGNOSTIC_REGISTRY_SOURCE = 'openspec/changes/archive/world-class-scanner-cli/diagnostic-and-exit-registry.md';
 export const DIAGNOSTIC_REGISTRY_VERSION = 'diagnostic-registry-v1';
 export const CATEGORIES = Object.freeze(['LIMIT', 'SOURCE', 'PARSER', 'POLICY', 'GRAPH', 'CATALOGUE', 'COMPATIBILITY']);
-export const EFFECT_MODES = Object.freeze(['DEGRADED', 'INDETERMINATE', 'BY_CAPABILITY']);
+export const EFFECT_MODES = Object.freeze(['NONE', 'DEGRADED', 'INDETERMINATE', 'BY_CAPABILITY']);
 export const PROJECTIONS = Object.freeze(['SAME', 'MIGRATED', 'PROJECTION_LOSS', 'SENTINEL']);
 
 const ANALYSIS_HEADING = '## Analysis diagnostics';

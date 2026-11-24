@@ -21,7 +21,7 @@ describe('RelatedRail', () => {
     const section = screen.getByRole('heading', { name: 'Related workflows' }).parentElement!;
     const links = within(section).getAllByRole('link');
     expect(links).toHaveLength(2);
-    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/w/first/', '/w/second/']);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/w/view/?id=first', '/w/view/?id=second']);
   });
 
   it('shows the empty state when every supplied target is ineligible', () => {

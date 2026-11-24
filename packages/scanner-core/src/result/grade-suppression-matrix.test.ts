@@ -85,10 +85,13 @@ describe('grade suppression matrix', () => {
       // Whole-object suppression: a half-graded result (riskAssessment without its summary)
       // fails here too, and the grade exists only alongside a non-indeterminate status.
       expect(graded).toEqual(
-        projected.result.analysisStatus === 'DEGRADED' ? [...GRADED_KEYS] : [],
+        projected.result.analysisStatus === 'INDETERMINATE' ? [] : [...GRADED_KEYS],
       );
       if (classification.aggregateEffect === 'INDETERMINATE') {
         expect(projected.result.analysisStatus).toBe('INDETERMINATE');
+      } else if (classification.aggregateEffect === 'NONE') {
+        expect(projected.result.analysisStatus).toBe('COMPLETE');
+        expect(projected.result.analysisDiagnostics).toEqual([]);
       }
     }
   });
@@ -134,6 +137,36 @@ describe('grade suppression matrix', () => {
       { code: 'POLICY_EXECUTION_FAILED', category: 'POLICY' },
     ]);
     expect(projected.result.analysisStatus).toBe('DEGRADED');
+    expect(gradedKeysOf(projected.result as Record<string, unknown>)).toEqual([...GRADED_KEYS]);
+  });
+
+  it('rejects forged NONE diagnostic effect or eligibility as unsafe input', () => {
+    for (const forged of [
+      { id: 'c'.repeat(64), code: 'SEMANTIC_CATALOGUE_MISS', category: 'CATALOGUE', capabilityId: 'structural-policies', aggregateEffect: 'DEGRADED', assessmentEligible: true },
+      { id: 'c'.repeat(64), code: 'SEMANTIC_CATALOGUE_MISS', category: 'CATALOGUE', capabilityId: 'structural-policies', aggregateEffect: 'NONE', assessmentEligible: false },
+      { id: 'c'.repeat(64), code: 'GENERIC_NODE_UNMODELED_CAPABILITY', category: 'CATALOGUE', capabilityId: 'structural-policies', aggregateEffect: 'DEGRADED', assessmentEligible: true },
+      { id: 'c'.repeat(64), code: 'GENERIC_NODE_UNMODELED_CAPABILITY', category: 'CATALOGUE', capabilityId: 'structural-policies', aggregateEffect: 'INDETERMINATE', assessmentEligible: false },
+    ]) {
+      expect(projectWithDiagnostic(forged)).toMatchObject({ ok: false, reason: 'UNSAFE_INPUT' });
+    }
+  });
+
+  it('preserves missing source span on advisory NONE diagnostics without loss', () => {
+    const projected = projectWithDiagnostic({
+      id: 'c'.repeat(64),
+      code: 'SEMANTIC_CATALOGUE_MISS',
+      category: 'CATALOGUE',
+      capabilityId: 'structural-policies',
+      aggregateEffect: 'NONE',
+      assessmentEligible: true,
+      location: { pointer: '/nodes/0', occurrencePath: [0], astNodeId: 'a'.repeat(64), span: null },
+    });
+    expect(projected.ok).toBe(true);
+    if (!projected.ok) return;
+    expect(projected.result.analysisStatus).toBe('DEGRADED');
+    expect(projected.result.analysisDiagnostics).toEqual([
+      { code: 'SOURCE_SPAN_UNAVAILABLE', category: 'SOURCE' },
+    ]);
     expect(gradedKeysOf(projected.result as Record<string, unknown>)).toEqual([...GRADED_KEYS]);
   });
 

@@ -69,7 +69,7 @@ test('submits a workflow and receives the current v2 result envelope', async ({ 
         semanticSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
         ambiguitySha256: expect.stringMatching(/^[0-9a-f]{64}$/),
       },
-      profile: { id: 'beta-default', version: '2.0.0' },
+      profile: { id: 'standard', version: '3.0.0' },
       analysis: {
         status: expect.stringMatching(/^(COMPLETE|DEGRADED|INDETERMINATE)$/),
         capabilities: expect.any(Array),

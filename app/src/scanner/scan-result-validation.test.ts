@@ -8,8 +8,10 @@ describe('parseScanWorkflowResult', () => {
     expect(parseScanWorkflowResult({ ...valid, schemaVersion })).toBeNull();
   });
 
-  it('accepts the worker result contract', () => {
+  it('accepts the worker result contract across supported profile identifiers', () => {
     expect(parseScanWorkflowResult(createMockScanResult('beta-default'))?.scannerVersion).toBe('scanner-beta-1');
+    expect(parseScanWorkflowResult(createMockScanResult('standard'))?.policyProfile).toBe('standard');
+    expect(parseScanWorkflowResult(createMockScanResult('strict'))?.policyProfile).toBe('strict');
   });
 
   it('rejects inconsistent summaries, status, and dangerous nested evidence', () => {

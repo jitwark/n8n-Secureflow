@@ -79,7 +79,7 @@ describe('public flow accounting', () => {
     } finally { spy.mockRestore(); }
   });
 
-  it('publishes an applicable UNKNOWN as zero-omission DEGRADED accounting', () => {
+  it('publishes an unmodeled flow pair as COMPLETE with zero-flow coverage and zero omissions', () => {
     const literal = {
       ...workflow,
       nodes: [workflow.nodes[0], { ...workflow.nodes[1], parameters: { command: 'echo fixed' } }],
@@ -90,13 +90,11 @@ describe('public flow accounting', () => {
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.code);
       expect(spy).not.toHaveBeenCalled();
-      expect(result.result.analysis.status).toBe('DEGRADED');
-      expect(result.result.facts.some((fact) => fact.kind.startsWith('dataflow.'))).toBe(false);
+      expect(result.result.analysis.status).toBe('COMPLETE');
+      expect(result.result.facts.some((fact) => fact.kind === 'dataflow.provenance.v1' || fact.kind === 'dataflow.summary.v3')).toBe(false);
+      expect(result.result.facts.filter((fact) => fact.kind === 'dataflow.coverage.v1')).toHaveLength(1);
       expect(result.result.traces).toEqual([]);
-      const diagnostic = result.result.analysis.diagnostics.find((item) => item.code === 'GRAPH_ANALYSIS_DEGRADED');
-      expect(diagnostic).toMatchObject({ capabilityId: 'structural-policies', aggregateEffect: 'DEGRADED',
-        assessmentEligible: true, observed: 1, omitted: 0 });
-      expect(diagnostic).not.toHaveProperty('maximum');
+      expect(result.result.analysis.diagnostics.some((item) => item.code === 'GRAPH_ANALYSIS_DEGRADED')).toBe(false);
       const owner = result.result.analysis.capabilities.find((capability) => capability.id === 'structural-policies');
       expect(owner).toMatchObject({ required: true, omitted: 0 });
       expect(result.result.stats.omittedFindings).toBe(0);

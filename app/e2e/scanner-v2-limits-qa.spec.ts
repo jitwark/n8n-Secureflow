@@ -111,6 +111,15 @@ async function setExpectedDomains(page: Page, value: string): Promise<void> {
   await input.fill(value);
 }
 
+async function expandTechnicalDetails(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15_000 });
+  const details = page.locator('#scanner-technical-details');
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await details.locator('> summary').click();
+  }
+  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+}
+
 test.describe('scanner v2 adversarial input limits', () => {
   test.beforeEach(async ({ page }) => {
     await captureWorkerMessages(page);
@@ -124,7 +133,7 @@ test.describe('scanner v2 adversarial input limits', () => {
     const terminals = (await page.evaluate(() => window.__scannerWorkerMessages ?? [])) as unknown as TerminalMessage[];
     expect(terminals).toHaveLength(1);
     expect(terminals[0]).toMatchObject({ kind: 'result-v2', result: { schemaVersion: 'scanner-result-v2' } });
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+    await expandTechnicalDetails(page);
     // The scanner error panel is the only alert with the code line; Next's route announcer is also role=alert.
     await expect(page.getByText('V2_TOO_COMPLEX', { exact: true })).toHaveCount(0);
   });
@@ -138,6 +147,7 @@ test.describe('scanner v2 adversarial input limits', () => {
     expect(terminals[0]?.kind).toBe('error-v2');
     expect(terminals[0]?.code).toBe('WORKFLOW_TOO_COMPLEX');
     await expect(page.getByRole('alert').filter({ hasText: 'V2_TOO_COMPLEX' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toHaveCount(0);
   });
 
@@ -189,7 +199,7 @@ test.describe('scanner v2 adversarial input limits', () => {
 
     const excluded = (await page.evaluate(() => window.__scannerWorkerMessages ?? [])) as unknown as TerminalMessage[];
     expect(excluded[0]?.kind).toBe('result-v2');
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+    await expandTechnicalDetails(page);
     // The finding's rule id is rendered whether or not a rule-reference URL is configured
     // (the link itself is covered by `report-trust.test.tsx`); this asserts the allowlist
     // change is visible in the report.
@@ -203,7 +213,7 @@ test.describe('scanner v2 adversarial input limits', () => {
       undefined,
       { timeout: 20_000 },
     );
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+    await expandTechnicalDetails(page);
 
     const included = (await page.evaluate(() => window.__scannerWorkerMessages ?? [])) as unknown as TerminalMessage[];
     expect(included).toHaveLength(2);

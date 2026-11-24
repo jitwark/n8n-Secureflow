@@ -45,7 +45,7 @@ const preview: SvgPreviewArtifact = {
   unresolvedEdgeCount: 0,
 };
 
-const explore = () => fireEvent.click(screen.getByRole('button', { name: /explore interactive canvas/i }));
+const explore = () => fireEvent.click(screen.getByRole('button', { name: /load interactive canvas/i }));
 
 beforeEach(() => {
   loadChartMock.mockReset();
@@ -123,7 +123,7 @@ describe('ChartLoader', () => {
     explore();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /explore interactive canvas/i })).toBeDefined());
+    await waitFor(() => expect(screen.getByRole('button', { name: /load interactive canvas/i })).toBeDefined());
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(screen.queryByText(/timed out/i)).toBeNull();
     resolveModule({ WorkflowChartComponent: () => createElement('div') });
@@ -149,7 +149,7 @@ describe('ChartLoader', () => {
   it('does not offer a retry when there is simply no diagram', async () => {
     render(createElement(ChartLoader, { entry: entryWithoutChart() }));
 
-    expect(screen.queryByRole('button', { name: /explore interactive canvas/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /load interactive canvas/i })).toBeNull();
     expect(screen.getByText(/no interactive diagram/i)).toBeDefined();
   });
 
@@ -202,6 +202,51 @@ describe('ChartLoader', () => {
     view.rerender(createElement(ChartLoader, { entry: second, loadCanvasModule }));
     resolveModule({ WorkflowChartComponent: () => createElement('div') });
     await waitFor(() => expect(loadChartMock).not.toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: /explore interactive canvas/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /load interactive canvas/i })).toBeDefined();
+  });
+
+  it('renders static structure fallback without fetching /data/previews and passes entry.id to loadChart', async () => {
+    const entry = {
+      ...entryWithChart(),
+      id: '26006871febf2139',
+      structure: {
+        ...entryWithChart().structure,
+        nodeCount: 5,
+        rawNodeCount: 7,
+        annotationNodeCount: 2,
+        connectionCount: 4,
+        trigger: 'webhook',
+        nodeTypes: ['n8n-nodes-base.webhook', 'n8n-nodes-base.slack'],
+      },
+    } as Entry;
+    loadChartMock.mockResolvedValue({
+      ok: true,
+      chart: { nodes: [{ id: 'n0', name: 'Webhook', type: 'n8n-nodes-base.webhook', x: 0, y: 0 }], edges: [] },
+    });
+
+    render(createElement(ChartLoader, { entry }));
+
+    expect(loadPreviewMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/5 active nodes/i)).toBeDefined();
+    expect(screen.getByText(/2 sticky notes/i)).toBeDefined();
+    expect(screen.getByText(/n8n-nodes-base\.webhook/)).toBeDefined();
+
+    explore();
+    await waitFor(() => expect(loadChartMock).toHaveBeenCalledWith(entry.chartRef, expect.any(AbortSignal), undefined, entry.id));
+  });
+
+  it('loads interactive canvas from packed charts when chartRef is omitted and packedChartAvailable is true', async () => {
+    const entry = { ...entryWithoutChart(), id: '26006871febf2139' } as Entry;
+    loadChartMock.mockResolvedValue({
+      ok: true,
+      chart: { nodes: [{ id: 'n0', name: 'Webhook', type: 'n8n-nodes-base.webhook', x: 0, y: 0 }], edges: [] },
+    });
+    const loadCanvasModule = async () => ({ WorkflowChartComponent: () => createElement('div', { 'data-testid': 'workflow-chart' }) });
+
+    render(createElement(ChartLoader, { entry, packedChartAvailable: true, loadCanvasModule }));
+    explore();
+
+    await waitFor(() => expect(loadChartMock).toHaveBeenCalledWith(undefined, expect.any(AbortSignal), undefined, entry.id));
+    await waitFor(() => expect(screen.getByTestId('workflow-chart')).toBeDefined());
   });
 });

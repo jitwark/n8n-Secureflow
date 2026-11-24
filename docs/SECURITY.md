@@ -52,8 +52,8 @@ described. Two residuals:
   the browser would leave the site and make that request with `connect-src 'self'`,
   `default-src 'self'`, and `form-action 'none'` all still active.
 
-Both were reproduced locally in Chromium under the exact policy this site ships; the probes are
-in the audit packets indexed by `docs/audit/HISTORY.md`.
+Both were reproduced locally in Chromium under the exact policy this site ships; the probe packets
+are retained in git history rather than shipped in the working tree.
 
 So the accurate statement is: **no code path sends your workflow anywhere, this is enforced by
 source and emitted-bundle gates and verified on the exercised path by an end-to-end request
@@ -168,8 +168,7 @@ run at all, and it fails closed without them rather than compare against whateve
 
 - **The snapshot** — `pipeline/.work/official-bodies-snapshot.json`, a verified inventory every body
   read must match file by file. It must be provisioned explicitly with `--snapshot <file>` or
-  `OFFICIAL_BODIES_SNAPSHOT`; there is no default lookup. The release descriptor names that path as
-  its input snapshot (`scripts/lib/release-descriptor.mjs`).
+  `OFFICIAL_BODIES_SNAPSHOT`; there is no default lookup, and the gate refuses to run without it.
 - **The bodies** — the sibling directory
   `<workspace>/../../n8n templates/04_curated_official_and_github/official`, which lives outside the
   repository entirely. Override with `--bodies <dir>` or `OFFICIAL_BODIES_DIR`.
@@ -180,9 +179,10 @@ committed. Only that operator regenerates either, and regenerating invalidates t
 any generated-byte change requires a fresh sweep of the exact staged bytes before they are published
 or committed.
 
-**`npm run release:gates` does not provision these inputs.** `scripts/run-gates.mjs` lists the gate
-in the release sequence but exports neither variable, so the sequence reaches it only if the operator
-exported them first. Provision both before a release-gate run, or the sequence stops there.
+**The release gate sequence does not provision these inputs.** `scripts/run-gates.mjs` lists the gate
+in the release sequence but exports neither variable, so `node scripts/run-gates.mjs release` reaches
+it only if the operator exported them first. Provision both before a release-gate run, or the
+sequence stops there.
 
 **It is not a hosted-CI gate.** Neither `.github/workflows/ci.yml` nor
 `.github/workflows/deploy.yml` references it: the trusted bodies are not available to CI, so the

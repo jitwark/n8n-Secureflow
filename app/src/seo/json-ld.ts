@@ -6,6 +6,7 @@ import { SITE_NAME } from './page-meta';
 import { isPreviewBuild } from './robots';
 import { capitalize } from './text-format';
 import { publishableAuthorName } from '../catalogue/author-display';
+import { detailHref } from '../catalogue/detail-href';
 /**
  * A schema.org ListItem whose `item` exists only when a release origin does.
  * `cleanObject` strips `undefined` but keeps `null`, and a JSON-LD field that
@@ -88,7 +89,7 @@ export function entryJsonLd(entry: Entry) {
 export function hubJsonLd(
   kind: string,
   slug: string,
-  items: Array<{ title: string; slug: string; isIndexable?: boolean }> = [],
+  items: Array<{ id?: string; title: string; slug: string; isIndexable?: boolean }> = [],
   page = 1,
 ) {
   const formattedSlug = capitalize(slug);
@@ -105,7 +106,7 @@ export function hubJsonLd(
 
   const first24 = items.filter((item) => item.isIndexable !== false).slice(0, 24);
   const itemListElements = first24.map((item, idx) => {
-    const itemUrl = absoluteSiteUrl(`/w/${item.slug}/`);
+    const itemUrl = absoluteSiteUrl(detailHref({ id: item.id ?? '', slug: item.slug }));
     return {
       '@type': 'ListItem',
       position: idx + 1,
@@ -249,8 +250,7 @@ const HTML_ESCAPES: Record<string, string> = {
   '<': '\\u003c',
   '>': '\\u003e',
   '&': '\\u0026',
-  '\u2028': '\\u2028',
-  '\u2029': '\\u2029',
+  '\u2028': '\\u2028', '\u2029': '\\u2029',
 };
 
 export function serializeJsonLd(data: unknown): string {

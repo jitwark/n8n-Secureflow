@@ -5,6 +5,7 @@ import type { Entry, SvgPreviewArtifact } from '@hub/contracts';
 import { loadPreviewById, type PreviewResult } from '../../catalogue/preview-client';
 import { loadChart } from '../../catalogue/shard-client';
 import { StaticWorkflowPreview } from './static-preview';
+import { StaticStructureFallback } from './static-structure-fallback';
 import { safeHttpUrl } from '../../seo/hostile-text';
 import { CHART_MESSAGES, CHART_RETRYABLE, PREVIEW_MESSAGES, PREVIEW_RETRYABLE, type ChartDisplayResult } from './chart-loader-copy';
 
@@ -12,8 +13,10 @@ type ChartLoaderProps = {
   entry: Entry;
   /** Supplied by a statically rendered page; omitted on the client-only view. */
   preview?: SvgPreviewArtifact | null;
-  /** Client-only view opts into fetching the preview artifact after entry load. */
+  /** Optional opt-in preview fetch; omitted by default because previews/ are pruned in static exports. */
   loadPreview?: boolean;
+  /** True when packed `charts/pack-*.jsonl.gzbin` buckets are published and `slimEntry` omitted `chartRef`. */
+  packedChartAvailable?: boolean;
   /** Test seam for the finite timeout; production defaults to 15 seconds. */
   interactiveTimeoutMs?: number;
   /** Test seam for the local dynamic chunk; production uses the real module. */
@@ -48,11 +51,11 @@ function SourceLink({ entry }: { entry: Entry }) {
 }
 
 /**
- * A preview is the default detail surface. The heavy interactive module and
- * chart shard are both deferred until the reader explicitly asks for them.
- * Every transport outcome settles into a finite state, including cancellation.
+ * Shows a zero-network structure summary by default and fetches the packed
+ * interactive chart + canvas module only when the user clicks "Load interactive canvas".
  */
-export function ChartLoader({ entry, preview, loadPreview = false, interactiveTimeoutMs = INTERACTIVE_TIMEOUT_MS, loadCanvasModule = loadWorkflowChart }: ChartLoaderProps) {
+export function ChartLoader({ entry, preview, loadPreview = false, packedChartAvailable = false, interactiveTimeoutMs = INTERACTIVE_TIMEOUT_MS, loadCanvasModule = loadWorkflowChart }: ChartLoaderProps) {
+  const canLoadInteractive = Boolean(entry.chartRef) || packedChartAvailable;
   const [previewState, setPreviewState] = useState<PreviewResult | null>(null);
   const [previewAttempt, setPreviewAttempt] = useState(0);
   const [interactiveState, setInteractiveState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -102,7 +105,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, interactiveTi
   }, []);
 
   const exploreInteractive = useCallback(async () => {
-    if (!entry.chartRef || interactiveState === 'loading') return;
+    if (!canLoadInteractive || interactiveState === 'loading') return;
     const controller = new AbortController();
     const requestGeneration = requestGenerationRef.current + 1;
     requestGenerationRef.current = requestGeneration;
@@ -122,7 +125,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, interactiveTi
     try {
       const workflowChartModule = await Promise.race([loadCanvasModule(), timeout]);
       if (controller.signal.aborted || requestGenerationRef.current !== requestGeneration) return;
-      const result = await Promise.race([loadChart(entry.chartRef, controller.signal), timeout]);
+      const result = await Promise.race([loadChart(entry.chartRef, controller.signal, undefined, entry.id), timeout]);
       if (controller.signal.aborted || requestGenerationRef.current !== requestGeneration) return;
       if (!result.ok) {
         setChartResult(result);
@@ -145,7 +148,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, interactiveTi
       if (timeoutRef.current === timeoutId) timeoutRef.current = undefined;
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [entry.chartRef, interactiveState, interactiveTimeoutMs, loadCanvasModule]);
+  }, [canLoadInteractive, entry.chartRef, entry.id, interactiveState, interactiveTimeoutMs, loadCanvasModule]);
 
   const previewArtifact = preview ?? (previewState?.ok ? previewState.preview : null);
   const previewFailure = preview === undefined && previewState && !previewState.ok ? previewState.reason : null;
@@ -165,14 +168,16 @@ export function ChartLoader({ entry, preview, loadPreview = false, interactiveTi
       <div data-testid="chart-preview-region" className={PREVIEW_REGION}>
         {previewArtifact ? <StaticWorkflowPreview preview={previewArtifact} /> : loadPreview && !previewFailure ? (
           <div role="status" aria-busy="true" className={`${PANEL} animate-pulse`}>Loading static workflow preview</div>
-        ) : (
+        ) : previewFailure ? (
           <div role="status" className={PANEL}>
-            <p className="text-ink">{previewFailure ? PREVIEW_MESSAGES[previewFailure] : 'Static preview unavailable for this release.'}</p>
-            {previewFailure && PREVIEW_RETRYABLE.has(previewFailure) && <ActionButton onClick={retryPreview}>Try preview again</ActionButton>}
+            <p className="text-ink">{PREVIEW_MESSAGES[previewFailure]}</p>
+            {PREVIEW_RETRYABLE.has(previewFailure) && <ActionButton onClick={retryPreview}>Try preview again</ActionButton>}
           </div>
+        ) : (
+          <StaticStructureFallback entry={entry} />
         )}
       </div>
-      {entry.chartRef ? (
+      {canLoadInteractive ? (
         <div className="flex flex-wrap items-center gap-3">
           {interactiveState === 'loading' ? (
             <div role="status" aria-busy="true" className="flex flex-wrap items-center gap-3 text-xs text-ink-muted">
@@ -190,7 +195,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, interactiveTi
               {CHART_RETRYABLE.has(chartResult.reason) && <ActionButton onClick={() => void exploreInteractive()}>Try again</ActionButton>}
             </div>
           ) : (
-            <ActionButton onClick={() => void exploreInteractive()}>Explore interactive canvas</ActionButton>
+            <ActionButton onClick={() => void exploreInteractive()}>Load interactive canvas</ActionButton>
           )}
         </div>
       ) : (

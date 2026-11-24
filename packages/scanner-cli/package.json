@@ -1,7 +1,7 @@
 {
   "name": "sfscanner",
-  "version": "0.2.1",
-  "description": "SecureFlow Scanner — Deterministic, offline security & dataflow analyzer for n8n workflows",
+  "version": "0.3.0",
+  "description": "Deterministic offline security & dataflow scanner for n8n workflows (CLI, MCP, GitHub Action)",
   "keywords": [
     "n8n",
     "security",
@@ -19,7 +19,7 @@
   "private": false,
   "type": "module",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=20.0.0"
   },
   "main": "./dist/index.js",
   "bin": {
@@ -31,6 +31,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "README.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"

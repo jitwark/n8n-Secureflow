@@ -1,15 +1,16 @@
-import { ADMITTED_PROFILE_V2, isAdmittedProfileSpecifierV2, isApprovedDomainV2, type ScanConfigV2, type ScanSeverityV2 } from './contracts.js';
+import { DEFAULT_PROFILE_V3, isApprovedDomainV2, resolveAdmittedProfileV2, type AdmittedProfileIdV2, type ScanConfidenceV2, type ScanConfigV2, type ScanFailOnV2, type ScanFormatV2, type ScanSeverityV2 } from './contracts.js';
 import { isAbsoluteAdmittedPathV2, isAdmittedLocalPath, isAdmittedRelativePath, normalizeAdmittedPathV2 } from './path-admission.js';
 import type { V2CommandName } from './help.js';
 
-export type CliFormatV2 = 'json' | 'ndjson' | 'sarif' | 'table';
-export type CliProfileV2 = typeof ADMITTED_PROFILE_V2.id;
+export type CliFormatV2 = ScanFormatV2;
+export type CliProfileV2 = AdmittedProfileIdV2;
 export type CliTargetEnumV2 = 'UNKNOWN' | 'COMMUNITY' | 'ENTERPRISE' | 'CLOUD' | 'SELF_HOSTED' | 'OWNER' | 'ADMIN' | 'MEMBER' | 'LEGACY' | 'NATIVE';
 export type CliParseErrorCodeV2 = 'NO_COMMAND' | 'UNKNOWN_COMMAND' | 'UNKNOWN_OPTION' | 'MISSING_VALUE' | 'INVALID_VALUE' | 'DUPLICATE_OPTION' | 'UNEXPECTED_ARGUMENT' | 'REMOTE_PATH' | 'RULE_PACK_INVALID' | 'SEMANTIC_CATALOGUE_INVALID' | 'PROFILE_NOT_ADMITTED';
 export type CliParseErrorV2 = Readonly<{ code: CliParseErrorCodeV2; message: string; argument?: string }>;
 
 type ScanCommandV2 = Readonly<{
-  kind: 'scan'; schema: 'v2'; inputs: readonly string[]; format: CliFormatV2; profile: CliProfileV2; failOn: ScanSeverityV2;
+  kind: 'scan'; schema: 'v2'; inputs: readonly string[]; format: CliFormatV2; formatSpecified?: boolean; profile: CliProfileV2; failOn: ScanFailOnV2;
+  minSeverity?: ScanSeverityV2; minConfidence?: ScanConfidenceV2; baseline?: string;
   requireComplete: boolean; concurrency: number; timeoutMs?: number; output?: string; configPath?: string;
   rules: 'builtin'; catalogue: 'builtin'; limits: string; target?: string; n8nVersion?: string;
   edition: 'COMMUNITY' | 'ENTERPRISE' | 'CLOUD' | 'UNKNOWN'; deployment: 'SELF_HOSTED' | 'CLOUD' | 'UNKNOWN';
@@ -35,12 +36,15 @@ export type CliParseResultV2 = Readonly<{ ok: true; command: ParsedCommandV2 } |
 export type CliArgumentDispatch = Readonly<{ mode: 'v1'; argv: readonly string[] } | { mode: 'v2'; result: CliParseResultV2 }>;
 
 const severities: readonly ScanSeverityV2[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+const failThresholds: readonly ScanFailOnV2[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'NONE'];
+const confidences: readonly ScanConfidenceV2[] = ['HIGH', 'MEDIUM', 'LOW'];
+const formats: readonly ScanFormatV2[] = ['json', 'ndjson', 'sarif', 'table', 'pretty', 'markdown'];
 const commands: Record<string, true> = Object.freeze({ scan: true, fix: true, rules: true, explain: true, profiles: true, 'validate-config': true, version: true, '--version': true });
-const implicitV2Commands: Record<string, true> = Object.freeze({ fix: true, rules: true, explain: true, profiles: true, 'validate-config': true, version: true });
-const scalarOptions: Record<string, true> = Object.freeze({ '--format': true, '--profile': true, '--fail-on': true, '--max-concurrency': true, '--concurrency': true, '--timeout': true, '--output': true, '--config': true, '--rules': true, '--catalogue': true, '--limits': true, '--target': true, '--n8n-version': true, '--edition': true, '--deployment': true, '--role': true, '--task-runner': true });
+const implicitV2Commands: Record<string, true> = Object.freeze({ scan: true, fix: true, rules: true, explain: true, profiles: true, 'validate-config': true, version: true });
+const scalarOptions: Record<string, true> = Object.freeze({ '--format': true, '--profile': true, '--fail-on': true, '--min-severity': true, '--min-confidence': true, '--baseline': true, '--max-concurrency': true, '--concurrency': true, '--timeout': true, '--output': true, '--config': true, '--rules': true, '--catalogue': true, '--limits': true, '--target': true, '--n8n-version': true, '--edition': true, '--deployment': true, '--role': true, '--task-runner': true });
 const repeatableOptions: Record<string, true> = Object.freeze({ '--community-package': true, '--configuration': true, '--approved-domain': true, '--include': true, '--exclude': true });
-const configFields: Record<string, keyof ScanConfigV2> = Object.freeze({ '--format': 'format', '--profile': 'profile', '--fail-on': 'failOn', '--max-concurrency': 'concurrency', '--concurrency': 'concurrency', '--output': 'output', '--config': 'configPath', '--rules': 'rules', '--catalogue': 'catalogue', '--limits': 'limits', '--target': 'target', '--approved-domain': 'approvedDomains', '--include': 'include', '--exclude': 'exclude', 'inputs': 'inputs', '--require-complete': 'requireComplete', '--allow-unsigned-development-rules': 'allowUnsignedDevelopmentRules', '--no-color': 'noColor' });
-const overrideOrder: readonly (keyof ScanConfigV2)[] = ['format', 'profile', 'output', 'inputs', 'configPath', 'failOn', 'requireComplete', 'concurrency', 'rules', 'catalogue', 'limits', 'target', 'include', 'exclude', 'approvedDomains', 'allowUnsignedDevelopmentRules', 'noColor'];
+const configFields: Record<string, keyof ScanConfigV2> = Object.freeze({ '--format': 'format', '--profile': 'profile', '--fail-on': 'failOn', '--min-severity': 'minSeverity', '--min-confidence': 'minConfidence', '--baseline': 'baseline', '--max-concurrency': 'concurrency', '--concurrency': 'concurrency', '--output': 'output', '--config': 'configPath', '--rules': 'rules', '--catalogue': 'catalogue', '--limits': 'limits', '--target': 'target', '--approved-domain': 'approvedDomains', '--include': 'include', '--exclude': 'exclude', 'inputs': 'inputs', '--require-complete': 'requireComplete', '--allow-unsigned-development-rules': 'allowUnsignedDevelopmentRules', '--no-color': 'noColor' });
+const overrideOrder: readonly (keyof ScanConfigV2)[] = ['format', 'profile', 'output', 'inputs', 'configPath', 'failOn', 'minSeverity', 'minConfidence', 'baseline', 'requireComplete', 'concurrency', 'rules', 'catalogue', 'limits', 'target', 'include', 'exclude', 'approvedDomains', 'allowUnsignedDevelopmentRules', 'noColor'];
 
 export function parseArgumentsV2(argv: readonly string[]): CliParseResultV2 {
   const stripped = stripSchema(argv); if (!stripped.ok) return stripped.result;
@@ -53,7 +57,7 @@ export function parseArgumentsV2(argv: readonly string[]): CliParseResultV2 {
   if (kind !== 'scan') return parseMetadata(kind as Exclude<CliCommandV2['kind'], 'scan' | 'help' | 'fix'>, args.slice(1));
   if (args.length === 2 && args[1] === '--help') return success({ kind: 'help', schema: 'v2', command: 'scan' });
   const value: Record<string, unknown> = {
-    kind: 'scan', schema: 'v2', inputs: [], format: 'json', profile: 'beta-default', failOn: 'INFO', requireComplete: false,
+    kind: 'scan', schema: 'v2', inputs: [], format: 'json', profile: DEFAULT_PROFILE_V3.id, failOn: 'INFO', requireComplete: false,
     concurrency: 1, rules: 'builtin', catalogue: 'builtin', limits: 'builtin', edition: 'UNKNOWN', deployment: 'UNKNOWN',
     role: 'UNKNOWN', taskRunner: 'UNKNOWN', communityPackages: [], configuration: [], include: ['**/*.json'],
     exclude: ['.git/**', 'node_modules/**'], allowUnsignedDevelopmentRules: false, noColor: false, auditSupplyChain: false,
@@ -101,9 +105,13 @@ export function parseArgumentsV2(argv: readonly string[]): CliParseResultV2 {
       if (configFields[name]) overrides[configFields[name]!] = Object.freeze([...repeatable[name]!]);
       continue;
     }
-    if (name === '--format' && !['json', 'ndjson', 'sarif', 'table'].includes(read)) return failure('INVALID_VALUE', 'Format is invalid.', name);
-    if (name === '--profile' && !isAdmittedProfileSpecifierV2(read)) return failure('PROFILE_NOT_ADMITTED', 'Profile is not admitted.', name);
-    if (name === '--fail-on' && !severities.includes(read as ScanSeverityV2)) return failure('INVALID_VALUE', 'Fail threshold is invalid.', name);
+    if (name === '--format' && !formats.includes(read as ScanFormatV2)) return failure('INVALID_VALUE', 'Format is invalid.', name);
+    const resolvedProfile = name === '--profile' ? resolveAdmittedProfileV2(read) : undefined;
+    if (name === '--profile' && !resolvedProfile) return failure('PROFILE_NOT_ADMITTED', 'Profile is not admitted.', name);
+    const normalized = name === '--fail-on' || name === '--min-severity' || name === '--min-confidence' ? read.toUpperCase() : read;
+    if (name === '--fail-on' && !failThresholds.includes(normalized as ScanFailOnV2)) return failure('INVALID_VALUE', 'Fail threshold is invalid.', name);
+    if (name === '--min-severity' && !severities.includes(normalized as ScanSeverityV2)) return failure('INVALID_VALUE', 'Minimum severity is invalid.', name);
+    if (name === '--min-confidence' && !confidences.includes(normalized as ScanConfidenceV2)) return failure('INVALID_VALUE', 'Minimum confidence is invalid.', name);
     if ((name === '--max-concurrency' || name === '--concurrency' || name === '--timeout') && !positiveInteger(read, name === '--timeout' ? 2 ** 31 - 1 : 16)) return failure('INVALID_VALUE', 'Numeric option is invalid.', name);
     if (name === '--n8n-version' && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(read)) return failure('INVALID_VALUE', 'n8n version is invalid.', name);
     if (name === '--edition' && !['COMMUNITY', 'ENTERPRISE', 'CLOUD', 'UNKNOWN'].includes(read)) return failure('INVALID_VALUE', 'Edition is invalid.', name);
@@ -111,10 +119,10 @@ export function parseArgumentsV2(argv: readonly string[]): CliParseResultV2 {
     if (name === '--role' && !['OWNER', 'ADMIN', 'MEMBER', 'UNKNOWN'].includes(read)) return failure('INVALID_VALUE', 'Role is invalid.', name);
     if (name === '--task-runner' && !['LEGACY', 'NATIVE', 'UNKNOWN'].includes(read)) return failure('INVALID_VALUE', 'Task runner is invalid.', name);
     if (name === '--rules' || name === '--catalogue') { if (read !== 'builtin') return failure(name === '--rules' ? 'RULE_PACK_INVALID' : 'SEMANTIC_CATALOGUE_INVALID', 'Only built-in authority is available.', name); }
-    else if (['--limits', '--target', '--config'].includes(name) && (read === '-' || !isAdmittedRelativePath(read))) return failure('REMOTE_PATH', 'Option value is not admitted.', name);
+    else if (['--limits', '--target', '--config', '--baseline'].includes(name) && (read === '-' || !isAdmittedRelativePath(read))) return failure('REMOTE_PATH', 'Option value is not admitted.', name);
     else if (name === '--output' && read !== '-' && !isAdmittedRelativePath(read)) return failure('REMOTE_PATH', 'Option value is not admitted.', name);
     else if (['--n8n-version', '--edition', '--deployment', '--role', '--task-runner'].includes(name) && !safeText(read)) return failure('INVALID_VALUE', 'Option value is not admitted.', name);
-    seen.add(duplicateKey); assign(value, name, read); if (name === '--profile') value.profile = ADMITTED_PROFILE_V2.id; if (configFields[name]) overrides[configFields[name]!] = ['--max-concurrency', '--concurrency'].includes(name) ? Number(read) : read;
+    seen.add(duplicateKey); assign(value, name, normalized); if (resolvedProfile) value.profile = resolvedProfile.id; if (configFields[name]) overrides[configFields[name]!] = ['--max-concurrency', '--concurrency'].includes(name) ? Number(normalized) : normalized;
   }
   // No external rule pack is admittable: `--rules`/`--catalogue` accept only the built-in authority,
   // so the unsigned development escape hatch has nothing it could admit. It is refused as a usage
@@ -127,7 +135,9 @@ export function parseArgumentsV2(argv: readonly string[]): CliParseResultV2 {
   overrides.inputs = Object.freeze([...inputs]);
   const cliOverrides: Partial<ScanConfigV2> = {}; const sparse = cliOverrides as Record<string, unknown>; for (const field of overrideOrder) if (Object.prototype.hasOwnProperty.call(overrides, field)) sparse[field] = overrides[field];
   const command: ScanCommandV2 = {
-    kind: 'scan', schema: 'v2', inputs: Object.freeze([...inputs]), format: value.format as CliFormatV2, profile: ADMITTED_PROFILE_V2.id, failOn: value.failOn as ScanSeverityV2, requireComplete: value.requireComplete as boolean, concurrency: value.concurrency as number,
+    kind: 'scan', schema: 'v2', inputs: Object.freeze([...inputs]), format: value.format as CliFormatV2, formatSpecified: seen.has('--format'), profile: value.profile as CliProfileV2, failOn: value.failOn as ScanFailOnV2,
+    ...(typeof value.minSeverity === 'string' ? { minSeverity: value.minSeverity as ScanSeverityV2 } : {}), ...(typeof value.minConfidence === 'string' ? { minConfidence: value.minConfidence as ScanConfidenceV2 } : {}), ...(typeof value.baseline === 'string' ? { baseline: value.baseline } : {}),
+    requireComplete: value.requireComplete as boolean, concurrency: value.concurrency as number,
     ...(typeof value.timeoutMs === 'number' ? { timeoutMs: value.timeoutMs } : {}), ...(typeof value.output === 'string' ? { output: value.output } : {}), ...(typeof value.configPath === 'string' ? { configPath: value.configPath } : {}), rules: value.rules as 'builtin', catalogue: value.catalogue as 'builtin', limits: value.limits as string,
     ...(typeof value.target === 'string' ? { target: value.target } : {}), ...(typeof value.n8nVersion === 'string' ? { n8nVersion: value.n8nVersion } : {}), edition: value.edition as ScanCommandV2['edition'], deployment: value.deployment as ScanCommandV2['deployment'], role: value.role as ScanCommandV2['role'], taskRunner: value.taskRunner as ScanCommandV2['taskRunner'], communityPackages: arrayFor(repeatable['--community-package']), configuration: arrayFor(repeatable['--configuration']), approvedDomains: arrayFor(repeatable['--approved-domain']), include: repeatable['--include']!.length > 0 ? arrayFor(repeatable['--include']) : Object.freeze(['**/*.json']), exclude: repeatable['--exclude']!.length > 0 ? arrayFor(repeatable['--exclude']) : Object.freeze(['.git/**', 'node_modules/**']), allowUnsignedDevelopmentRules: value.allowUnsignedDevelopmentRules as boolean, noColor: value.noColor as boolean, auditSupplyChain: value.auditSupplyChain === true, includeReadiness: value.includeReadiness as boolean, cliOverrides,
   };
@@ -223,7 +233,7 @@ function parseMetadata(kind: Exclude<CliCommandV2['kind'], 'scan' | 'help' | 'fi
   if (rest.length !== 1 || !isAdmittedRelativePath(rest[0]!)) return failure('UNEXPECTED_ARGUMENT', 'validate-config requires one local file.');
   return success({ kind, schema: 'v2', format, path: rest[0]! });
 }
-function assign(value: Record<string, unknown>, name: string, read: string): void { const fields: Record<string, string> = { '--format': 'format', '--profile': 'profile', '--fail-on': 'failOn', '--max-concurrency': 'concurrency', '--concurrency': 'concurrency', '--timeout': 'timeoutMs', '--output': 'output', '--config': 'configPath', '--rules': 'rules', '--catalogue': 'catalogue', '--limits': 'limits', '--target': 'target', '--n8n-version': 'n8nVersion', '--edition': 'edition', '--deployment': 'deployment', '--role': 'role', '--task-runner': 'taskRunner' }; value[fields[name]!] = ['--max-concurrency', '--concurrency', '--timeout'].includes(name) ? Number(read) : read; }
+function assign(value: Record<string, unknown>, name: string, read: string): void { const fields: Record<string, string> = { '--format': 'format', '--profile': 'profile', '--fail-on': 'failOn', '--min-severity': 'minSeverity', '--min-confidence': 'minConfidence', '--baseline': 'baseline', '--max-concurrency': 'concurrency', '--concurrency': 'concurrency', '--timeout': 'timeoutMs', '--output': 'output', '--config': 'configPath', '--rules': 'rules', '--catalogue': 'catalogue', '--limits': 'limits', '--target': 'target', '--n8n-version': 'n8nVersion', '--edition': 'edition', '--deployment': 'deployment', '--role': 'role', '--task-runner': 'taskRunner' }; value[fields[name]!] = ['--max-concurrency', '--concurrency', '--timeout'].includes(name) ? Number(read) : read; }
 function splitOption(token: string): [string, string | undefined] { const at = token.indexOf('='); return at < 0 ? [token, undefined] : [token.slice(0, at), token.slice(at + 1)]; }
 function positiveInteger(value: string, maximum: number): boolean { if (!/^\d+$/.test(value)) return false; const number = Number(value); return Number.isSafeInteger(number) && number > 0 && number <= maximum; }
 function safeText(value: string): boolean { return value.length > 0 && value.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value) && !/^(?:[a-z][a-z\d+.-]*:|\/|[a-z]:|\\\\)/i.test(value); }

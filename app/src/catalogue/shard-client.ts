@@ -1,25 +1,22 @@
 import type { ChartRef, WorkflowChart } from '@hub/contracts';
 import { parseWorkflowChart } from '@hub/contracts/workflow-chart';
+import { fetchTextMaybeGzip } from './gzip-fetch';
 import { loadManifest, type Manifest } from './manifest';
+import { bucketForId, bucketTag } from './pack-bucket';
 import { sitePath } from '../ui/site-url.mjs';
 
 const MAX_CHART_BYTES = 512_000;
+const chartPackCache = new Map<string, Promise<Map<string, string>>>();
 
-/**
- * Fetch a workflow chart out-of-line, by range request.
- *
- * A chart is one JSONL line — a few kilobytes — inside a shard that runs to
- * 16 MB. A `206` is the only acceptable answer, and the manifest is what makes
- * it verifiable: the shard's declared byte size decides whether the requested
- * range is inside the artifact at all, and its `sha256` names the release the
- * bytes came from.
- */
+export function clearChartPackCache(): void {
+  chartPackCache.clear();
+}
+
 export async function fetchChart(chartRef: ChartRef, signal?: AbortSignal): Promise<WorkflowChart | null> {
   const result = await loadChart(chartRef, signal);
   return result.ok ? result.chart : null;
 }
 
-/** Why a chart is not on screen. `retryable` decides whether to offer a retry. */
 export type ChartUnavailableReason =
   | 'no-chart'
   | 'range-unsupported'
@@ -30,41 +27,83 @@ export type ChartUnavailableReason =
   | 'malformed'
   | 'aborted';
 
-/**
- * The release identity of the shard a failure came from. Present only after the
- * chart artifact resolved, because that is the only moment a digest exists —
- * `no-chart` and a manifest-load failure have no artifact to name.
- */
 export type ChartRelease = { generatedAt: string; shardSha256: string };
 
 export type ChartResult =
   | { ok: true; chart: WorkflowChart }
   | { ok: false; reason: ChartUnavailableReason; release?: ChartRelease };
 
-/**
- * These finite outcomes used to collapse into a single `null`, so no caller
- * could tell "this workflow has no diagram" from "we could not fetch it" — and
- * `ChartLoader` rendered all of them as a pulse that never stopped (CV-1).
- */
+function hasPackedCharts(manifest: Manifest): boolean {
+  return manifest.artifacts.some((candidate) => candidate.path.startsWith('charts/pack-') && candidate.path.endsWith('.jsonl.gzbin'));
+}
+
+async function fetchChartBucketMap(
+  packPath: string,
+  sha256: string,
+  manifest: Manifest,
+  signal?: AbortSignal,
+): Promise<Map<string, string>> {
+  const key = `${manifest.schemaVersion}:${manifest.generatedAt}:${sha256}:${packPath}`;
+  let pending = chartPackCache.get(key);
+  if (!pending) {
+    pending = fetchTextMaybeGzip(sitePath(`/data/${packPath}`), { expectedSha256: sha256, signal }).then((text) => {
+      const map = new Map<string, string>();
+      for (const line of text.split('\n')) {
+        if (!line) continue;
+        const parsed = JSON.parse(line) as { id?: unknown };
+        if (typeof parsed.id === 'string') map.set(parsed.id, line);
+      }
+      return map;
+    });
+    chartPackCache.set(key, pending);
+    pending.catch(() => { if (chartPackCache.get(key) === pending) chartPackCache.delete(key); });
+  }
+  return pending;
+}
+
+async function loadPackedChart(entryId: string, manifest: Manifest, signal?: AbortSignal): Promise<ChartResult> {
+  const packPath = `charts/pack-${bucketTag(bucketForId(entryId))}.jsonl.gzbin`;
+  const artifact = manifest.artifacts.find((candidate) => candidate.path === packPath);
+  if (!artifact) return { ok: false, reason: 'no-chart' };
+  const release: ChartRelease = { generatedAt: manifest.generatedAt, shardSha256: artifact.sha256 };
+
+  try {
+    const map = await fetchChartBucketMap(packPath, artifact.sha256, manifest, signal);
+    const line = map.get(entryId);
+    if (!line) return { ok: false, reason: 'no-chart', release };
+    const chart = parseWorkflowChart(JSON.parse(line));
+    return chart ? { ok: true, chart } : { ok: false, reason: 'malformed', release };
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') return { ok: false, reason: 'aborted', release };
+    if ((cause as { code?: string } | null)?.code === 'hash-mismatch' || cause instanceof SyntaxError) {
+      return { ok: false, reason: 'malformed', release };
+    }
+    return { ok: false, reason: 'network', release };
+  }
+}
+
 export async function loadChart(
   chartRef: ChartRef | undefined,
   signal?: AbortSignal,
   manifestArg?: Manifest,
+  entryId?: string,
 ): Promise<ChartResult> {
-  if (!chartRef) return { ok: false, reason: 'no-chart' };
+  if (!chartRef && !entryId) return { ok: false, reason: 'no-chart' };
 
   let manifest: Manifest;
   try {
     manifest = manifestArg ?? await loadManifest();
   } catch {
-    // Resolved, never rejected: a rejecting loader is what produced the
-    // unbounded spinner CV-1 fixed. No artifact means no release to report.
     return { ok: false, reason: 'network' };
   }
 
+  if (entryId && hasPackedCharts(manifest)) {
+    return loadPackedChart(entryId, manifest, signal);
+  }
+  if (!chartRef) return { ok: false, reason: 'no-chart' };
+
   const artifact = manifest.artifacts.find((candidate) => candidate.path === `charts/chart-${chartRef.shard}.jsonl`);
   if (!artifact) return { ok: false, reason: 'no-chart' };
-
   const release: ChartRelease = { generatedAt: manifest.generatedAt, shardSha256: artifact.sha256 };
 
   if (!Number.isSafeInteger(chartRef.shard) || chartRef.shard < 0 ||
@@ -80,7 +119,6 @@ export async function loadChart(
   try {
     const res = await fetch(path, { headers: { Range: rangeHeader }, signal });
     if (res.status === 200) {
-      // The host ignored Range and is sending the whole shard: cancel, never read.
       await res.body?.cancel();
       return { ok: false, reason: 'range-unsupported', release };
     }
@@ -93,7 +131,6 @@ export async function loadChart(
 
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.byteLength !== chartRef.length) return { ok: false, reason: 'short-body', release };
-    // One JSONL line, terminated. Anything else is not the line we asked for.
     if (bytes.at(-1) !== 0x0a || bytes.indexOf(0x0a) !== bytes.length - 1) {
       return { ok: false, reason: 'malformed', release };
     }

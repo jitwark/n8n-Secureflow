@@ -40,12 +40,15 @@ describe('reduceExitV2', () => {
     expectExit(reduceExitV2(batch(item('COMPLETED', result('INDETERMINATE')), item('COMPLETED', result('DEGRADED'))), options({ requireComplete: true })), 'REQUIRE_COMPLETE', 1);
   });
 
-  it('counts report-only findings at every fail-on severity', () => {
+  it('counts report-only findings at every fail-on severity and exits 0 under NONE unless error', () => {
     const vectors = [['CRITICAL', 'CRITICAL'], ['HIGH', 'HIGH'], ['MEDIUM', 'MEDIUM'], ['LOW', 'LOW'], ['INFO', 'INFO']] as const;
     for (const [failOn, finding] of vectors) {
       expectExit(reduceExitV2(batch(item('COMPLETED', result('COMPLETE', [finding]))), options({ failOn })), 'FINDING_THRESHOLD', 1);
     }
     expectExit(reduceExitV2(batch(item('COMPLETED', result('COMPLETE', ['INFO']))), options({ failOn: 'CRITICAL' })), 'UNDER_THRESHOLD', 0);
+    expectExit(reduceExitV2(batch(item('COMPLETED', result('COMPLETE', ['CRITICAL', 'HIGH']))), options({ failOn: 'NONE' })), 'UNDER_THRESHOLD', 0);
+    expectExit(reduceExitV2(batch(item('COMPLETED', result('COMPLETE', ['CRITICAL'])), item('FAILED', undefined, 'INVALID_JSON')), options({ failOn: 'NONE' })), 'ITEM_FAILURE', 3);
+    expectExit(reduceExitV2(batch(item('COMPLETED', result('COMPLETE', ['CRITICAL'])), item('FAILED', undefined, 'TOOL_INVARIANT_FAILED')), options({ failOn: 'NONE' })), 'INTERNAL', 4);
   });
 
   it('supports the object input form and never leaks malformed values', () => {

@@ -3,7 +3,7 @@
 > Status: admitted-core architecture; host convergence remains gated
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer
-> Source of truth: [`packages/scanner-core/src/v2/scan-workflow.ts`](../../packages/scanner-core/src/v2/scan-workflow.ts), [`packages/scanner-core/src/v2/admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts), and [`openspec/changes/world-class-scanner-cli/design.md`](../../openspec/changes/world-class-scanner-cli/design.md)
+> Source of truth: [`packages/scanner-core/src/v2/scan-workflow.ts`](../../packages/scanner-core/src/v2/scan-workflow.ts) and [`packages/scanner-core/src/v2/admitted-registry.ts`](../../packages/scanner-core/src/v2/admitted-registry.ts)
 
 This page describes the explicitly versioned scanner v2 path. It does not replace the historical
 [v1 architecture](architecture.md), native `scanner-beta-1` behavior, or any public-entry and rights
@@ -169,8 +169,10 @@ The result status is the maximum effect of capability outcomes and diagnostic ef
 
 Findings are stable-sorted and their IDs exclude prose. The scoring policy admits only scoring,
 applicable, observed findings; report-only, potential, unknown, and not-applicable findings remain
-visible but do not alter the assessment. The exact scoring contract is in
-[`assessment-contract.md`](../../openspec/changes/world-class-scanner-cli/assessment-contract.md).
+visible but do not alter the assessment. The exact scoring contract was written as
+`assessment-contract.md` in the retired `world-class-scanner-cli` change package, which is no longer
+shipped in the working tree; recover it from git history if you need the original wording, and read
+[`contracts-v2.md`](contracts-v2.md) for the shipped contract.
 
 ## 7. Redaction boundary
 
@@ -183,7 +185,8 @@ shipped path produces a redacted artifact**:
 patch components (`EXPRESSION_LITERAL`, `CODE_LITERAL`) have no candidate producer, and the
 `reparse`/`rescan` verification legs pass when a caller omits them, so these modules must not be
 cited as a shipped guarantee. The disposition and its
-successor owner are recorded in [`PHASE1-LEDGER.md`](../audit/2026-09-16-fix/PHASE1-LEDGER.md).
+successor owner were recorded in `PHASE1-LEDGER.md`, a planning artefact retained in git history
+rather than shipped in the working tree.
 
 A redacted artifact, when the capability is finally wired, must fail closed: any conflict, limit, or
 verification failure returns `artifact: null` and no partial artifact, and reparse plus rescan are

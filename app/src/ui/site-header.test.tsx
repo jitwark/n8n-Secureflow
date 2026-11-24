@@ -69,4 +69,29 @@ describe('SiteHeader', () => {
     expect(screen.getByRole('button', { name: 'Open menu' }).getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('navigation', { name: 'Mobile Navigation' })).toBeNull();
   });
+
+  it('keeps desktop nav non-wrapping at lg+ and resets mobile drawer when pathname changes', () => {
+    pathname.current = '/';
+    const { rerender } = render(<SiteHeader searchableCount={18320} />);
+
+    const mainNav = screen.getByRole('navigation', { name: 'Main' });
+    const desktopWrapper = mainNav.parentElement!;
+    expect(desktopWrapper.className).toContain('hidden');
+    expect(desktopWrapper.className).toContain('lg:flex');
+    expect(desktopWrapper.className).toContain('shrink-0');
+
+    const cta = screen.getByRole('link', { name: 'Scan Workflow' });
+    expect(cta.className).toContain('whitespace-nowrap');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(screen.getByRole('navigation', { name: 'Mobile Navigation' })).toBeDefined();
+
+    pathname.current = '/library/';
+    rerender(<SiteHeader searchableCount={18320} />);
+    expect(screen.queryByRole('navigation', { name: 'Mobile Navigation' })).toBeNull();
+
+    pathname.current = '/';
+    rerender(<SiteHeader searchableCount={18320} />);
+    expect(screen.queryByRole('navigation', { name: 'Mobile Navigation' })).toBeNull();
+  });
 });

@@ -1,7 +1,7 @@
 import {
-  ADMITTED_PROFILE_V2, BUILTIN_AUTHORITIES_V2, DEFAULT_SCAN_CONFIG_V2, SCAN_CONFIG_V2_FIELDS,
+  BUILTIN_AUTHORITIES_V2, DEFAULT_SCAN_CONFIG_V2, SCAN_CONFIG_V2_FIELDS,
   SCAN_CONFIG_V2_MAX_CONCURRENCY, SCAN_CONFIG_V2_MAX_DOMAINS, SCAN_CONFIG_V2_MAX_PATTERNS, SCAN_CONFIG_V2_MAX_STRING,
-  isAdmittedProfileSpecifierV2, isApprovedDomainV2,
+  isApprovedDomainV2, resolveAdmittedProfileV2,
   type ScanConfigV2,
 } from './contracts';
 import { normalizeAdmittedPathV2 } from './path-admission';
@@ -10,8 +10,12 @@ export type ConfigLoadOptions = Readonly<{ configDirectory?: string; cli?: unkno
 export type ConfigLoadResult = Readonly<{ ok: true; config: ScanConfigV2 } | { ok: false; code: 'INVALID_CONFIG'; errors: readonly string[] }>;
 type Plain = Record<string, unknown>;
 const BUILTIN: Record<string, true> = { builtin: true };
+const FORMATS = ['json', 'ndjson', 'sarif', 'table', 'pretty', 'markdown'] as const;
+const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const;
+const CONFIDENCES = ['HIGH', 'MEDIUM', 'LOW'] as const;
 const CLI_NAMES: Readonly<Record<string, string>> = Object.freeze({
-  'fail-on': 'failOn', 'require-complete': 'requireComplete', 'max-concurrency': 'concurrency',
+  'fail-on': 'failOn', 'min-severity': 'minSeverity', 'min-confidence': 'minConfidence',
+  'require-complete': 'requireComplete', 'max-concurrency': 'concurrency',
   'allow-unsigned-development-rules': 'allowUnsignedDevelopmentRules',
   'no-color': 'noColor', config: 'configPath',
 });
@@ -67,10 +71,18 @@ function readCli(input: unknown, errors: string[]): Plain | undefined {
 }
 function normalize(value: Plain, config: Plain, cli: Plain, errors: string[]): ScanConfigV2 | undefined {
   const out: Plain = Object.assign(Object.create(null), { schemaVersion: 'n8n-scan-config-v2' });
-  const format = value.format; if (format !== 'json' && format !== 'ndjson' && format !== 'sarif' && format !== 'table') errors.push('format is invalid'); else out.format = format;
-  const profile = value.profile;
-  if (!isAdmittedProfileSpecifierV2(profile)) errors.push('profile is not admitted'); else out.profile = ADMITTED_PROFILE_V2.id;
-  if (value.failOn !== 'CRITICAL' && value.failOn !== 'HIGH' && value.failOn !== 'MEDIUM' && value.failOn !== 'LOW' && value.failOn !== 'INFO') errors.push('failOn is invalid'); else out.failOn = value.failOn;
+  const format = value.format; if (typeof format !== 'string' || !(FORMATS as readonly string[]).includes(format)) errors.push('format is invalid'); else out.format = format;
+  const profile = resolveAdmittedProfileV2(value.profile);
+  if (!profile) errors.push('profile is not admitted'); else out.profile = profile.id;
+  if (value.failOn !== 'NONE' && (typeof value.failOn !== 'string' || !(SEVERITIES as readonly string[]).includes(value.failOn))) errors.push('failOn is invalid'); else out.failOn = value.failOn;
+  if (value.minSeverity !== undefined || Object.prototype.hasOwnProperty.call(value, 'minSeverity')) {
+    if (typeof value.minSeverity !== 'string' || !(SEVERITIES as readonly string[]).includes(value.minSeverity)) errors.push('minSeverity is invalid');
+    else out.minSeverity = value.minSeverity;
+  }
+  if (value.minConfidence !== undefined || Object.prototype.hasOwnProperty.call(value, 'minConfidence')) {
+    if (typeof value.minConfidence !== 'string' || !(CONFIDENCES as readonly string[]).includes(value.minConfidence)) errors.push('minConfidence is invalid');
+    else out.minConfidence = value.minConfidence;
+  }
   for (const key of ['requireComplete', 'allowUnsignedDevelopmentRules', 'noColor']) {
     if (typeof value[key] !== 'boolean') errors.push(`${key} is invalid`); else out[key] = value[key];
   }
@@ -79,7 +91,7 @@ function normalize(value: Plain, config: Plain, cli: Plain, errors: string[]): S
     const raw = value[key];
     if (typeof raw !== 'string' || BUILTIN[raw] !== true) errors.push(`${key} is not admitted in built-in-only v2`); else out[key] = 'builtin';
   }
-  for (const key of ['limits', 'target', 'output', 'configPath'] as const) if (value[key] !== undefined || Object.prototype.hasOwnProperty.call(value, key)) {
+  for (const key of ['limits', 'target', 'output', 'configPath', 'baseline'] as const) if (value[key] !== undefined || Object.prototype.hasOwnProperty.call(value, key)) {
     const raw = value[key]; if (typeof raw !== 'string') errors.push(`${key} is invalid`); else { const path = localPath(raw, false, errors, key === 'limits'); if (path) out[key] = path; }
   }
   for (const key of ['inputs', 'include', 'exclude'] as const) {
@@ -148,18 +160,28 @@ function safeErrorKey(value: string): string {
 }
 
 export {
+  ADMITTED_PROFILES_V2,
+  ADMITTED_PROFILE_SPECIFIERS_V2,
   ADMITTED_PROFILE_V2,
   BUILTIN_AUTHORITIES_V2,
   BUILTIN_LIMITS_AUTHORITY_V2,
   BUILTIN_RULESET_AUTHORITY_V2,
   BUILTIN_SEMANTICS_AUTHORITY_V2,
   CLI_TOOL_V2,
+  DEFAULT_PROFILE_V3,
   DEFAULT_SCAN_CONFIG_V2,
   PROFILE_MANIFEST_DIGEST_V2,
   RULE_PACK_DIGEST_V2,
   SCAN_CONFIG_SCHEMA_V2,
   SEMANTIC_CATALOGUE_DIGEST_V2,
+  isAdmittedProfileSpecifierV2,
+  resolveAdmittedProfileV2,
+  type AdmittedProfileEntryV2,
+  type AdmittedProfileIdV2,
   type ScanConfigV2,
+  type ScanConfidenceV2,
+  type ScanFailOnV2,
+  type ScanSeverityV2,
 } from './contracts';
 
 function record(value: unknown): Plain | undefined {

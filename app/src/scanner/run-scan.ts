@@ -1,6 +1,7 @@
 import { DEFAULT_SCANNER_LIMITS } from '@hub/contracts';
 import type { ScanErrorCode, ScanErrorDetails, ScanWorkerResponse } from './scan.worker';
 import type { ScanWorkflowResult } from './engine';
+import { DEFAULT_SCAN_PROFILE, type ScanProfile } from './scan-profiles';
 import { parseScanWorkflowResult } from './scan-result-validation';
 import { runBrowserScanV2, type BrowserScanRequestV2 } from './scanner-v2-adapter';
 import { toScannerReportModelV2 } from './scanner-v2-presentation';
@@ -16,7 +17,7 @@ export class ScanError extends Error {
 }
 export type ScanRunOptions = {
   json: string;
-  profile?: 'beta-default' | 'beta-hardened';
+  profile?: ScanProfile;
   /** Hostnames the workflow is expected to contact. Anything else is reported. */
   approvedDomains?: string[];
   onProgress?: (phase: 'parse' | 'analyse' | 'render', pct: number) => void;
@@ -171,7 +172,7 @@ export function runScan(options: ScanRunOptions): Promise<ScanWorkflowResult | '
         kind: 'scan',
         id: scanId,
         json: options.json,
-        profile: options.profile ?? 'beta-default',
+        profile: options.profile ?? DEFAULT_SCAN_PROFILE,
         ...(options.approvedDomains && options.approvedDomains.length > 0
           ? { approvedDomains: options.approvedDomains }
           : {}),

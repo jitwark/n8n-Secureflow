@@ -63,8 +63,8 @@ export function ReportFindings({ scan }: ReportFindingsProps) {
       : `Showing ${visibleFindings.length} of ${scan.findings.length} findings${filtersActive ? ' with filters applied; priority findings remain visible' : ''}.${remainingFindings > 0 ? ` ${remainingFindings} more ${pluralize('finding', remainingFindings)} available; select Show more findings.` : ''}`;
 
   return <>
-    <section aria-labelledby="scanner-findings-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-2">
+    <section aria-labelledby="scanner-findings-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="scanner-findings-heading" className="font-display text-lg font-semibold text-ink">Critical and high findings</h2>
         <p className="font-mono text-xs text-ink-muted">{priority.length} priority</p>
       </div>
@@ -80,20 +80,20 @@ export function ReportFindings({ scan }: ReportFindingsProps) {
         <h3 className="font-display text-base font-semibold text-ink">Filter other findings</h3>
         <p className="mt-1 text-xs leading-5 text-ink-muted">Priority findings stay visible. These filters narrow the remaining findings.</p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
-          <div>
+          <div className="min-w-0">
             <label htmlFor="finding-severity-filter" className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">Severity</label>
             <select id="finding-severity-filter" aria-label="Filter findings by severity" value={filters.severity}
               onChange={(event) => setFilters((current) => ({ ...current, severity: event.target.value as FindingSeverityFilter }))}
-              className="mt-1 block min-h-11 rounded-control border border-hairline bg-raised px-3 text-sm text-ink">
+              className="mt-1 block min-h-11 max-w-full rounded-control border border-hairline bg-raised px-3 text-sm text-ink">
               <option value="ALL">All severities</option>
               {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
             </select>
           </div>
-          <div>
+          <div className="min-w-0">
             <label htmlFor="finding-effect-filter" className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">Effect</label>
             <select id="finding-effect-filter" aria-label="Filter findings by effect" value={filters.effect}
               onChange={(event) => setFilters((current) => ({ ...current, effect: event.target.value as FindingEffectFilter }))}
-              className="mt-1 block min-h-11 rounded-control border border-hairline bg-raised px-3 text-sm text-ink">
+              className="mt-1 block min-h-11 max-w-full rounded-control border border-hairline bg-raised px-3 text-sm text-ink">
               <option value="ALL">All effects</option>
               <option value="LEGACY_SCORE">Changes risk grade</option>
               <option value="REPORT_ONLY">Report-only</option>
@@ -109,7 +109,7 @@ export function ReportFindings({ scan }: ReportFindingsProps) {
 
       {emptyScan ? <p className="mt-4 rounded-control border border-accent-border/30 bg-accent-dim p-3 text-sm leading-6 text-ink" role="note">
         {emptyFindingsMessage(scan)}
-      </p> : noMatches ? <p className="mt-4 rounded-control border border-accent-border/30 bg-accent-dim p-3 text-sm leading-6 text-ink" role="note">
+      </p> : noMatches ? <p className="mt-4 rounded-control border border-hairline bg-raised/50 p-3 text-sm leading-6 text-ink" role="note">
         No filterable findings match these filters. The scan did return findings; priority findings remain visible while you review the filterable findings.
       </p> : null}
 
@@ -129,14 +129,14 @@ export function ReportFindings({ scan }: ReportFindingsProps) {
 
     <ReportTrust scan={scan} />
 
-    <section aria-labelledby="affected-nodes-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-2">
+    <section aria-labelledby="affected-nodes-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="affected-nodes-heading" className="font-display text-lg font-semibold text-ink">Affected nodes</h2>
         <p className="font-mono text-xs text-ink-muted">{nodes.length} {pluralize('node', nodes.length)}</p>
       </div>
       {nodes.length > 0 ? <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-        {nodes.map((node) => <li key={node} className="flex items-start gap-2 rounded-control border border-hairline bg-raised/40 p-3 text-sm text-ink">
-          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden="true" /><span className="break-all">{node}</span>
+        {nodes.map((node) => <li key={node} className="flex min-w-0 items-start gap-2 rounded-control border border-hairline bg-raised/40 p-3 text-sm text-ink">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden="true" /><span className="min-w-0 break-words [overflow-wrap:anywhere]">{node}</span>
         </li>)}
       </ul> : <p className="mt-3 text-sm text-ink-muted">No finding was tied to a specific node.</p>}
     </section>
@@ -173,18 +173,33 @@ function noPriorityFindingsMessage(scan: ScanWorkflowResult): string {
   return 'No critical or high findings were returned. Review every node and credential boundary before import.';
 }
 
+function summarizeTraces(v2Finding: ScannerReportModelV2['v2']['findings'][number] | undefined, model?: ScannerReportModelV2): string[] {
+  if (!model || !v2Finding) return [];
+  return v2Finding.traceRefs
+    .map((ref) => model.v2.traces.find((trace) => trace.traceId === ref))
+    .filter((trace): trace is NonNullable<typeof trace> => Boolean(trace && trace.steps.length > 0))
+    .slice(0, 2)
+    .map((trace) => trace.steps.map((step) => {
+      const nodeLabel = step.subject.kind === 'NODE'
+        ? safeReportText(step.subject.node.name ?? step.subject.node.explicitId ?? 'Node', 60)
+        : step.subject.kind;
+      return `${safeReportText(step.kind, 24)} (${nodeLabel})`;
+    }).join(' -> '));
+}
+
 function FindingCard({ finding, model }: { finding: CanonicalScanFinding; model?: ScannerReportModelV2 }) {
   const v2Finding = model?.v2.findings.find((item) => item.ruleId === finding.policyId && item.severity === finding.severity && item.confidence === finding.confidence && (item.effect === 'SCORING') === (finding.policyEffect === 'LEGACY_SCORE')) ?? model?.v2.findings.find(({ ruleId }) => ruleId === finding.policyId);
   const traceCount = model && v2Finding ? v2Finding.traceRefs.filter((ref) => model.v2.traces.some((trace) => trace.traceId === ref)).length : 0;
+  const tracePaths = summarizeTraces(v2Finding, model);
   // No configured reference means the policy id is text, not a dead anchor.
   const ruleHref = scannerRuleReferenceHref();
-  return <article className="py-4 first:pt-0 last:pb-0">
+  return <article className="min-w-0 py-4 first:pt-0 last:pb-0">
     <div className="flex flex-wrap items-center gap-2">
       <SeverityPill severity={finding.severity} />
       {finding.policyEffect === 'REPORT_ONLY' ? <span className="font-mono text-2xs font-semibold text-accent-text">Advisory finding — did not change risk grade</span> : null}
     </div>
-    <h3 className="mt-2 font-display text-base font-semibold text-ink">{safeReportText(finding.title, 180)}</h3>
-    <p className="mt-1 font-mono text-xs text-ink-muted">
+    <h3 className="mt-2 break-words font-display text-base font-semibold text-ink">{safeReportText(finding.title, 180)}</h3>
+    <p className="mt-1 [overflow-wrap:anywhere] font-mono text-xs text-ink-muted">
       {ruleHref ? (
         <a href={ruleHref} target="_blank" rel="noopener noreferrer"
           aria-label={`Open generated scanner rule reference for ${safeReportText(finding.policyId, 120)}`}
@@ -195,12 +210,15 @@ function FindingCard({ finding, model }: { finding: CanonicalScanFinding; model?
         <span className="text-accent-text">{safeReportText(finding.policyId, 120)}</span>
       )}{safeReportText(location(finding.location), 180)}
     </p>
-    <p className="mt-3 text-sm leading-6 text-ink">{safeReportText(finding.message)}</p>
-    <p className="mt-2 text-sm leading-6 text-ink">{safeReportText(finding.explanation)}</p>
-    {v2Finding ? <p className="mt-3 text-xs leading-5 text-ink-muted" aria-label="V2 finding evidence">
+    <p className="mt-3 break-words text-sm leading-6 text-ink">{safeReportText(finding.message)}</p>
+    <p className="mt-2 break-words text-sm leading-6 text-ink">{safeReportText(finding.explanation)}</p>
+    {v2Finding ? <p className="mt-3 [overflow-wrap:anywhere] text-xs leading-5 text-ink-muted" aria-label="V2 finding evidence">
       Applicability: {v2Finding.applicability} · Evidence class: {v2Finding.evidenceClass} · Effect: {v2Finding.effect}{v2Finding.effect === 'REPORT_ONLY' ? ' (does not change risk grade)' : ''} · Trace references: {v2Finding.traceRefs.length} total; {traceCount} available · Trace labels: {v2Finding.traceRefs.map((ref) => model?.v2.traces.find((trace) => trace.traceId === ref)?.kind).filter(Boolean).join(', ') || 'none'}
     </p> : null}
-    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+    {tracePaths.length > 0 ? <ul aria-label="Trace flow summary" className="mt-2 space-y-1">
+      {tracePaths.map((path, index) => <li key={`${finding.policyId}-trace-${index}`} className="[overflow-wrap:anywhere] font-mono text-xs text-ink-muted">Flow path: {path}</li>)}
+    </ul> : null}
+    <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
       <SafeTextBlock title="Why it matters" text={finding.whyItMatters} />
       <SafeTextBlock title="Possible impact" text={finding.possibleImpact} />
     </div>
@@ -208,7 +226,7 @@ function FindingCard({ finding, model }: { finding: CanonicalScanFinding; model?
   </article>;
 }
 function SafeTextBlock({ title, text }: { title: string; text: string }) {
-  return <div><h4 className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">{title}</h4><p className="mt-1 text-sm leading-6 text-ink">{safeReportText(text)}</p></div>;
+  return <div className="min-w-0"><h4 className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">{title}</h4><p className="mt-1 break-words text-sm leading-6 text-ink">{safeReportText(text)}</p></div>;
 }
 function affectedNodes(findings: CanonicalScanFinding[]): string[] {
   return Array.from(new Set(findings.map((finding) => safeReportText(finding.location.nodeName ?? finding.location.nodeId ?? 'Workflow-level finding', 180))));

@@ -284,4 +284,26 @@ describe('loadPreviewById', () => {
     await expect(loadPreviewById(ID_A)).resolves.toMatchObject({ ok: true, preview });
     expect(indexCalls).toBe(2);
   });
+
+  it('does not fetch preview artifacts when previews/ is absent from the release manifest', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: MANIFEST_SCHEMA_VERSION,
+            generatedAt: '2026-11-23T00:00:00.000Z',
+            totalEntries: 1,
+            catalogueShards: { [ID_A]: 0 },
+            artifacts: [{ path: 'details/pack-00.jsonl.gzbin', byteSize: 10, sha256: 'a'.repeat(64) }],
+          }),
+        } as Response;
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await expect(loadPreviewById(ID_A)).resolves.toEqual({ ok: false, reason: 'not-found' });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });

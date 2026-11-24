@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { gzipSync } from 'node:zlib';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   configureDeferredPayloads,
@@ -7,6 +10,7 @@ import {
   resetDeferredPayloads,
 } from './deferred-payloads';
 import { resetManifestCache } from '../catalogue/manifest';
+import { setKnownManifest } from './artifact-integrity';
 
 afterEach(() => {
   resetDeferredPayloads();
@@ -213,5 +217,32 @@ describe('semantic index release binding', () => {
 
     requestSemanticVectorsFor('slack');
     await vi.waitFor(() => expect(deliverSemantic).toHaveBeenCalledWith(semanticJson));
+  });
+
+  it('fetches, hashes, and decompresses semantic-index.json.gzbin when manifest lists .gzbin', async () => {
+    const gz = new Uint8Array(gzipSync(Buffer.from(semanticJson, 'utf8')));
+    const gzSha = bytesToHex(sha256(gz));
+    const manifest = {
+      schemaVersion: 'manifest-v1' as const,
+      generatedAt: '2026-08-30T00:00:00.000Z',
+      totalEntries: 0,
+      catalogueShards: {},
+      artifacts: [{ path: 'semantic-index.json.gzbin', byteSize: gz.byteLength, sha256: gzSha }],
+    };
+    setKnownManifest(manifest);
+    const requested: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.includes('manifest.json')) return { ok: true, json: async () => manifest } as unknown as Response;
+      return { ok: true, arrayBuffer: async () => gz.slice().buffer } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const deliverSemantic = vi.fn(() => true);
+    configureDeferredPayloads({ deliverExtended: () => false, deliverSemantic, version: () => 0 });
+
+    requestSemanticVectorsFor('slack');
+    await vi.waitFor(() => expect(deliverSemantic).toHaveBeenCalledWith(semanticJson));
+    expect(requested.some((url) => url.endsWith('/data/semantic-index.json.gzbin'))).toBe(true);
   });
 });

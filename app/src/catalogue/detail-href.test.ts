@@ -1,22 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { detailHref, interactiveHref } from './detail-href';
+import { detailHref, interactiveHref, isClientRoutable } from './detail-href';
 
 describe('detailHref', () => {
-  it('uses the slug route for a page Next pre-rendered', () => {
-    expect(detailHref({ id: 'id/one', slug: 'send-mail', isPrerendered: true })).toBe('/w/send-mail/');
+  it('routes every workflow to /w/view/?id=<id> regardless of isPrerendered', () => {
+    expect(detailHref({ id: '26006871febf2139', slug: 'send-mail', isPrerendered: true })).toBe('/w/view/?id=26006871febf2139');
+    expect(detailHref({ id: '9a366a688a57c198', slug: 'long-tail-workflow', isPrerendered: false })).toBe('/w/view/?id=9a366a688a57c198');
   });
 
-  it('uses the slug route for the long tail too, because those pages now exist', () => {
-    // Until 2026-08-26 this sent 12,971 entries to `/w/view/?id=`, because only
-    // 250 slugs had a page. `scripts/generate-lean-pages.tsx` writes one for
-    // every entry, so routing readers past them would leave the pages reachable
-    // by a crawler and not by anyone clicking.
-    expect(detailHref({ id: 'id/one', slug: 'long-tail-workflow', isPrerendered: false }))
-      .toBe('/w/long-tail-workflow/');
+  it('falls back to encoded slug when id is empty', () => {
+    expect(detailHref({ id: '', slug: 'a/b?c', isPrerendered: false })).toBe('/w/view/?id=a%2Fb%3Fc');
   });
 
-  it('encodes a slug that would otherwise change the path', () => {
-    expect(detailHref({ id: 'x', slug: 'a/b?c', isPrerendered: false })).toBe('/w/a%2Fb%3Fc/');
+  it('encodes ids with special characters', () => {
+    expect(detailHref({ id: 'id/one', slug: 'send-mail' })).toBe('/w/view/?id=id%2Fone');
+  });
+
+  it('marks /w/view/ as client-routable across all entries', () => {
+    expect(isClientRoutable({ isPrerendered: true })).toBe(true);
+    expect(isClientRoutable({ isPrerendered: false })).toBe(true);
+    expect(isClientRoutable({})).toBe(true);
   });
 });
 
@@ -26,9 +28,6 @@ describe('interactiveHref', () => {
   });
 
   it('carries related ids as a compact, encoded query parameter', () => {
-    // The client shell has no cheap way to compute related workflows itself
-    // (see `view-client.tsx`); this is how the build-time computation reaches
-    // it without re-fetching the catalogue.
     expect(interactiveHref('main', ['r1', 'r2'])).toBe('/w/view/?id=main&related=r1,r2');
   });
 

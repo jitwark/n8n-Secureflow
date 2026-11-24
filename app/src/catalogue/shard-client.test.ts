@@ -1,7 +1,9 @@
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChartRef } from '@hub/contracts';
-import { fetchChart, loadChart } from './shard-client';
+import { clearChartPackCache, fetchChart, loadChart } from './shard-client';
 import { resetManifestCache } from './manifest';
+import { bucketForId, bucketTag } from './pack-bucket';
 
 /**
  * Every case queues the manifest first: `loadChart` resolves the release
@@ -23,6 +25,7 @@ const rangeResponse = (bytes: string, contentRange = `bytes 0-${len - 1}/128`, s
   new Response(bytes, { status, headers: { 'content-range': contentRange } });
 
 afterEach(() => {
+  clearChartPackCache();
   resetManifestCache();
   vi.restoreAllMocks();
 });
@@ -124,5 +127,94 @@ describe('loadChart', () => {
 
     const result = await loadChart(chartRef);
     expect(result).toMatchObject({ ok: false, reason: 'range-mismatch', release });
+  });
+});
+
+describe('packed chart buckets', () => {
+  async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  it('loads and caches a workflow chart by id from charts/pack-{bucket}.jsonl.gzbin', async () => {
+    const entryId = '26006871febf2139';
+    const bucket = bucketTag(bucketForId(entryId));
+    const packPath = `charts/pack-${bucket}.jsonl.gzbin`;
+    const chartRecord = {
+      id: entryId,
+      nodes: [{ id: 'n0', name: 'Webhook', type: 'n8n-nodes-base.webhook', x: 10, y: 20 }],
+      edges: [],
+    };
+    const packBytes = new Uint8Array(gzipSync(Buffer.from(`${JSON.stringify(chartRecord)}\n`, 'utf8')));
+    const packSha = await sha256Bytes(packBytes);
+
+    let packFetches = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return new Response(JSON.stringify({
+          schemaVersion: 'manifest-v1',
+          generatedAt: '2026-11-23T00:00:00.000Z',
+          totalEntries: 1,
+          catalogueShards: { [entryId]: 0 },
+          artifacts: [{ path: packPath, byteSize: packBytes.byteLength, sha256: packSha }],
+        }));
+      }
+      if (url.endsWith(`/${packPath}`)) {
+        packFetches += 1;
+        return new Response(packBytes.slice().buffer, { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    const first = await loadChart(chartRef, undefined, undefined, entryId);
+    expect(first).toEqual({ ok: true, chart: { nodes: chartRecord.nodes, edges: [] } });
+    const second = await loadChart(chartRef, undefined, undefined, entryId);
+    expect(second).toEqual(first);
+    expect(packFetches).toBe(1);
+  });
+
+  it('reports no-chart when entry is absent from packed chart bucket and malformed on digest mismatch', async () => {
+    const entryId = '26006871febf2139';
+    const bucket = bucketTag(bucketForId(entryId));
+    const packPath = `charts/pack-${bucket}.jsonl.gzbin`;
+    const packBytes = new Uint8Array(gzipSync(Buffer.from(`${JSON.stringify({ id: 'other', nodes: [], edges: [] })}\n`, 'utf8')));
+    const packSha = await sha256Bytes(packBytes);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return new Response(JSON.stringify({
+          schemaVersion: 'manifest-v1',
+          generatedAt: '2026-11-23T00:00:00.000Z',
+          totalEntries: 1,
+          catalogueShards: { [entryId]: 0 },
+          artifacts: [{ path: packPath, byteSize: packBytes.byteLength, sha256: packSha }],
+        }));
+      }
+      if (url.endsWith(`/${packPath}`)) return new Response(packBytes.slice().buffer, { status: 200 });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await expect(loadChart(chartRef, undefined, undefined, entryId)).resolves.toMatchObject({ ok: false, reason: 'no-chart' });
+
+    clearChartPackCache();
+    resetManifestCache();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return new Response(JSON.stringify({
+          schemaVersion: 'manifest-v1',
+          generatedAt: '2026-11-23T00:00:00.000Z',
+          totalEntries: 1,
+          catalogueShards: { [entryId]: 0 },
+          artifacts: [{ path: packPath, byteSize: packBytes.byteLength, sha256: 'e'.repeat(64) }],
+        }));
+      }
+      if (url.endsWith(`/${packPath}`)) return new Response(packBytes.slice().buffer, { status: 200 });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await expect(loadChart(chartRef, undefined, undefined, entryId)).resolves.toMatchObject({ ok: false, reason: 'malformed' });
   });
 });

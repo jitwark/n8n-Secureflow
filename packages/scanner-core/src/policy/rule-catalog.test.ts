@@ -7,7 +7,7 @@ import {
 } from './rule-catalog';
 
 const CWE_ID_PATTERN = /^CWE-\d+$/;
-const AGENTIC_POLICY_IDS = ['TAINTED_AI_PROMPT', 'AI_AGENT_UNGATED_TOOL'];
+const AGENTIC_POLICY_IDS = ['TAINTED_AI_PROMPT', 'AI_AGENT_UNGATED_TOOL', 'AGENT_EGRESS_UNRESTRICTED'];
 
 describe('rule catalogs', () => {
   it('preserves beta-default order, metadata, and legacy scoring effect', () => {
@@ -39,6 +39,16 @@ describe('rule catalogs', () => {
       'JAVASCRIPT_DYNAMIC_EXECUTION',
       'PYTHON_DYNAMIC_EXECUTION',
       ...TAINT_POLICY_IDS,
+      'EXPRESSION_SANDBOX_ESCAPE',
+      'EXPRESSION_ENV_EXPOSURE',
+      'AGENT_EGRESS_UNRESTRICTED',
+      'UNAUTHENTICATED_TRIGGER_TO_SINK',
+    ]);
+    expect(betaHardenedRuleCatalog.slice(-4)).toEqual([
+      expect.objectContaining({ policyId: 'EXPRESSION_SANDBOX_ESCAPE', defaultSeverity: 'CRITICAL', defaultConfidence: 'HIGH', precision: 'HIGH', policyEffect: 'REPORT_ONLY', cweIds: ['CWE-94'] }),
+      expect.objectContaining({ policyId: 'EXPRESSION_ENV_EXPOSURE', defaultSeverity: 'HIGH', defaultConfidence: 'HIGH', precision: 'HIGH', policyEffect: 'REPORT_ONLY', cweIds: ['CWE-200'] }),
+      expect.objectContaining({ policyId: 'AGENT_EGRESS_UNRESTRICTED', defaultSeverity: 'HIGH', defaultConfidence: 'MEDIUM', precision: 'MEDIUM', policyEffect: 'REPORT_ONLY', cweIds: ['CWE-918'], owaspAgenticIds: ['Excessive Agency'] }),
+      expect.objectContaining({ policyId: 'UNAUTHENTICATED_TRIGGER_TO_SINK', defaultSeverity: 'CRITICAL', defaultConfidence: 'HIGH', precision: 'HIGH', policyEffect: 'REPORT_ONLY', cweIds: ['CWE-306'] }),
     ]);
     expect(betaHardenedRuleCatalog.every((rule, index) => index < betaDefaultRuleCatalog.length
       ? rule.policyEffect === 'LEGACY_SCORE'

@@ -219,18 +219,19 @@ describe('ReportCoverage', () => {
     expect(screen.queryByText(/No bounded omissions were reported/)).toBeNull();
   });
 
-  it('composes v2 sections once, never grades degraded analysis, and keeps the v1 fallback intact', () => {
+  it('composes v2 sections collapsed by default, never grades degraded analysis, and keeps the v1 fallback intact', () => {
     const v2 = model();
     const { container: sectionsContainer, unmount: unmountSections } = render(<ReportV2Sections model={v2} />);
+    expect(sectionsContainer.querySelector('details')?.open).toBe(false);
     expect(sectionsContainer.querySelectorAll('h2')).toHaveLength(4);
-    expect(screen.getAllByRole('heading', { name: 'Analysis coverage' })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Analysis coverage', hidden: true })).toHaveLength(1);
     unmountSections();
 
     const { unmount: unmountV2 } = render(<ReportResult scan={v2} outcomeHeadingRef={ref()} onRetry={() => undefined} />);
-    expect(screen.getAllByRole('heading', { name: 'Analysis coverage' })).toHaveLength(1);
-    expect(screen.getByRole('heading', { name: 'Evidence and conclusions' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Applicability and target context' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Verified traces' })).toBeTruthy();
+    expect(screen.getAllByRole('heading', { name: 'Analysis coverage', hidden: true })).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Evidence and conclusions', hidden: true })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Applicability and target context', hidden: true })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Verified traces', hidden: true })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Readiness and integrations' })).toBeNull();
     expect(screen.queryByText(/LOW risk/)).toBeNull();
     unmountV2();
@@ -292,5 +293,32 @@ describe('ReportCoverage', () => {
     expect(within(list).getByText('GENERIC_NODE_UNMODELED_CAPABILITY · DEGRADED')).toBeTruthy();
     expect(within(list).getByText(/no semantic catalogue entry/i)).toBeTruthy();
     expect(within(list).getAllByText(/not linked to a capability row/i)).toHaveLength(2);
+  });
+
+  it('keeps Technical details collapsed by default and displays a node coverage meter', () => {
+    const withDeps = model({
+      v2: {
+        ...model().v2,
+        analysis: { status: 'COMPLETE', capabilities: [{ id: 'structural-policies', version: '3.0.0', required: true, status: 'COMPLETED', seen: 4, analyzed: 4, skipped: 0, omitted: 0, diagnosticIds: [] }], diagnostics: [] },
+        facts: [{
+          factId: 'f'.repeat(64),
+          kind: 'workflow.dependencies.v1',
+          subject: { kind: 'WORKFLOW' },
+          properties: {
+            totalNodes: 4, reviewedNodes: 3, assumedNodes: 1, unknownNodes: 0,
+            credentialReferences: 0, requiredCredentialSlots: 0, configuredCredentialSlots: 0,
+            missingCredentialSlots: 0, unknownCredentialSlots: 0, environmentReferences: 0,
+            redactedIdentifiers: 0, omittedIdentifiers: 0,
+          },
+        }],
+      },
+      assessment,
+    });
+    const { container } = render(<ReportV2Sections model={withDeps} />);
+    const details = container.querySelector('details');
+    expect(details).toBeTruthy();
+    expect(details?.open).toBe(false);
+    expect(container.querySelector('summary')?.textContent).toContain('Technical details');
+    expect(container.textContent).toContain('3/4 nodes deeply analyzed');
   });
 });

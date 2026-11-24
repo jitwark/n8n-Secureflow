@@ -198,7 +198,7 @@ async function main() {
       const fileName = `og-${integration}-${grade}.png`;
 
       const buf = await sharp(Buffer.from(svg))
-        .png({ compressionLevel: 9 })
+        .png({ palette: true, compressionLevel: 9, colours: 4, dither: 0 })
         .toBuffer();
 
       for (const dir of outDirs) {

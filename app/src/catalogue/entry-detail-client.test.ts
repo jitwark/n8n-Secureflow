@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SCANNER_RESULT_SCHEMA_VERSION, type Entry } from '@hub/contracts';
 import {
@@ -6,6 +7,7 @@ import {
   loadEntryDetail,
 } from './entry-detail-client';
 import { MANIFEST_SCHEMA_VERSION, resetManifestCache } from './manifest';
+import { bucketForId, bucketTag } from './pack-bucket';
 
 const ID_A = 'aaaaaaaaaaaaaaaa';
 const ID_B = 'bbbbbbbbbbbbbbbb';
@@ -67,10 +69,16 @@ describe('loadEntryDetail', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['constructor', '__proto__', 'not-an-artifact-id'])('rejects malformed ID %s before loading an index', async (id) => {
+  it.each(['constructor', '__proto__', 'bad/slug'])('rejects unsafe ID %s before loading an index', async (id) => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(manifestResponse({}));
     await expect(loadEntryDetail(id)).resolves.toEqual({ ok: false, reason: 'not-found' });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports not-found for an unknown slug without loading detail-index shards', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(manifestResponse({}));
+    await expect(loadEntryDetail('not-an-artifact-id')).resolves.toEqual({ ok: false, reason: 'not-found' });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not resolve an inherited per-shard index entry', async () => {
@@ -466,5 +474,94 @@ describe('fetchEntryById', () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
     await expect(fetchEntryById(ID_A)).rejects.toThrow(/network/i);
+  });
+});
+
+describe('packed detail buckets', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearDetailIndexCache();
+    resetManifestCache();
+  });
+
+  async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  it('loads an entry by hex id and by slug from gzipped FNV-1a buckets', async () => {
+    const entryA = detailEntry(ID_A, 'Packed Workflow A');
+    entryA.slug = 'packed-workflow-a';
+    const bucket = bucketTag(bucketForId(ID_A));
+    const packPath = `details/pack-${bucket}.jsonl.gzbin`;
+    const packBytes = new Uint8Array(gzipSync(Buffer.from(`${JSON.stringify(entryA)}\n`, 'utf8')));
+    const slugBytes = new Uint8Array(gzipSync(Buffer.from(JSON.stringify({ 'packed-workflow-a': ID_A }), 'utf8')));
+    const packSha = await sha256Bytes(packBytes);
+    const slugSha = await sha256Bytes(slugBytes);
+
+    let packFetches = 0;
+    let slugFetches = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: MANIFEST_SCHEMA_VERSION,
+            generatedAt: '2026-11-23T00:00:00.000Z',
+            totalEntries: 1,
+            catalogueShards: { [ID_A]: 0 },
+            artifacts: [
+              { path: packPath, byteSize: packBytes.byteLength, sha256: packSha },
+              { path: 'details/slug-index.json.gzbin', byteSize: slugBytes.byteLength, sha256: slugSha },
+            ],
+          }),
+        } as Response;
+      }
+      if (url.endsWith(`/${packPath}`)) {
+        packFetches += 1;
+        return { ok: true, status: 200, arrayBuffer: async () => packBytes.slice().buffer } as Response;
+      }
+      if (url.endsWith('/details/slug-index.json.gzbin')) {
+        slugFetches += 1;
+        return { ok: true, status: 200, arrayBuffer: async () => slugBytes.slice().buffer } as Response;
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await expect(loadEntryDetail(ID_A)).resolves.toEqual({ ok: true, entry: entryA });
+    await expect(loadEntryDetail('packed-workflow-a')).resolves.toEqual({ ok: true, entry: entryA });
+    await expect(loadEntryDetail('missing-slug')).resolves.toEqual({ ok: false, reason: 'not-found' });
+    await expect(loadEntryDetail('__proto__')).resolves.toEqual({ ok: false, reason: 'not-found' });
+    expect(packFetches).toBe(1);
+    expect(slugFetches).toBe(1);
+  });
+
+  it('reports hash-mismatch when packed detail bucket digest fails', async () => {
+    const bucket = bucketTag(bucketForId(ID_A));
+    const packPath = `details/pack-${bucket}.jsonl.gzbin`;
+    const packBytes = new Uint8Array(gzipSync(Buffer.from(`${JSON.stringify(detailEntry(ID_A))}\n`, 'utf8')));
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schemaVersion: MANIFEST_SCHEMA_VERSION,
+            generatedAt: '2026-11-23T00:00:00.000Z',
+            totalEntries: 1,
+            catalogueShards: { [ID_A]: 0 },
+            artifacts: [{ path: packPath, byteSize: packBytes.byteLength, sha256: 'f'.repeat(64) }],
+          }),
+        } as Response;
+      }
+      if (url.endsWith(`/${packPath}`)) {
+        return { ok: true, status: 200, arrayBuffer: async () => packBytes.slice().buffer } as Response;
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await expect(loadEntryDetail(ID_A)).resolves.toEqual({ ok: false, reason: 'hash-mismatch' });
   });
 });

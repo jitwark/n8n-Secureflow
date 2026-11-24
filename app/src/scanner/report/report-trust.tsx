@@ -89,7 +89,7 @@ export function ReportTrust({ scan }: { scan: ScanWorkflowResult }) {
   const example = !v2Incomplete && scan.scannerVersion.trim() && scan.findings.find((finding) => finding.policyId.trim());
 
   return (
-    <aside aria-labelledby="scanner-trust-heading" className="mt-4 rounded-control border border-accent-border/30 bg-accent-dim/40 p-4">
+    <aside aria-labelledby="scanner-trust-heading" className="mt-4 min-w-0 rounded-panel border border-hairline bg-panel p-4">
       <div className="flex items-start gap-2">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden="true" />
         <div>

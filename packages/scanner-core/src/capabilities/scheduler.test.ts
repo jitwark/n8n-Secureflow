@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SCANNER_LIMITS_V2 } from '@hub/contracts';
-import { BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST, type ProfileManifestV2 } from './profile-manifest';
+import { BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST, computeProfileManifestDigest, type ProfileManifestV2 } from './profile-manifest';
 import { createDiagnosticId } from '../diagnostics/identity';
 import { classifyDiagnostic, type AnalysisDiagnosticV2, type DiagnosticCodeV2 } from '../diagnostics/registry';
 import { isParsedSourceDocument } from '../source/source-document-provenance';
@@ -110,7 +110,9 @@ describe('capability scheduler', () => {
   });
   it('does not run a defined but unadmitted hardened manifest', () => {
     const invoked: string[] = [];
-    const result = scheduleCapabilities(context, BETA_HARDENED_PROFILE_MANIFEST, registryFor(BETA_HARDENED_PROFILE_MANIFEST, (id) => { invoked.push(id); return emptyCandidate(); }));
+    const { digest: _removed, ...body } = { ...BETA_HARDENED_PROFILE_MANIFEST, scoringPolicyVersion: 'unadmitted@0.0.0' };
+    const unadmitted = { ...body, digest: computeProfileManifestDigest(body) };
+    const result = scheduleCapabilities(context, unadmitted, registryFor(BETA_HARDENED_PROFILE_MANIFEST, (id) => { invoked.push(id); return emptyCandidate(); }));
     expect(invoked).toEqual([]);
     expect(result.executions.map(({ id, status }) => ({ id, status }))).toEqual(BETA_HARDENED_PROFILE_MANIFEST.capabilities.map(({ id, required }) => ({ id, status: required ? 'FAILED' : 'DEGRADED' })));
     expect(result.candidates).toEqual([]);
@@ -192,9 +194,11 @@ describe('capability scheduler', () => {
     expect(byId.get('workflow-insights')).toMatchObject({ seen: 0, analyzed: 0, skipped: 0, omitted: 1, diagnosticIds: [expect.any(String)] });
   });
 
-  it('fails closed for hardened profiles with required and optional effects', () => {
+  it('fails closed for unadmitted hardened profiles with required and optional effects', () => {
     let invoked = false;
-    const result = scheduleCapabilities(context, BETA_HARDENED_PROFILE_MANIFEST, new Map(BETA_HARDENED_PROFILE_MANIFEST.capabilities.map((capability) => [capability.id, { ...capability, run: () => { invoked = true; return emptyCandidate(); } }])));
+    const { digest: _removed, ...body } = { ...BETA_HARDENED_PROFILE_MANIFEST, scoringPolicyVersion: 'unadmitted@0.0.0' };
+    const unadmitted = { ...body, digest: computeProfileManifestDigest(body) };
+    const result = scheduleCapabilities(context, unadmitted, new Map(BETA_HARDENED_PROFILE_MANIFEST.capabilities.map((capability) => [capability.id, { ...capability, run: () => { invoked = true; return emptyCandidate(); } }])));
     const byId = new Map(result.executions.map((execution) => [execution.id, execution]));
     expect(invoked).toBe(false); expect(byId.get('structural-policies')).toMatchObject({ status: 'FAILED', omitted: 1 }); expect(byId.get('expression-security')).toMatchObject({ status: 'DEGRADED', omitted: 1 }); expect(byId.get('taint-confidentiality')).toMatchObject({ status: 'DEGRADED', omitted: 1 }); expect(result.diagnostics.map(({ code }) => code)).toEqual(expect.arrayContaining(['REQUIRED_CAPABILITY_FAILED', 'POLICY_EXECUTION_FAILED']));
   });

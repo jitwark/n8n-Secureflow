@@ -152,4 +152,80 @@ describe('ReportEvidence', () => {
     expect(text).not.toMatch(/hostile-extra-property|private-snapshot-identity|sk_live_12345678/);
     expect(screen.queryByText(/unregistered fact kind|No allowlisted fact properties|No additional facts/)).toBeNull();
   });
+
+  it('registers v0.3 field-flow facts (dataflow.coverage.v1, dataflow.provenance.v1, dataflow.summary.v3) without unregistered-kind warnings', () => {
+    render(<ReportEvidence model={model({
+      facts: [
+        {
+          ...fact('dataflow.coverage.v1', {
+            capabilityId: 'taint-integrity',
+            coverageStatus: 'COMPLETE',
+            fieldsExamined: 4,
+            knownFields: 4,
+            knownEmptyFields: 2,
+            unknownFields: 0,
+            positiveFields: 1,
+            emittedFlows: 1,
+            suppressedFlows: 0,
+            omittedAtoms: 0,
+            omittedSanitizers: 0,
+            unknownReasons: [],
+            taintChannels: ['CONFIDENTIALITY'],
+            sinkChannels: ['DATA'],
+            edgeChannels: ['DATA'],
+            unmappedSources: 0,
+            unmappedSinks: 0,
+            unmappedPaths: 0,
+            redactedPaths: 0,
+            invalidTokens: 0,
+            witnessUnavailable: 0,
+            omittedTraceSteps: 0,
+          }, { kind: 'WORKFLOW' }),
+          factId: 'c'.repeat(64),
+        },
+        {
+          ...fact('dataflow.provenance.v1', {
+            sourceNodeOrdinal: 0,
+            sourceNodeDigest: 'd'.repeat(64),
+            sourceFieldPath: ['body', 'cmd'],
+            taintChannel: 'CONFIDENTIALITY',
+            taintLabels: ['WEBHOOK_BODY'],
+          }, { kind: 'NODE', node: { ordinal: 0, identityDigest: 'd'.repeat(64), source: source.source } }),
+          factId: 'e'.repeat(64),
+        },
+        {
+          ...fact('dataflow.summary.v3', {
+            flowKind: 'TAINT_SINK',
+            sinkClass: 'COMMAND',
+            sinkParameterPath: '/command',
+            sinkChannel: 'DATA',
+            edgeChannel: 'DATA',
+            taintChannel: 'CONFIDENTIALITY',
+            taintLabels: ['WEBHOOK_BODY'],
+            sourceProvenanceFactId: 'e'.repeat(64),
+            sourceNodeOrdinal: 0,
+            sourceNodeDigest: 'd'.repeat(64),
+            sourceFieldPath: ['body', 'cmd'],
+            sinkFieldPath: ['command'],
+            knowledge: 'KNOWN',
+            unknownReasons: [],
+            omittedAtoms: 0,
+            omittedSanitizers: 0,
+            sanitizedFor: [],
+            reachability: 'CONFIGURED',
+          }, { kind: 'NODE', node: { ordinal: 1, identityDigest: 'f'.repeat(64), source: source.source } }),
+          factId: 'f'.repeat(64),
+        },
+      ],
+    })} />);
+
+    expect(screen.queryByText(/unregistered fact kind/i)).toBeNull();
+    expect(screen.getByText('dataflow.coverage.v1')).toBeTruthy();
+    expect(screen.getByText('Coverage status')).toBeTruthy();
+    expect(screen.getByText('Fields examined')).toBeTruthy();
+    expect(screen.getByText('dataflow.provenance.v1')).toBeTruthy();
+    expect(screen.getByText('dataflow.summary.v3')).toBeTruthy();
+    expect(screen.getByText('Sink class')).toBeTruthy();
+    expect(screen.getByText('COMMAND')).toBeTruthy();
+  });
 });

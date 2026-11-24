@@ -56,9 +56,9 @@ describe('matchTokens: semantic-only admission', () => {
     expect(matches).toHaveLength(0);
   });
 
-  it('still admits a semantic-only match once the query has real vocabulary evidence', () => {
+  it('allows semantic-only admission at or above 0.55 once the query has real vocabulary evidence', () => {
     // "digest" has a literal lexical hit on ordinal 0; ordinal 1 has none, but
-    // carries the higher semantic score and should be admitted as intent-only.
+    // carries a strong (>= 0.55) semantic score and should be admitted when lexical hits < 25.
     const semanticScores = new Map([[0, 0.2], [1, 0.6]]);
     const matches = matchTokens({
       tokens: ['digest'],
@@ -71,6 +71,36 @@ describe('matchTokens: semantic-only admission', () => {
     const semanticOnly = matches.find((match) => match.ordinal === 1);
     expect(semanticOnly?.bm25).toBe(0);
     expect(semanticOnly?.semantic).toBe(0.6);
+  });
+
+  it('rejects semantic-only matches below the 0.55 similarity threshold', () => {
+    const semanticScores = new Map([[0, 0.2], [1, 0.54]]);
+    const matches = matchTokens({
+      tokens: ['digest'],
+      indexes: [twoDocIndex()],
+      ordinalOf,
+      semanticScores,
+    });
+    expect(matches.map((match) => match.ordinal)).toEqual([0]);
+  });
+
+  it('suppresses semantic-only admission when lexical hits reach 25 while preserving semantic ranking scores', () => {
+    const docs = [
+      ...Array.from({ length: 25 }, (_, i) => ({ id: `gmail-${i}`, title: `Gmail workflow ${i}` })),
+      { id: 'unrelated', title: 'Unrelated document' },
+    ];
+    const index = indexForTitles(docs);
+    const mapOrdinal = (id: string) => docs.findIndex((d) => d.id === id);
+    const semanticScores = new Map<number, number>([[0, 0.7], [25, 0.95]]);
+    const matches = matchTokens({
+      tokens: ['gmail'],
+      indexes: [index],
+      ordinalOf: mapOrdinal,
+      semanticScores,
+    });
+    expect(matches).toHaveLength(25);
+    expect(matches.some((match) => match.ordinal === 25)).toBe(false);
+    expect(matches.find((match) => match.ordinal === 0)?.semantic).toBe(0.7);
   });
 
   it('lets one real token carry semantic-only admission even alongside a gibberish token', () => {
@@ -111,15 +141,43 @@ describe('matchTokens: search query contract', () => {
     expect(matches.map((match) => match.ordinal)).toEqual([0]);
   });
 
-  it('uses aliases as OR alternatives for a single query group', () => {
+  it('uses aliases as OR alternatives when direct hits are sparse and weights alias-only hits lower', () => {
+    const docs = [
+      { id: 'direct-gmail', title: 'Gmail inbox workflow' },
+      { id: 'alias-email', title: 'Email inbox workflow' },
+    ];
     const matches = matchTokens({
-      tokens: ['email'],
-      indexes: [indexForTitles([{ id: 'gmail', title: 'Gmail inbox workflow' }])],
-      ordinalOf: (id) => id === 'gmail' ? 0 : undefined,
+      tokens: ['gmail'],
+      indexes: [indexForTitles(docs)],
+      ordinalOf: (id) => (id === 'direct-gmail' ? 0 : id === 'alias-email' ? 1 : undefined),
       semanticScores: new Map(),
     });
 
-    expect(matches.map((match) => match.ordinal)).toEqual([0]);
+    expect(matches.map((match) => match.ordinal).sort()).toEqual([0, 1]);
+    const direct = matches.find((match) => match.ordinal === 0)!;
+    const alias = matches.find((match) => match.ordinal === 1)!;
+    expect(direct.bm25).toBeGreaterThan(alias.bm25);
+    expect(alias.bm25 / direct.bm25).toBeCloseTo(0.55, 2);
+  });
+
+  it('does not expand broad aliases or fuzzy synonyms when direct lexical hits are >= 15', () => {
+    const docs = [
+      ...Array.from({ length: 16 }, (_, i) => ({ id: `gmail-${i}`, title: `Gmail sync ${i}` })),
+      ...Array.from({ length: 5 }, (_, i) => ({ id: `email-${i}`, title: `Email newsletter ${i}` })),
+      ...Array.from({ length: 5 }, (_, i) => ({ id: `mail-${i}`, title: `Mail archive ${i}` })),
+    ];
+    const matches = matchTokens({
+      tokens: ['gmail'],
+      indexes: [indexForTitles(docs)],
+      ordinalOf: (id) => {
+        const idx = docs.findIndex((d) => d.id === id);
+        return idx >= 0 ? idx : undefined;
+      },
+      semanticScores: new Map(),
+    });
+
+    expect(matches).toHaveLength(16);
+    expect(matches.every((match) => match.ordinal < 16)).toBe(true);
   });
 
   it('ANDs whitespace-separated groups when one document satisfies every group', () => {

@@ -15,7 +15,7 @@ const SAFE_EVIDENCE_KEYS = new Set([
   'header', 'domain', 'nodePackage', 'authentication', 'member', 'start', 'end',
   'sink', 'referenceRoot', 'propertyPath', 'propertyPathComplete', 'taintLabels',
   'sourceNodeId', 'sourceNodeName', 'traceLength', 'tracePath', 'toolCount',
-  'contextCount', 'humanGatePresent', 'humanGateDominates',
+  'contextCount', 'humanGatePresent', 'humanGateDominates', 'capabilities', 'flowKind',
 ]);
 
 export type ReportEvidenceEntry = {
@@ -62,6 +62,9 @@ function formatEvidenceValue(value: unknown): string {
   if (value === null) return 'Not present';
   if (typeof value === 'string') return safeReportText(value, MAX_REPORT_TEXT_CHARS);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')) {
+    return value.length === 0 ? 'None' : safeReportText(value.map((item) => String(item)).join(', '), MAX_REPORT_TEXT_CHARS);
+  }
   return 'Structured details withheld';
 }
 

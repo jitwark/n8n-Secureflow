@@ -21,8 +21,14 @@ vi.mock('../../../src/catalogue/entry-detail-client', () => ({
   fetchEntryById: vi.fn(),
 }));
 vi.mock('../../../src/ui/detail/detail-body', () => ({
-  DetailBody: ({ entry, related }: { entry: Entry; related?: Entry[] }) => (
-    <div data-testid="detail-entry" data-related={(related ?? []).map((item) => item.id).join(',')}>{entry.id}</div>
+  DetailBody: ({ entry, related, packedChartAvailable }: { entry: Entry; related?: Entry[]; packedChartAvailable?: boolean }) => (
+    <div
+      data-testid="detail-entry"
+      data-related={(related ?? []).map((item) => item.id).join(',')}
+      data-packed-chart={String(Boolean(packedChartAvailable))}
+    >
+      {entry.id}
+    </div>
   ),
 }));
 
@@ -159,5 +165,23 @@ describe('WorkflowViewClient', () => {
 
     const node = await screen.findByTestId('detail-entry');
     expect(node.getAttribute('data-related')).toBe('r1');
+  });
+
+  it('passes packedChartAvailable when the release manifest ships packed chart buckets', async () => {
+    const { loadManifest } = vi.mocked(await import('../../../src/catalogue/manifest'));
+    loadManifest.mockResolvedValueOnce({
+      schemaVersion: 'manifest-v1',
+      generatedAt: '2026-11-23T00:00:00.000Z',
+      totalEntries: 1,
+      catalogueShards: {},
+      artifacts: [{ path: 'charts/pack-00.jsonl.gzbin', byteSize: 64, sha256: 'a'.repeat(64) }],
+    });
+    vi.mocked(useSearchParams).mockImplementation(() => fakeSearchParams({ id: 'main' }));
+    fetchEntryById.mockResolvedValue(entry('main'));
+
+    render(<WorkflowViewClient />);
+
+    const node = await screen.findByTestId('detail-entry');
+    expect(node.getAttribute('data-packed-chart')).toBe('true');
   });
 });

@@ -33,20 +33,20 @@ const start = `{"id":"Start","name":"Start","type":"n8n-nodes-base.manualTrigger
 const codesAt = (envelope: Envelope, pointer: string) =>
   envelope.results[0]!.result.analysis.diagnostics.filter(({ location }) => location?.pointer === pointer).map(({ code }) => code);
 
-async function scanThroughMcp(directory: string, document: string): Promise<{ response: McpScanResult; envelope: Envelope; raw: string }> {
+async function scanThroughMcp(directory: string, document: string, profile?: string): Promise<{ response: McpScanResult; envelope: Envelope; raw: string }> {
   await writeFile(join(directory, 'workflow.json'), document);
   const response = await handleMcpRequest({
     jsonrpc: '2.0',
     id: 90,
     method: 'tools/call',
-    params: { name: 'n8n_scan', arguments: { inputs: ['./workflow.json'] } },
+    params: { name: 'n8n_scan', arguments: { inputs: ['./workflow.json'], format: 'json', ...(profile ? { profile } : {}) } },
   }, { cwd: directory }) as { result: McpScanResult };
   const raw = response.result.content[0]!.text;
   return { response: response.result, envelope: JSON.parse(raw) as Envelope, raw };
 }
 
 describe('MCP semantic fallback candidate', () => {
-  it('returns both coverage codes, DEGRADED, and the engine/profile identity', async () => {
+  it('returns both coverage codes, COMPLETE status, and the default standard engine/profile identity', async () => {
     await withTempDirectory(async (directory) => {
       const { response, envelope } = await scanThroughMcp(directory, workflow(start, node('Unknown', {})));
       const item = envelope.results[0]!.result;
@@ -54,8 +54,8 @@ describe('MCP semantic fallback candidate', () => {
       expect(response.isError).toBe(false);
       expect(response.structuredContent?.exitCode).toBe(0);
       expect(item.engine.version).toBe('2.0.0');
-      expect(item.profile).toMatchObject({ id: 'beta-default', version: '2.0.0' });
-      expect(item.analysis.status).toBe('DEGRADED');
+      expect(item.profile).toMatchObject({ id: 'standard', version: '3.0.0' });
+      expect(item.analysis.status).toBe('COMPLETE');
       expect(codesAt(envelope, '/nodes/1')).toEqual(['SEMANTIC_CATALOGUE_MISS', 'GENERIC_NODE_UNMODELED_CAPABILITY']);
       expect(item.assessment?.grade).toBeTruthy();
     });
@@ -64,14 +64,16 @@ describe('MCP semantic fallback candidate', () => {
   it('retains the secret finding while keeping the raw secret out of the MCP payload', async () => {
     const secret = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
     await withTempDirectory(async (directory) => {
-      const { response, envelope, raw } = await scanThroughMcp(directory, workflow(start, node('Unknown', { url: 'https://example.invalid/x', awsSecretAccessKey: secret })));
+      const { response, envelope, raw } = await scanThroughMcp(directory, workflow(start, node('Unknown', { url: 'https://example.invalid/x', awsSecretAccessKey: secret })), 'beta-default');
       const item = envelope.results[0]!.result;
 
       expect(response.isError).toBe(false);
       expect(response.structuredContent?.exitCode).toBe(1);
-      expect(item.analysis.status).toBe('DEGRADED');
+      expect(item.profile).toMatchObject({ id: 'beta-default', version: '2.0.0' });
+      expect(item.analysis.status).toBe('COMPLETE');
       expect(item.findings.map(({ ruleId }) => ruleId)).toContain('RAW_SECRET_INDICATOR');
       expect(raw).not.toContain(secret);
+      expect(JSON.stringify(response)).not.toContain(secret);
     });
   }, 20_000);
 

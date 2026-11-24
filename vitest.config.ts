@@ -141,9 +141,6 @@ export default defineConfig({
           // no-build-step convention of `npm run check:*`; their colocated
           // tests need the same extension to share a module system.
           include: ['**/*.test.ts', '**/*.test.mjs'],
-          // This drill intentionally uses node:test and is run by its own
-          // command; Vitest must not treat it as an empty suite.
-          exclude: ['**/rollback-release.test.mjs'],
           alias,
         },
       },

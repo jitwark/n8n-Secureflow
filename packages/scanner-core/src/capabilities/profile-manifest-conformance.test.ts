@@ -3,9 +3,13 @@ import {
   ADMITTED_PROFILE_MANIFESTS_V2,
   BETA_DEFAULT_PROFILE_MANIFEST,
   BETA_HARDENED_PROFILE_MANIFEST,
+  DEFAULT_PROFILE_REF,
   PROFILE_MANIFEST_REGISTRY_V2,
+  STANDARD_PROFILE_MANIFEST,
+  STRICT_PROFILE_MANIFEST,
   computeProfileManifestDigest,
   isProfileAdmitted,
+  resolveAdmittedProfileManifest,
   validateProfileManifest,
   type ProfileManifestV2,
 } from './profile-manifest';
@@ -20,12 +24,13 @@ import type { CapabilityCandidateV2 } from './scheduler';
  * dependency edges, declaration order, and rule ownership.
  */
 
-/** The 17 initial rule IDs, in `v1-projection-ledger.md` order. */
+/** The 21 v0.3 rule IDs, in projection order. */
 const LEDGER_RULE_IDS = [
   'N8N_EXECUTE_COMMAND', 'N8N_CODE_NODE', 'RAW_AUTH_HEADER', 'RAW_SECRET_INDICATOR', 'UNAPPROVED_DOMAIN',
   'UNKNOWN_NODE_PACKAGE', 'WEBHOOK_EXPOSURE', 'JAVASCRIPT_DYNAMIC_EXECUTION', 'PYTHON_DYNAMIC_EXECUTION',
   'TAINTED_COMMAND', 'TAINTED_SQL_QUERY', 'TAINTED_REQUEST_URL', 'TAINTED_FILE_PATH', 'TAINTED_CODE_INPUT',
   'TAINTED_REQUEST_HEADER', 'TAINTED_AI_PROMPT', 'AI_AGENT_UNGATED_TOOL',
+  'EXPRESSION_SANDBOX_ESCAPE', 'EXPRESSION_ENV_EXPOSURE', 'AGENT_EGRESS_UNRESTRICTED', 'UNAUTHENTICATED_TRIGGER_TO_SINK',
 ] as const;
 
 type DeclaredCapability = Readonly<{ id: string; required: boolean; dependsOn: readonly string[] }>;
@@ -52,7 +57,7 @@ const CONTRACT_HARDENED: readonly DeclaredCapability[] = [
   CONTRACT_DEFAULT[3]!, CONTRACT_DEFAULT[4]!,
 ];
 
-/** Exact initial ownership; expression, graph, and confidentiality capabilities own no rule. */
+/** Exact v0.3 rule ownership; taint-confidentiality remains an auxiliary graph/flow capability. */
 const CONTRACT_RULE_OWNER: Readonly<Record<string, string>> = {
   N8N_EXECUTE_COMMAND: 'structural-policies', N8N_CODE_NODE: 'structural-policies',
   RAW_AUTH_HEADER: 'structural-policies', RAW_SECRET_INDICATOR: 'structural-policies',
@@ -63,6 +68,10 @@ const CONTRACT_RULE_OWNER: Readonly<Record<string, string>> = {
   TAINTED_FILE_PATH: 'taint-integrity', TAINTED_CODE_INPUT: 'taint-integrity',
   TAINTED_REQUEST_HEADER: 'taint-integrity', TAINTED_AI_PROMPT: 'taint-integrity',
   AI_AGENT_UNGATED_TOOL: 'agentic-control',
+  EXPRESSION_SANDBOX_ESCAPE: 'expression-security',
+  EXPRESSION_ENV_EXPOSURE: 'expression-security',
+  AGENT_EGRESS_UNRESTRICTED: 'agentic-control',
+  UNAUTHENTICATED_TRIGGER_TO_SINK: 'graph-semantics',
 };
 
 const emptyCandidate = (): CapabilityCandidateV2 => ({
@@ -99,11 +108,18 @@ describe('profile-registry contract conformance', () => {
   it('declares the contract capability set, requiredness, dependency edges, and order exactly', () => {
     expect(declarationOf(BETA_DEFAULT_PROFILE_MANIFEST)).toEqual(CONTRACT_DEFAULT);
     expect(declarationOf(BETA_HARDENED_PROFILE_MANIFEST)).toEqual(CONTRACT_HARDENED);
+    expect(declarationOf(STANDARD_PROFILE_MANIFEST)).toEqual(CONTRACT_HARDENED);
+    expect(declarationOf(STRICT_PROFILE_MANIFEST)).toEqual(CONTRACT_HARDENED);
     for (const capability of [...BETA_DEFAULT_PROFILE_MANIFEST.capabilities, ...BETA_HARDENED_PROFILE_MANIFEST.capabilities]) {
       expect(capability.version).toBe('2.0.0');
     }
+    for (const capability of [...STANDARD_PROFILE_MANIFEST.capabilities, ...STRICT_PROFILE_MANIFEST.capabilities]) {
+      expect(capability.version).toBe('3.0.0');
+    }
     expect(BETA_DEFAULT_PROFILE_MANIFEST.version).toBe('2.0.0');
     expect(BETA_HARDENED_PROFILE_MANIFEST.version).toBe('2.0.0');
+    expect(STANDARD_PROFILE_MANIFEST.version).toBe('3.0.0');
+    expect(STRICT_PROFILE_MANIFEST.version).toBe('3.0.0');
     expect(BETA_DEFAULT_PROFILE_MANIFEST.schemaVersion).toBe('scanner-profile-v2');
   });
 
@@ -170,6 +186,8 @@ describe('profile-registry contract conformance', () => {
     expect(computeProfileManifestDigest(bodyOf(BETA_DEFAULT_PROFILE_MANIFEST))).toBe(BETA_DEFAULT_PROFILE_MANIFEST.digest);
     expect(computeProfileManifestDigest(bodyOf(BETA_DEFAULT_PROFILE_MANIFEST))).toBe(computeProfileManifestDigest(bodyOf(BETA_DEFAULT_PROFILE_MANIFEST)));
     expect(computeProfileManifestDigest(bodyOf(BETA_HARDENED_PROFILE_MANIFEST))).toBe(BETA_HARDENED_PROFILE_MANIFEST.digest);
+    expect(computeProfileManifestDigest(bodyOf(STANDARD_PROFILE_MANIFEST))).toBe(STANDARD_PROFILE_MANIFEST.digest);
+    expect(computeProfileManifestDigest(bodyOf(STRICT_PROFILE_MANIFEST))).toBe(STRICT_PROFILE_MANIFEST.digest);
   });
 
   it('moves the digest for every owned field', () => {
@@ -192,11 +210,22 @@ describe('profile-registry contract conformance', () => {
     }
   });
 
-  it('keeps beta-hardened defined but unadmitted and beta-default the only admitted profile', () => {
-    expect(ADMITTED_PROFILE_MANIFESTS_V2).toEqual([BETA_DEFAULT_PROFILE_MANIFEST]);
-    expect(isProfileAdmitted(BETA_DEFAULT_PROFILE_MANIFEST)).toBe(true);
-    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(false);
-    expect(validateProfileManifest(BETA_HARDENED_PROFILE_MANIFEST, registryFor(BETA_HARDENED_PROFILE_MANIFEST)))
-      .toEqual({ ok: false, code: 'PROFILE_MANIFEST_NOT_ADMITTED', reason: 'PROFILE_NOT_ADMITTED' });
+  it('admits beta-default, beta-hardened, standard, and strict while refusing synthetic profiles', () => {
+    expect(DEFAULT_PROFILE_REF).toEqual({ id: 'standard', version: '3.0.0' });
+    expect(ADMITTED_PROFILE_MANIFESTS_V2).toEqual([
+      BETA_DEFAULT_PROFILE_MANIFEST,
+      BETA_HARDENED_PROFILE_MANIFEST,
+      STANDARD_PROFILE_MANIFEST,
+      STRICT_PROFILE_MANIFEST,
+    ]);
+    for (const manifest of ADMITTED_PROFILE_MANIFESTS_V2) {
+      expect(isProfileAdmitted(manifest)).toBe(true);
+      expect(resolveAdmittedProfileManifest({ id: manifest.id, version: manifest.version })).toBe(manifest);
+      expect(validateProfileManifest(manifest, registryFor(manifest))).toEqual({ ok: true, manifest });
+    }
+    const syntheticBody = { ...bodyOf(STANDARD_PROFILE_MANIFEST), id: 'synthetic-unadmitted' };
+    const synthetic = { ...syntheticBody, digest: computeProfileManifestDigest(syntheticBody) };
+    expect(isProfileAdmitted(synthetic)).toBe(false);
+    expect(resolveAdmittedProfileManifest({ id: 'synthetic-unadmitted', version: '3.0.0' })).toBeUndefined();
   });
 });

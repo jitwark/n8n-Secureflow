@@ -80,10 +80,17 @@ describe('FacetSheet', () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it('exposes the open filter sheet as a modal dialog', () => {
+  it('exposes the open filter sheet as a modal dialog with one Filters heading and one scroll container', () => {
     render(<FacetSheet open counts={counts} filters={applied} onApply={() => {}} onClose={() => {}} />);
 
-    expect(screen.getByRole('dialog', { name: 'Filters' }).getAttribute('aria-modal')).toBe('true');
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.className).toContain('overflow-hidden');
+    expect(screen.getAllByRole('heading', { name: 'Filters' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Clear all' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Link-only 0/ })).toBeNull();
+    const apply = screen.getByRole('button', { name: 'Apply filters' });
+    expect(apply.className).toContain('text-accent-ink');
   });
 
   it('keeps keyboard focus inside the open dialog', () => {
@@ -148,7 +155,7 @@ describe('FacetSheet', () => {
     const onClose = vi.fn();
     const { rerender } = render(<FacetSheet open counts={counts} filters={applied} onApply={onApply} onClose={onClose} />);
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Clear all' })[1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
     expect(onApply).not.toHaveBeenCalled();
     expect(applied.trigger).toEqual(['webhook']);
 

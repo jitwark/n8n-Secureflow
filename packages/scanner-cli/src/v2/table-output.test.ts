@@ -161,4 +161,85 @@ describe('renderTableV2', () => {
     const output = renderTableV2({ ok: true, items: [], cancelled: false, completed: 0, failed: 0, concurrency: 1 });
     expect(output.split('\n')).toEqual(['Input  Status  Findings  Coverage  Omitted  Error', '-----  ------  --------  --------  -------  -----', '']);
   });
+
+  it('appends a clean Findings table and plain-English coverage summary whenever any item has findings', () => {
+    const findingId = digest('9');
+    const diagId = digest('8');
+    const diagnostic = {
+      id: diagId,
+      code: 'SEMANTIC_CATALOGUE_MISS' as const,
+      category: 'CATALOGUE' as const,
+      capabilityId: 'source-normalization',
+      aggregateEffect: 'NONE' as const,
+      assessmentEligible: true,
+      location: { pointer: '/nodes/0', occurrencePath: [0], astNodeId: digest('a'), span: null },
+    };
+    const withFindings = checked(result({
+      workflow: { name: 'Alert Flow', nodeCount: 2, rawNodeCount: 2, annotationNodeCount: 0, triggerCount: 1, actionCount: 1, integrationCount: 0, edgeCount: 1, resolvedEdgeCount: 1, payloadBytes: 120, complexity: 'LOW', isSubWorkflow: false },
+      analysis: { status: 'COMPLETE', capabilities: [capability({ seen: 2, analyzed: 2, diagnosticIds: [diagId] })], diagnostics: [diagnostic] },
+      findings: [{
+        findingId,
+        ruleId: 'N8N_EXECUTE_COMMAND',
+        ruleRevision: '1',
+        effect: 'SCORING',
+        severity: 'CRITICAL',
+        confidence: 'HIGH',
+        evidenceClass: 'CAPABILITY',
+        conclusion: 'OBSERVED',
+        applicability: 'APPLICABLE',
+        subject: { kind: 'NODE', node: { ordinal: 1, source: { pointer: '/nodes/1', occurrencePath: [1], astNodeId: digest('a'), span: null }, identityDigest: digest('b'), name: 'Run Shell\nxoxb-1234567890-secret' } },
+        factRefs: [],
+        traceRefs: [],
+        remediationId: 'r',
+      }],
+      assessment: { score: 80, grade: 'CRITICAL', scoringPolicyVersion: 'secureflow-risk-v2@2.0.0', basisFindingIds: [findingId], excludedReportOnlyFindingIds: [], excludedUncertainFindingIds: [], excludedNotApplicableFindingIds: [], unknownEvidenceCount: 0 },
+    }));
+    const output = renderTableV2(batch([completed('alert.json', withFindings)]));
+
+    expect(output).toMatch(/^Input +Status +Findings +Coverage +Omitted +Error$/m);
+    expect(output).toMatch(/^alert\.json +COMPLETE +1 +2\/2 +0\s*$/m);
+    expect(output).toMatch(/^Severity +Confidence +Rule +Node +Summary$/m);
+    expect(output).toMatch(/^CRITICAL +HIGH +N8N_EXECUTE_COMMAND +Run Shell\\n\[REDACTED\] +Execute Command node can run shell commands$/m);
+    expect(output).toContain('1 node evaluated using generic security rules (uncatalogued type)');
+    expect(output).not.toContain('SEMANTIC_CATALOGUE_MISS');
+    expect(output).not.toContain('xoxb-1234567890-secret');
+  });
+
+  it('renders Findings table alongside error rows and readiness when opted in', () => {
+    const findingId = digest('7');
+    const workflow = { nodes: [{ id: 'n1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: {} }], connections: {} };
+    const withFinding = checked(result({
+      workflow: { name: 'Alert Flow', nodeCount: 1, rawNodeCount: 1, annotationNodeCount: 0, triggerCount: 0, actionCount: 1, integrationCount: 0, edgeCount: 0, resolvedEdgeCount: 0, payloadBytes: 90, complexity: 'LOW', isSubWorkflow: false },
+      analysis: { status: 'COMPLETE', capabilities: [capability({ seen: 1, analyzed: 1 })], diagnostics: [] },
+      findings: [{
+        findingId,
+        ruleId: 'N8N_EXECUTE_COMMAND',
+        ruleRevision: '1',
+        effect: 'SCORING',
+        severity: 'CRITICAL',
+        confidence: 'HIGH',
+        evidenceClass: 'CAPABILITY',
+        conclusion: 'OBSERVED',
+        applicability: 'APPLICABLE',
+        subject: { kind: 'NODE', node: { ordinal: 0, source: { pointer: '/nodes/0', occurrencePath: [0], astNodeId: digest('a'), span: null }, identityDigest: digest('b'), name: 'Exec' } },
+        factRefs: [],
+        traceRefs: [],
+        remediationId: 'r',
+      }],
+      assessment: { score: 85, grade: 'CRITICAL', scoringPolicyVersion: 'secureflow-risk-v2@2.0.0', basisFindingIds: [findingId], excludedReportOnlyFindingIds: [], excludedUncertainFindingIds: [], excludedNotApplicableFindingIds: [], unknownEvidenceCount: 0 },
+    }));
+
+    const output = renderTableV2(
+      batch([
+        { ...completed('one.json', withFinding), rawWorkflow: workflow },
+        { label: 'two.json', status: 'FAILED', error: { code: 'INVALID_JSON' } },
+      ]),
+      { ...DEFAULT_PROJECTION_OPTIONS, includeReadiness: true },
+    );
+
+    expect(output).toContain('INVALID_JSON');
+    expect(output).toMatch(/^Severity +Confidence +Rule +Node +Summary$/m);
+    expect(output).toContain('one.json: Analysis: Complete · 1/1 nodes inspected');
+    expect(output).toContain('Readiness (declared workflow prerequisites');
+  });
 });

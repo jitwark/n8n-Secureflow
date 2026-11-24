@@ -38,22 +38,27 @@ describe('scanWorkflowV2', () => {
     const source = JSON.stringify({ nodes: [{ id: 'start', name: 'Start', type: 'n8n-nodes-base.manualTrigger', typeVersion, parameters: {} }], connections: {} });
     expect(failure(scanWorkflowV2(request({ bytes: bytes(source) })))).toMatchObject({ code: 'SEMANTIC_CATALOGUE_INVALID' });
   });
-  it('keeps an unadmitted prerelease typeVersion out of complete semantic analysis', () => {
+  it('records SEMANTIC_CATALOGUE_MISS as advisory NONE without degrading status on prerelease typeVersion', () => {
     const source = JSON.stringify({ nodes: [{ id: 'start', name: 'Start', type: 'n8n-nodes-base.manualTrigger', typeVersion: '1.0.0-alpha', parameters: {} }], connections: {} });
     const result = scanWorkflowV2(request({ bytes: bytes(source) }));
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(`scan failed: ${result.code}`);
-    expect(result.result.analysis.status).toBe('DEGRADED');
-    expect(result.result.analysis.diagnostics.map(({ code }) => code)).toContain('SEMANTIC_CATALOGUE_MISS');
+    expect(result.result.analysis.status).toBe('COMPLETE');
+    expect(result.result.analysis.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true }),
+    ]));
   });
 
-  it('rejects malformed, unknown, and unadmitted profile references before scanning', () => {
+  it('rejects malformed, unknown, and unadmitted profile references before scanning while admitting v2 and v3 profiles', () => {
     const malformed = scanWorkflowV2({ bytes: bytes(), profile: { id: 'beta-default' } } as unknown);
     const unknownKey = scanWorkflowV2({ bytes: bytes(), profile: { id: 'beta-default', version: '2.0.0', extra: true } } as unknown);
-    const hardened = scanWorkflowV2(request({ profile: { id: 'beta-hardened', version: '2.0.0' } }));
+    const unadmitted = scanWorkflowV2(request({ profile: { id: 'unknown-profile', version: '9.9.9' } }));
     expect(failure(malformed)).toMatchObject({ code: 'INVALID_CONFIG' });
     expect(failure(unknownKey)).toMatchObject({ code: 'INVALID_CONFIG' });
-    expect(failure(hardened)).toMatchObject({ code: 'PROFILE_NOT_ADMITTED' });
+    expect(failure(unadmitted)).toMatchObject({ code: 'PROFILE_NOT_ADMITTED' });
+    expect(scanWorkflowV2(request({ profile: { id: 'beta-hardened', version: '2.0.0' } })).ok).toBe(true);
+    expect(scanWorkflowV2(request({ profile: { id: 'standard', version: '3.0.0' } })).ok).toBe(true);
+    expect(scanWorkflowV2(request({ profile: { id: 'strict', version: '3.0.0' } })).ok).toBe(true);
   });
 
   it('rejects unsafe bytes and unknown request keys', () => {
@@ -128,7 +133,7 @@ describe('scanWorkflowV2', () => {
     expect(failure(scanWorkflowV2(request({ target })))).toMatchObject({ code: 'UNKNOWN_CONFIGURATION_KEY' });
   });
 
-  it('grades a normalized uncatalogued namespaced node under the degraded fallback advisory', () => {
+  it('grades a normalized uncatalogued namespaced node without degrading analysis status', () => {
     const source = JSON.stringify({
       nodes: [{ id: 'custom', name: 'Custom', type: '@example/custom-node.unknown', parameters: {} }],
       connections: {},
@@ -138,9 +143,10 @@ describe('scanWorkflowV2', () => {
     if (result.ok) {
       expect(result.result.workflow.nodeCount).toBe(1);
       expect(result.result.analysis.diagnostics).toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'DEGRADED', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
+        expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
+        expect.objectContaining({ code: 'GENERIC_NODE_UNMODELED_CAPABILITY', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
       ]));
-      expect(result.result.analysis.status).toBe('DEGRADED');
+      expect(result.result.analysis.status).toBe('COMPLETE');
       expect(result.result.assessment).not.toBeNull();
     }
   });
@@ -215,5 +221,24 @@ describe('scanWorkflowV2', () => {
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => { throw new Error('clock'); });
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => { throw new Error('network'); });
     try { expect(scanWorkflowV2(request()).ok).toBe(true); } finally { clock.mockRestore(); fetch.mockRestore(); }
+  });
+
+  it('keeps multi-node and unmodeled flow topologies COMPLETE without GRAPH_ANALYSIS_DEGRADED', () => {
+    const source = JSON.stringify({
+      nodes: [
+        { id: 'w1', name: 'Webhook', type: 'n8n-nodes-base.webhook', typeVersion: 1, parameters: { path: 'in', httpMethod: 'POST' } },
+        { id: 'n1', name: 'NoOp', type: 'n8n-nodes-base.noOp', typeVersion: 1, parameters: {} },
+        { id: 'e1', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: '={{ $json.body.cmd }}' } },
+      ],
+      connections: {
+        Webhook: { main: [[{ node: 'NoOp', type: 'main', index: 0 }]] },
+        NoOp: { main: [[{ node: 'Exec', type: 'main', index: 0 }]] },
+      },
+    });
+    const result = scanWorkflowV2(request({ bytes: bytes(source) }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.result.analysis.status).toBe('COMPLETE');
+    expect(result.result.analysis.diagnostics.map(({ code }) => code)).not.toContain('GRAPH_ANALYSIS_DEGRADED');
   });
 });

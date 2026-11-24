@@ -163,6 +163,43 @@ describe('freshness invalidation', () => {
 });
 
 describe('retained verdicts that are not current', () => {
+  it('drops the three historical not-scanned placeholders on fresh serialization and replay', () => {
+    const ids = ['4f0e5ac19abff5a6', '5996dd9d73585096', 'f42b7e880fe64710'];
+    const receipts = ids.map((entryId) => row(entryId, { status: 'MISSING' }));
+    const placeholder: V2RetainedVerdict = { scannerVersion: 'not-scanned', grade: null, analysisStatus: null };
+    const fresh = buildV2ScanEvidence(inventory(receipts), {
+      ...options,
+      retainedVerdictOf: () => placeholder,
+    });
+
+    expect(fresh.map(({ scanFreshness, scan, retainedVerdict }) => [scanFreshness, scan, retainedVerdict]))
+      .toEqual(ids.map(() => ['UNSCANNED', null, null]));
+
+    const replayed = JSON.parse(JSON.stringify(ids.map((entryId) => ({
+      ...fresh.find((record) => record.entryId === entryId)!,
+      scanFreshness: 'HISTORICAL',
+      retainedVerdict: placeholder,
+    })))) as V2ScanEvidenceRecord[];
+    expect(replayed.map((record, index) => classifyV2ScanFreshness(record, receipts[index]!, INVENTORY_SHA)))
+      .toEqual(ids.map(() => 'UNSCANNED'));
+  });
+
+  it.each([
+    { scannerVersion: 'scanner-beta-1', grade: 'MEDIUM', analysisStatus: 'COMPLETE' },
+    { scannerVersion: '2.0.0', grade: null, analysisStatus: 'INDETERMINATE' },
+  ] as const)('preserves valid historical v1/v2 verdicts and null assessments: $scannerVersion', (retained) => {
+    const receipt = row(`historical-${retained.scannerVersion}`, { status: 'MISSING' });
+    const [record] = buildV2ScanEvidence(inventory([receipt]), {
+      ...options,
+      retainedVerdictOf: () => retained,
+    });
+
+    expect(record?.scanFreshness).toBe('HISTORICAL');
+    expect(record?.retainedVerdict).toEqual(retained);
+    expect(classifyV2ScanFreshness(JSON.parse(JSON.stringify(record)) as V2ScanEvidenceRecord, receipt, INVENTORY_SHA))
+      .toBe('HISTORICAL');
+  });
+
   it('never carries c998701 as a current engine identity', () => {
     const retained: V2RetainedVerdict = { scannerVersion: 'c998701', grade: 'MEDIUM', analysisStatus: null };
     const legacy = inventory([row('legacy-row', { status: 'MISSING', reasonCode: 'NO_SOURCE_BINDING' })]);

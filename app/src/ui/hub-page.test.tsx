@@ -34,5 +34,7 @@ describe('HubPage', () => {
 
     expect(screen.getByText(/Showing 0 of 48 quality-ranked workflows/)).toBeTruthy();
     expect(screen.queryByText(/Showing the first 0 quality-ranked workflows/)).toBeNull();
+    const libraryLink = screen.getByRole('link', { name: /view all in library/i });
+    expect(libraryLink.getAttribute('href')).toMatch(/^\/library\/?\?tag=notifications$/);
   });
 });

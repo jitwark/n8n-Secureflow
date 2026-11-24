@@ -81,16 +81,18 @@ async function fillTextarea(page: Page, text: string) {
 test.describe('Workflow Scanner E2E', () => {
   test('clean fixture scanning', async ({ page }) => {
     await page.goto(appPath('/scanner'));
-    // The v2 scanner admits one profile and shows it in the same labelled chip the v1 page
-    // used for its single scan depth (`scanner-input.tsx`).
-    await expect(page.getByLabel('Selected scanner profile: Default scan')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Standard' })).toHaveCount(0);
+    const profileGroup = page.getByRole('radiogroup', { name: 'Scanner profile' });
+    await expect(profileGroup).toBeVisible();
+    await expect(profileGroup.getByRole('radio', { name: 'Standard' })).toHaveAttribute('aria-checked', 'true');
+    await expect(profileGroup.getByRole('radio', { name: 'Strict' })).toHaveAttribute('aria-checked', 'false');
 
     await fillTextarea(page, cleanJson);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
 
-    // The v2 report's outcome heading is "Analysis coverage"; "Analyst summary" was the v1
-    // report's heading and left with the cutover.
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible();
+    const details = page.locator('#scanner-technical-details');
+    await expect(details).not.toHaveAttribute('open', '');
+    await details.locator('> summary').click();
     await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
 
     // Verify the scanned workflow is summarised. The v2 report renders no workflow name
@@ -111,16 +113,20 @@ test.describe('Workflow Scanner E2E', () => {
     await fillTextarea(page, maliciousJson);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible();
 
-    await expect(page.getByLabel('Selected scanner profile: Default scan')).toBeVisible();
+    const profileGroup = page.getByRole('radiogroup', { name: 'Scanner profile' });
+    await expect(profileGroup.getByRole('radio', { name: 'Standard' })).toHaveAttribute('aria-checked', 'true');
 
     // Verify visible findings
     await expect(page.getByRole('heading', { name: 'Critical and high findings' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Execute Command node can run shell commands' })).toBeVisible();
 
-    // Verify severity and grade evidence (CRITICAL)
+    // Verify severity and grade evidence (CRITICAL) and clean mobile verdict layout
     await expect(page.getByText('CRITICAL').first()).toBeVisible();
+    await page.setViewportSize({ width: 375, height: 900 });
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
   test('cancellation mid-scan', async ({ page }) => {
@@ -142,7 +148,8 @@ test.describe('Workflow Scanner E2E', () => {
     // Assert UI returns to idle with no stale report
     await expect(cancelButton).not.toBeVisible();
     await expect(page.getByRole('button', { name: 'Scan workflow' })).toBeEnabled();
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toHaveCount(0);
   });
 
   test('zero network requests containing workflow content', async ({ page }) => {
@@ -174,7 +181,7 @@ test.describe('Workflow Scanner E2E', () => {
 
     await fillTextarea(page, maliciousJson);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible();
 
     // The sentinel has to have observed the page's traffic and its headers, or the loop
     // below proves nothing. Measured on this build: 17 requests, 9 header names.
@@ -285,7 +292,7 @@ test.describe('Workflow Scanner E2E', () => {
       requestAnimationFrame(sampleRAF);
     });
 
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15000 });
 
     // Stop RAF sampling and collect gaps
     const gaps: number[] = await page.evaluate(() => {

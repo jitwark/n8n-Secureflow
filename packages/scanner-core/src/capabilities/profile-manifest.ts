@@ -36,14 +36,14 @@ const RULE_IDS_BY_CAPABILITY: ReadonlyMap<string, readonly string[]> = (() => {
 
 const SCORING_POLICY_VERSION = 'secureflow-risk-v2@2.0.0';
 const MAX_CAPABILITIES = 32;
-const MAX_LIST_ITEMS = 17;
+const MAX_LIST_ITEMS = 64;
 const MAX_STRING_LENGTH = 128;
 
-function capability(id: string, required: boolean, dependsOn: readonly string[]): ProfileCapabilityV2 {
-  return Object.freeze({ id, version: '2.0.0', required, dependsOn: Object.freeze([...dependsOn]), ruleIds: RULE_IDS_BY_CAPABILITY.get(id) ?? NO_RULES });
+function capability(id: string, required: boolean, dependsOn: readonly string[], version = '2.0.0'): ProfileCapabilityV2 {
+  return Object.freeze({ id, version, required, dependsOn: Object.freeze([...dependsOn]), ruleIds: RULE_IDS_BY_CAPABILITY.get(id) ?? NO_RULES });
 }
-function buildManifest(id: string, capabilities: readonly ProfileCapabilityV2[]): ProfileManifestV2 {
-  const body = { schemaVersion: 'scanner-profile-v2' as const, id, version: '2.0.0', capabilities: Object.freeze([...capabilities]), scoringPolicyVersion: SCORING_POLICY_VERSION };
+function buildManifest(id: string, capabilities: readonly ProfileCapabilityV2[], version = '2.0.0'): ProfileManifestV2 {
+  const body = { schemaVersion: 'scanner-profile-v2' as const, id, version, capabilities: Object.freeze([...capabilities]), scoringPolicyVersion: SCORING_POLICY_VERSION };
   return Object.freeze({ ...body, digest: computeProfileManifestDigest(body) });
 }
 
@@ -53,22 +53,45 @@ const structural = capability('structural-policies', true, ['source-normalizatio
 const assessment = capability('assessment', true, ['workflow-insights', 'structural-policies']);
 const presentation = capability('presentation-facts', true, ['assessment']);
 
+function hardenedStack(version: '2.0.0' | '3.0.0'): readonly ProfileCapabilityV2[] {
+  return [
+    capability('source-normalization', true, [], version),
+    capability('workflow-insights', true, ['source-normalization'], version),
+    capability('structural-policies', true, ['source-normalization'], version),
+    capability('expression-security', false, ['source-normalization'], version),
+    capability('javascript-security', false, ['source-normalization'], version),
+    capability('python-security', false, ['source-normalization'], version),
+    capability('graph-semantics', false, ['source-normalization'], version),
+    capability('taint-confidentiality', false, ['graph-semantics', 'expression-security', 'javascript-security', 'python-security'], version),
+    capability('taint-integrity', false, ['graph-semantics', 'expression-security', 'javascript-security', 'python-security'], version),
+    capability('agentic-control', false, ['graph-semantics', 'taint-confidentiality', 'taint-integrity'], version),
+    capability('assessment', true, ['workflow-insights', 'structural-policies'], version),
+    capability('presentation-facts', true, ['assessment'], version),
+  ];
+}
+
 export const BETA_DEFAULT_PROFILE_MANIFEST = buildManifest('beta-default', [source, insights, structural, assessment, presentation]);
-export const BETA_HARDENED_PROFILE_MANIFEST = buildManifest('beta-hardened', [
-  source, insights, structural, capability('expression-security', false, ['source-normalization']),
-  capability('javascript-security', false, ['source-normalization']),
-  capability('python-security', false, ['source-normalization']),
-  capability('graph-semantics', false, ['source-normalization']),
-  capability('taint-confidentiality', false, ['graph-semantics', 'expression-security', 'javascript-security', 'python-security']),
-  capability('taint-integrity', false, ['graph-semantics', 'expression-security', 'javascript-security', 'python-security']),
-  capability('agentic-control', false, ['graph-semantics', 'taint-confidentiality', 'taint-integrity']), assessment, presentation,
-]);
-export const PROFILE_MANIFEST_REGISTRY_V2 = Object.freeze([BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST]);
-export const ADMITTED_PROFILE_MANIFESTS_V2 = Object.freeze([BETA_DEFAULT_PROFILE_MANIFEST]);
+export const BETA_HARDENED_PROFILE_MANIFEST = buildManifest('beta-hardened', hardenedStack('2.0.0'));
+export const STANDARD_PROFILE_MANIFEST = buildManifest('standard', hardenedStack('3.0.0'), '3.0.0');
+export const STRICT_PROFILE_MANIFEST = buildManifest('strict', hardenedStack('3.0.0'), '3.0.0');
+export const DEFAULT_PROFILE_REF = Object.freeze({ id: 'standard', version: '3.0.0' } as const);
+export const PROFILE_MANIFEST_REGISTRY_V2 = Object.freeze([BETA_DEFAULT_PROFILE_MANIFEST, BETA_HARDENED_PROFILE_MANIFEST, STANDARD_PROFILE_MANIFEST, STRICT_PROFILE_MANIFEST]);
+export const ADMITTED_PROFILE_MANIFESTS_V2 = PROFILE_MANIFEST_REGISTRY_V2;
 export const PROFILE_MANIFEST_REGISTRY = PROFILE_MANIFEST_REGISTRY_V2;
 export const ADMITTED_PROFILE_REGISTRY_V2 = ADMITTED_PROFILE_MANIFESTS_V2;
 export const BETA_DEFAULT_MANIFEST = BETA_DEFAULT_PROFILE_MANIFEST;
 export const BETA_HARDENED_MANIFEST = BETA_HARDENED_PROFILE_MANIFEST;
+
+export function resolveAdmittedProfileManifest(ref: unknown): ProfileManifestV2 | undefined {
+  if (ref === null || typeof ref !== 'object' || Array.isArray(ref)) return undefined;
+  const idDescriptor = Object.getOwnPropertyDescriptor(ref, 'id');
+  const versionDescriptor = Object.getOwnPropertyDescriptor(ref, 'version');
+  if (!idDescriptor || !('value' in idDescriptor) || !versionDescriptor || !('value' in versionDescriptor)) return undefined;
+  const idValue = idDescriptor.value;
+  const versionValue = versionDescriptor.value;
+  if (typeof idValue !== 'string' || typeof versionValue !== 'string') return undefined;
+  return ADMITTED_PROFILE_MANIFESTS_V2.find((item) => item.id === idValue && item.version === versionValue);
+}
 
 export function computeProfileManifestDigest(manifest: Omit<ProfileManifestV2, 'digest'>): string {
   return bytesToHex(sha256(new TextEncoder().encode(canonicalizeJson(manifest))));
@@ -78,7 +101,8 @@ export function isProfileAdmitted(candidate: unknown): boolean {
   try {
     const manifest = readManifest(candidate, true);
     const { digest, ...body } = manifest;
-    return sameManifest(manifest, BETA_DEFAULT_PROFILE_MANIFEST) && computeProfileManifestDigest(body) === digest;
+    return ADMITTED_PROFILE_MANIFESTS_V2.some((admitted) => sameManifest(manifest, admitted))
+      && computeProfileManifestDigest(body) === digest;
   } catch { return false; }
 }
 

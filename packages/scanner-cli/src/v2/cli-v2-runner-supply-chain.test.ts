@@ -31,9 +31,9 @@ function scanCommand(...args: string[]): ScanCommand {
 function run(args: readonly string[], options: V2CliRunOptions = {}) { return runCliV2Internal(scanCommand(...args), { cwd: '.', ...options }); }
 function envelope(stdout: string): Envelope { return JSON.parse(stdout) as Envelope; }
 const fixtureBytes = async (): Promise<Uint8Array> => new TextEncoder().encode(await readFile(cleanInput, 'utf8'));
-function scanTargeted(bytes: Uint8Array, _item?: unknown, options?: { target?: unknown; limits?: typeof DEFAULT_SCANNER_LIMITS_V2; advisoryRequest?: unknown }): ScanWorkflowV2Result {
+function scanTargeted(bytes: Uint8Array, _item?: unknown, options?: { profile?: Readonly<{ id: string; version: string }>; target?: unknown; limits?: typeof DEFAULT_SCANNER_LIMITS_V2; advisoryRequest?: unknown }): ScanWorkflowV2Result {
   return scanWorkflowV2({
-    bytes, profile: { id: 'beta-default', version: '2.0.0' },
+    bytes, profile: options?.profile ?? { id: 'standard', version: '3.0.0' },
     limits: options?.limits ?? DEFAULT_SCANNER_LIMITS_V2,
     target: (options?.target as TargetContextV3 | undefined) ?? READY_TARGET,
     ...(options?.advisoryRequest === undefined ? {} : { advisoryRequest: options.advisoryRequest }),
@@ -75,6 +75,7 @@ describe('canonical supply-chain request and result through the v2 CLI', () => {
 
   it('places request-v2 only on the NDJSON header', async () => {
     const result = await run([...READY_ARGS, '--format', 'ndjson'], { read: fixtureBytes, scan: scanTargeted });
+    expect(result.exitCode).toBe(0);
     const rows = result.stdout.trimEnd().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
     expect(rows[0]).toMatchObject({ type: 'header', supplyChain: { schemaVersion: 'supply-chain-request-v2', inventoryState: 'DECLARED' } });
     for (const row of rows.slice(1)) expect(row).not.toHaveProperty('supplyChain');
@@ -86,6 +87,7 @@ describe('canonical supply-chain request and result through the v2 CLI', () => {
     let calls = 0;
     const transport: SnapshotTransportV1 = async () => { calls += 1; return { status: 200, bytes: raw }; };
     const result = await run([...READY_ARGS, '--format', 'json'], { read: fixtureBytes, scan: scanTargeted, transport, snapshotPin: pin, now: () => Date.parse('2026-11-03T00:00:01.000Z') });
+    expect(result.exitCode).toBe(0);
     expect(calls).toBe(0);
     const output = envelope(result.stdout);
     expect(output.supplyChain?.evaluation).toEqual({ status: 'UNAVAILABLE', reason: 'NO_ADMITTED_SNAPSHOT' });

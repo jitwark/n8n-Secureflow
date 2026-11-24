@@ -9,7 +9,7 @@ export const metadata = {
   ...(isPreviewBuild() ? {} : { alternates: canonicalAlternates('/scanner/') }),
   title: 'Workflow Scanner | n8n-secureflow',
   description:
-    'Check one n8n workflow after the page loads. Review pasted credentials, open webhooks and shell execution locally; results are advisory.',
+    'Check an n8n workflow 100% locally in your browser with v0.3 Standard analysis: JS AST, Python CST, taint flow, expressions, and AI egress.',
 };
 
 export default function ScannerPage() {
@@ -17,19 +17,20 @@ export default function ScannerPage() {
     <div>
       <JsonLdScript data={scannerJsonLd()} />
 
-      <div className="mx-auto flex max-w-5xl flex-col gap-7">
+      <div className="mx-auto flex min-w-0 max-w-5xl flex-col gap-7">
         <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Scanner' }]} className="rounded-control" />
 
-        <header className="flex max-w-3xl flex-col gap-3">
+        <header className="flex min-w-0 max-w-3xl flex-col gap-3">
           <p className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-text font-bold">
-            Local workflow scanner
+            Local workflow scanner · v0.3 Standard
           </p>
           <h1 className="font-sans text-3xl font-bold tracking-tight text-ink sm:text-4xl">
             Check a workflow before you run it
           </h1>
           <p className="text-base leading-7 text-ink-muted">
-            Paste or upload one workflow JSON export from n8n. See what the local scan found, what it
-            could not assess, and what to review before import.
+            Paste or upload one workflow JSON export from n8n. Runs 100% client-side with zero uploads:
+            structural policies, JavaScript AST, Python CST, expression escape/env checks, taint flow,
+            and AI agent egress review.
           </p>
         </header>
 

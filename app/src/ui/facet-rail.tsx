@@ -9,6 +9,7 @@ type FacetRailProps = {
   filters: SearchFilters;
   onFilterChange: (filters: SearchFilters) => void;
   className?: string;
+  showHeader?: boolean;
 };
 
 const SINGLE_GROUPS = [
@@ -24,13 +25,13 @@ const REPEATED_GROUPS = [
 type SingleFacet = 'rights' | 'complexity' | 'grade';
 type ManyFacet = 'trigger' | 'capability' | 'integration' | 'tag';
 
-const FACET_BUTTON = 'flex min-h-11 w-full items-center justify-between rounded-control px-2 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-2 focus-visible:ring-offset-page active:bg-raised';
+const FACET_BUTTON = 'flex min-h-11 w-full items-center justify-between rounded-control border px-2 py-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-2 focus-visible:ring-offset-page active:bg-raised';
 const DISCOVERY_PAGE_SIZE = 40;
 
 function facetButtonClass(selected: boolean, disabled: boolean): string {
-  if (selected) return `${FACET_BUTTON} bg-ink text-page ring-1 ring-accent-border font-bold hover:bg-ink/90`;
-  if (disabled) return `${FACET_BUTTON} cursor-not-allowed text-ink-faint opacity-40`;
-  return `${FACET_BUTTON} text-ink hover:bg-raised`;
+  if (selected) return `${FACET_BUTTON} border-accent-border bg-accent-dim text-accent-text font-semibold ring-1 ring-accent-border`;
+  if (disabled) return `${FACET_BUTTON} cursor-not-allowed border-transparent text-ink-faint opacity-40`;
+  return `${FACET_BUTTON} border-transparent text-ink hover:bg-raised`;
 }
 
 function countFor(counts: FacetCounts | undefined, facet: string, value: string): number {
@@ -42,7 +43,7 @@ function label(group: TagGroup, value: string): string {
   return toNormalizedTag(group, value, 0).label;
 }
 
-export function FacetRail({ counts, filters, onFilterChange, className = '' }: FacetRailProps) {
+export function FacetRail({ counts, filters, onFilterChange, className = '', showHeader = true }: FacetRailProps) {
   const [terms, setTerms] = useState({ integration: '', tag: '' });
   const [discoveryLimits, setDiscoveryLimits] = useState({ integration: DISCOVERY_PAGE_SIZE, tag: DISCOVERY_PAGE_SIZE });
   const updateSingle = (facet: SingleFacet, value: string) =>
@@ -62,37 +63,54 @@ export function FacetRail({ counts, filters, onFilterChange, className = '' }: F
     ['Tags', 'tag', counts?.tags ?? {}],
   ] as const;
 
-  return (
-    <aside className={`w-60 shrink-0 space-y-5 text-sm ${className}`}>
-      <div className="flex items-center justify-between border-b border-hairline pb-2">
-        <h2 className="font-display text-base font-semibold">Filters</h2>
-        {active && <button type="button" onClick={clear} className="min-h-11 rounded-control px-2 text-xs text-accent-text transition-colors hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border active:bg-raised">Clear all</button>}
-      </div>
-      {SINGLE_GROUPS.slice(0, 1).map(([title, facet, group, options]) => (
-        <fieldset key={facet} className="space-y-1">
-          <legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>
-          {options.map((value) => {
-            const count = countFor(counts, facet, value);
-            const selected = filters[facet] === value;
-            const disabled = count === 0 && !selected;
-            return <button key={value} type="button" disabled={disabled} onClick={() => updateSingle(facet, value)} aria-label={`${label(group, value)} ${count}`} aria-pressed={selected} className={facetButtonClass(selected, disabled)}><span>{label(group, value)}</span><span className="font-mono tabular-nums">{count}</span></button>;
-          })}
-        </fieldset>
-      ))}
-      {REPEATED_GROUPS.slice(0, 1).map(([title, facet, group, options]) => {
-        const selected = new Set(Array.isArray(filters[facet]) ? filters[facet] : []);
-        return <fieldset key={facet} className="space-y-1"><legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>{options.map((value) => {
+  const renderSingleGroup = ([title, facet, group, options]: (typeof SINGLE_GROUPS)[number]) => {
+    const visible = options.filter((value) => filters[facet] === value || countFor(counts, facet, value) > 0);
+    if (visible.length === 0) return null;
+    return (
+      <fieldset key={facet} className="space-y-1">
+        <legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>
+        {visible.map((value) => {
+          const count = countFor(counts, facet, value);
+          const selected = filters[facet] === value;
+          const disabled = count === 0 && !selected;
+          return <button key={value} type="button" disabled={disabled} onClick={() => updateSingle(facet, value)} aria-label={`${label(group, value)} ${count}`} aria-pressed={selected} className={facetButtonClass(selected, disabled)}><span>{label(group, value)}</span><span className="font-mono tabular-nums">{count}</span></button>;
+        })}
+      </fieldset>
+    );
+  };
+
+  const renderRepeatedGroup = ([title, facet, group, options]: (typeof REPEATED_GROUPS)[number]) => {
+    const selected = new Set(Array.isArray(filters[facet]) ? filters[facet] : []);
+    const visible = options.filter((value) => selected.has(value) || countFor(counts, facet, value) > 0);
+    if (visible.length === 0) return null;
+    return (
+      <fieldset key={facet} className="space-y-1">
+        <legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>
+        {visible.map((value) => {
           const count = countFor(counts, facet, value);
           const isSelected = selected.has(value);
           const disabled = count === 0 && !isSelected;
           return <button key={value} type="button" disabled={disabled} onClick={() => updateMany(facet, value)} aria-label={`${label(group, value)} ${count}`} aria-pressed={isSelected} className={facetButtonClass(isSelected, disabled)}><span>{label(group, value)}</span><span className="font-mono tabular-nums">{count}</span></button>;
-        })}</fieldset>;
-      })}
-      {SINGLE_GROUPS.slice(1).map(([title, facet, group, options]) => <fieldset key={facet} className="space-y-1"><legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>{options.map((value) => { const count = countFor(counts, facet, value); const selected = filters[facet] === value; const disabled = count === 0 && !selected; return <button key={value} type="button" disabled={disabled} onClick={() => updateSingle(facet, value)} aria-label={`${label(group, value)} ${count}`} aria-pressed={selected} className={facetButtonClass(selected, disabled)}><span>{label(group, value)}</span><span className="font-mono tabular-nums">{count}</span></button>; })}</fieldset>)}
-      {REPEATED_GROUPS.slice(1).map(([title, facet, group, options]) => <fieldset key={facet} className="space-y-1"><legend className="mb-1 font-mono text-xs text-ink-faint">{title}</legend>{options.map((value) => { const count = countFor(counts, facet, value); const selected = (filters[facet] ?? []).includes(value); const disabled = count === 0 && !selected; return <button key={value} type="button" disabled={disabled} onClick={() => updateMany(facet, value)} aria-label={`${label(group, value)} ${count}`} aria-pressed={selected} className={facetButtonClass(selected, disabled)}><span>{label(group, value)}</span><span className="font-mono tabular-nums">{count}</span></button>; })}</fieldset>)}
+        })}
+      </fieldset>
+    );
+  };
+
+  return (
+    <aside className={`w-60 shrink-0 space-y-5 text-sm ${className}`}>
+      {showHeader && (
+        <div className="flex items-center justify-between border-b border-hairline pb-2">
+          <h2 className="font-display text-base font-semibold">Filters</h2>
+          {active && <button type="button" onClick={clear} className="min-h-11 rounded-control px-2 text-xs text-accent-text transition-colors hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border active:bg-raised">Clear all</button>}
+        </div>
+      )}
+      {SINGLE_GROUPS.slice(0, 1).map(renderSingleGroup)}
+      {REPEATED_GROUPS.slice(0, 1).map(renderRepeatedGroup)}
+      {SINGLE_GROUPS.slice(1).map(renderSingleGroup)}
+      {REPEATED_GROUPS.slice(1).map(renderRepeatedGroup)}
       {discoveryLists.map(([title, facet, values]) => {
         const selected = new Set(filters[facet] ?? []);
-        const available = new Map(Object.entries(values));
+        const available = new Map(Object.entries(values).filter(([value, count]) => count > 0 || selected.has(value)));
         for (const value of selected) if (!available.has(value)) available.set(value, 0);
         const term = terms[facet];
         const normalizedTerm = normalizeDiscoverySlug(term);

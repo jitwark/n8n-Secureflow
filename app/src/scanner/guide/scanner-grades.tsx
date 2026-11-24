@@ -91,9 +91,9 @@ export function ScannerGrades() {
         </p>
         <p>
           Repeat hits are deliberately discounted so one repeated pattern cannot drown out the rest
-          of the report. Code and value-flow findings are not admitted in the shipped scanner; if a
-          later profile admits them, they add review context rather than an authoritative execution
-          or safety verdict.
+          of the report. Code, expression, value-flow, and AI-agent checks are scored in v0.3
+          Standard mode alongside structural policies so critical execution and exfiltration paths
+          cannot hide behind clean node shells.
         </p>
         <p className="border-l-2 border-hairline-strong pl-3 text-ink-faint">
           Known limitation: workflow size is currently measured from raw node count, which includes

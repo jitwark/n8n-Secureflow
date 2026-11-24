@@ -1,4 +1,5 @@
 import type { SvgPreviewListItem, NodeCategory } from '@hub/contracts';
+import { isFunctionalNode } from '@hub/contracts/functional-nodes';
 
 const CATEGORY_COLOR: Record<NodeCategory, string> = {
   trigger: '#22c55e',
@@ -22,14 +23,17 @@ function escapeXml(value: string): string {
 
 /**
  * Generates an actual node-and-wire flowchart SVG for Tier C or bar-chart previews.
- * Displays nodes in an organic sequential layout with connecting bezier wires.
+ * Excludes non-functional sticky notes / placeholders so node counts match active workflow nodes.
  */
 export function generateNodeFlowchartSvg(nodes: readonly SvgPreviewListItem[]): string {
   if (!nodes || nodes.length === 0) {
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100"><text x="50%" y="50%" text-anchor="middle" fill="currentColor">No nodes</text></svg>';
   }
 
-  const displayNodes = nodes.slice(0, 24);
+  const activeNodes = nodes.filter((node) => isFunctionalNode(node.type));
+  const stickyCount = nodes.length - activeNodes.length;
+  const sourceNodes = activeNodes.length > 0 ? activeNodes : nodes;
+  const displayNodes = sourceNodes.slice(0, 24);
   const nodeWidth = 140;
   const nodeHeight = 44;
   const colGap = 40;
@@ -60,7 +64,7 @@ export function generateNodeFlowchartSvg(nodes: readonly SvgPreviewListItem[]): 
     const c1X = startX + 20;
     const c2X = endX - 20;
     paths.push(
-      `<path d="M ${startX} ${startY} C ${c1X} ${startY}, ${c2X} ${endY}, ${endX} ${endY}" fill="none" stroke="#64748b" stroke-width="1.5" opacity="0.6" />`
+      `<path d="M ${startX} ${startY} C ${c1X} ${startY}, ${c2X} ${endY}, ${endX} ${endY}" fill="none" stroke="#64748b" stroke-width="1.5" opacity="0.6" />`,
     );
   }
 
@@ -78,13 +82,15 @@ export function generateNodeFlowchartSvg(nodes: readonly SvgPreviewListItem[]): 
         `<circle cx="12" cy="${nodeHeight / 2}" r="4" fill="${color}" />` +
         `<text x="22" y="18" font-size="10" font-weight="600" fill="#f2f6f9">${name}</text>` +
         `<text x="22" y="32" font-size="8" font-family="monospace" fill="#94a3b8">${type}</text>` +
-      `</g>`
+      `</g>`,
     );
   });
 
+  const activeLabel = `${activeNodes.length} active ${activeNodes.length === 1 ? 'node' : 'nodes'}`;
+  const stickyLabel = stickyCount > 0 ? `, ${stickyCount} sticky ${stickyCount === 1 ? 'note' : 'notes'}` : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${totalHeight}" preserveAspectRatio="xMidYMid meet" role="img">` +
-    `<title>Workflow node diagram (${displayNodes.length} nodes)</title>` +
+    `<title>Workflow node diagram (${activeLabel}${stickyLabel})</title>` +
     paths.join('') +
     nodeElements.join('') +
     `</svg>`

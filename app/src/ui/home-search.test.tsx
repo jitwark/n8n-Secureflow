@@ -199,7 +199,7 @@ describe('HomeSearch', () => {
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(input.getAttribute('aria-activedescendant')).toBe('search-result-1');
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(router.push).toHaveBeenCalledWith('/w/github/');
+    expect(router.push).toHaveBeenCalledWith('/w/view/?id=2');
 
     const listbox = screen.getByRole('listbox');
     const viewAll = screen.getByRole('link', { name: 'View all results' });
@@ -246,5 +246,26 @@ describe('HomeSearch', () => {
     const options = screen.getAllByRole('option').map((a) => a.getAttribute('href'));
     expect(hrefs.length).toBeGreaterThan(0);
     expect([...hrefs, ...options].every((href) => href?.startsWith('/community-hub/'))).toBe(true);
+  });
+
+  it('navigates to /library/?q=<encoded> when View all results is clicked, never to a /w/ detail route', async () => {
+    vi.mocked(searchClientMock.search).mockResolvedValue({ items: [
+      { id: 'wf-1', slug: 'gmail-sync', title: 'Gmail sync workflow', tags: ['gmail'], rightsStatus: 'link_only', isPrerendered: true },
+    ] } as never);
+    render(<HomeSearch />);
+
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'gmail & webhook' } });
+    await waitFor(() => expect(screen.getByRole('listbox')).toBeTruthy());
+
+    const viewAll = screen.getByRole('link', { name: 'View all results' });
+    expect(viewAll.getAttribute('href')).toBe('/library/?q=gmail%20%26%20webhook');
+
+    fireEvent.mouseDown(viewAll);
+    fireEvent.click(viewAll);
+
+    expect(router.push).toHaveBeenCalledWith('/library/?q=gmail%20%26%20webhook');
+    expect(router.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/w\//));
   });
 });

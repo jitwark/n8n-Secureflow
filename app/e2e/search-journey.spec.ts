@@ -14,7 +14,7 @@ for (const width of widths) {
 
     const first = page.getByRole('list', { name: 'Workflow results' }).getByRole('link').first();
     await first.click();
-    await expect(page).toHaveURL(/\/w\/[^?]+\//, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/w\/view\/\?id=/, { timeout: 30_000 });
     await expect(page.locator('h1')).toHaveCount(1);
     await page.goBack();
 
@@ -72,8 +72,31 @@ test('semantic enhancement preserves the keyboard-active result', async ({ page 
   await search.press('ArrowDown');
   await expect(search).toHaveAttribute('aria-activedescendant', /result-/);
   const activeBefore = await search.getAttribute('aria-activedescendant');
-  await expect.poll(() => dataPaths.has('semantic-index.json'), { timeout: 15_000 }).toBe(true);
+  await expect.poll(
+    () => dataPaths.has('semantic-index.json.gzbin') || dataPaths.has('semantic-index.json'),
+    { timeout: 15_000 },
+  ).toBe(true);
   await expect(search).toHaveAttribute('aria-activedescendant', activeBefore ?? /result-/);
+});
+
+test('gmail search stays direct-first rather than matching unrelated workflows', async ({ page }) => {
+  await page.goto(appPath('/library/'));
+  const search = page.getByRole('combobox', { name: 'Search n8n workflows' });
+  await search.fill('gmail');
+  const announcer = page
+    .locator('section[aria-labelledby="library-results-heading"] p[aria-live]')
+    .filter({ hasText: /^[1-9][\d,]* workflows? of [\d,]+$/ });
+  await expect.poll(async () => {
+    const text = (await announcer.innerText().catch(() => '')).trim();
+    const m = /^([\d,]+)\s+workflows?\s+of\s+([\d,]+)$/.exec(text);
+    const total = Number.parseInt((m?.[2] ?? '0').replaceAll(',', ''), 10);
+    return total > 5_000 ? Number.parseInt((m?.[1] ?? '0').replaceAll(',', ''), 10) : 0;
+  }, { timeout: 30_000 }).toBeGreaterThan(500);
+
+  const match = /^([\d,]+)\s+workflows?\s+of\s+([\d,]+)$/.exec((await announcer.innerText()).trim());
+  const count = Number.parseInt((match?.[1] ?? '0').replaceAll(',', ''), 10);
+  expect(count, 'gmail match count should reflect direct-first precision (~2,684)').toBeGreaterThan(500);
+  expect(count, 'gmail match count should not bloat across unrelated workflows').toBeLessThan(4_000);
 });
 
 test('restores loaded result depth from the URL after a reload', async ({ page }) => {

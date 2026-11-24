@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { firstPrerenderedSubject, viewHref } from './detail-subjects';
 
 /**
  * W-010 independent browser verification: artifact identity plus the trust
@@ -84,15 +85,15 @@ if (!chartPath) throw new Error('no chart artifact declared in the manifest');
 const servedPaths = [
   'index.html',
   'scanner/index.html',
+  'w/view/index.html',
   'data/manifest.json',
   `data/${chartPath}`,
   ...workerChunks.map((relative) => `_next/static/chunks/${relative}`),
 ];
 
-const qaSlug = process.env.QA_SLUG;
-// The journey MUST include one prerendered detail page (W-010); a 3-route run is not the journey.
-if (!qaSlug) throw new Error('QA_SLUG is required: the trust journey must include a prerendered detail page');
-const routes = ['/', '/library/', '/scanner/', `/w/${qaSlug}/`];
+const qaSubject = firstPrerenderedSubject();
+const qaRoute = process.env.QA_SLUG ? `/w/view/?id=${encodeURIComponent(process.env.QA_SLUG)}` : viewHref(qaSubject);
+const routes = ['/', '/library/', '/scanner/', qaRoute];
 const widths = [320, 768, 1024, 1440];
 
 for (const width of widths) {
@@ -149,9 +150,9 @@ for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     for (const route of routes) {
       await page.goto(`${basePath}${route}`);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).resolves.toBe(true);
       await page.screenshot({
-        path: testInfo.outputPath(`${width}-${route.replaceAll('/', '_') || 'home'}.png`),
+        path: testInfo.outputPath(`${width}-${route.replace(/[^a-z0-9]+/gi, '_') || 'home'}.png`),
         fullPage: true,
       });
     }
@@ -166,7 +167,9 @@ for (const width of widths) {
       element.dispatchEvent(new Event('input', { bubbles: true }));
     }, fixture);
     await page.getByRole('button', { name: 'Scan workflow' }).click();
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15_000 });
+    await page.locator('#scanner-technical-details > summary').click();
+    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
     const scanRequests = requests.slice(scanStart);
     testInfo.annotations.push({
       type: 'pre-scan-requests',
@@ -186,14 +189,18 @@ for (const width of widths) {
 /** W-008.2: keyboard open, focus inside, Escape close, focus restored. */
 test('diagram dialog keyboard', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 900 });
-  await page.goto(`${basePath}/w/${qaSlug}/`);
-  const opener = page.getByRole('button', { name: 'Expand diagram' });
+  await page.goto(`${basePath}${qaRoute}`);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Load interactive canvas' }).click();
+  await expect(page.getByRole('group', { name: /Workflow diagram/ })).toBeVisible({ timeout: 30_000 });
+  const opener = page.getByRole('button', { name: 'Fullscreen view' });
   await opener.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Close/ })).toBeFocused();
-  expect(await page.evaluate(() => Boolean(document.querySelector('dialog')?.contains(document.activeElement)))).toBe(true);
+  const exitFullscreen = page.getByRole('button', { name: 'Exit fullscreen' });
+  await expect(exitFullscreen).toBeVisible();
+  await expect(exitFullscreen).toBeFocused();
+  expect(await page.evaluate(() => Boolean(document.querySelector('[data-testid="workflow-chart"]')?.contains(document.activeElement)))).toBe(true);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Exit fullscreen' })).toHaveCount(0);
   await expect(opener).toBeFocused();
 });

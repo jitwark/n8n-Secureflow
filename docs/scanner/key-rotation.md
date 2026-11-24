@@ -3,7 +3,7 @@
 > Status: authorised work that is not yet built; no Ed25519 verification or live rotation
 > Last verified: 2026-10-17
 > Owner: Security and release owners, when trust work is authorized
-> Source of truth: [`pack-identity.ts`](../../packages/scanner-core/src/rules-v2/pack-identity.ts), the [rule-pack trust ADR](../decisions/scanner-rule-pack-trust.md), the [rule-pack contract](../../openspec/changes/world-class-scanner-cli/rule-pack-contract.md), and the [trust deferral record](../plans/IMPLEMENTATION-LOG.md)
+> Source of truth: [`pack-identity.ts`](../../packages/scanner-core/src/rules-v2/pack-identity.ts), the [rule-pack trust ADR](../decisions/scanner-rule-pack-trust.md), and the [trust deferral record](../plans/IMPLEMENTATION-LOG.md)
 
 This page records the procedure for the Ed25519 trust store, which is authorised but not yet built. It
 describes authorised work, not a live capability. It is deliberately separate from the shipped release's
@@ -16,12 +16,13 @@ tested state.
 | Canonical pack identity | Implemented for the built-in contract: canonical pack bytes set `signatures: []` and receive a lowercase SHA-256 digest. |
 | Ed25519 verification | Not yet built; no verifier, trust store, or active/revoked key check is live in v2. |
 | Key generation/rotation/revocation | Authorised but not yet built; no wall-clock validity or rotation command exists. |
-| Rule authority | The admitted v2 path is built-in `scanner-core-builtins@2.0.0` with `beta-default@2.0.0`. Native TypeScript policies remain the scoring authority. |
+| Rule authority | The admitted path is built-in `scanner-core-builtins@2.0.0`, with `standard@3.0.0` as the default profile and `strict@3.0.0` (`ci`) as its admitted alias. Native TypeScript policies remain the scoring authority. |
 | Declarative custom packs | Not admitted for v2 scoring. Development/evaluation rules are `REPORT_ONLY` and cannot change assessment. |
 
 Do not call the built-in digest a customer-pack signature, claim that a signature was verified, or
 claim that a key has rotated. The Phase 7 signature/rotation/tamper/downgrade gate remains pending;
-its open status is recorded in [`tasks.md`](../../openspec/changes/world-class-scanner-cli/tasks.md).
+its open status was recorded in `tasks.md` in the retired `world-class-scanner-cli` change package,
+which is now retained in git history rather than shipped in the working tree.
 
 ## Trust-store procedure (authorised, not yet built)
 

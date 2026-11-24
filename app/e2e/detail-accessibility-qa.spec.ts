@@ -1,11 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { firstLeanSubject } from './detail-subjects';
-
-const basePath = (process.env.PLAYWRIGHT_BASE_PATH ?? '').replace(/\/+$/, '');
-
-function appPath(pathname: string): string {
-  return `${basePath}${pathname}`;
-}
+import { firstLeanSubject, viewHref } from './detail-subjects';
+import { appPath } from './app-paths';
 
 async function assertNoHorizontalOverflow(page: Page, surface: string): Promise<void> {
   const measurement = await page.evaluate(() => ({
@@ -25,26 +20,6 @@ async function focusByKeyboard(page: Page, target: ReturnType<Page['getByRole']>
   throw new Error('Primary detail action was not reachable in the keyboard order.');
 }
 
-/**
- * Open a **lean** detail page.
- *
- * This used to click the first `rights=link_only` card, on the reasoning that
- * filtering to link-only kept it deterministic across corpus rebuilds. It did
- * not: link-only is 97.5% of the corpus and says nothing about whether Next
- * prerendered the page. The assertion below — the deferred canvas, reachable
- * only through "Open the interactive view" — is the lean page's contract, and
- * the prerendered page renders its canvas inline with no such link, so it is
- * not subject to it. The section's heading is not the discriminator: `a1681ad`
- * deliberately aligned both tiers on "Workflow canvas". So the subject is
- * chosen by page type. See `detail-subjects.ts`.
- */
-async function openLinkOnlyDetail(page: Page): Promise<void> {
-  const subject = firstLeanSubject();
-  await page.goto(appPath(`/w/${subject.slug}/`));
-  await expect(page).toHaveURL(/\/w\/[^?]+\/$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-}
-
 async function setTwoHundredPercentVisualZoom(page: Page): Promise<void> {
   const client = await page.context().newCDPSession(page);
   await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
@@ -52,9 +27,11 @@ async function setTwoHundredPercentVisualZoom(page: Page): Promise<void> {
 }
 
 test.describe('workflow detail accessibility evidence', () => {
-  test('link-only detail has truthful landmarks, keyboard focus, and 200% zoom evidence', async ({ page }) => {
+  test('detail view has truthful landmarks, keyboard focus, and 200% zoom evidence', async ({ page }) => {
+    const subject = firstLeanSubject();
     await page.setViewportSize({ width: 1280, height: 900 });
-    await openLinkOnlyDetail(page);
+    await page.goto(appPath(viewHref(subject)));
+    await expect(page.getByRole('heading', { level: 1, name: subject.title })).toBeVisible({ timeout: 30_000 });
 
     await expect(page.getByRole('main')).toHaveCount(1);
     await expect(page.getByRole('navigation', { name: 'Breadcrumbs' })).toBeVisible();
@@ -66,10 +43,7 @@ test.describe('workflow detail accessibility evidence', () => {
     await expect(primary).toBeVisible();
     await expect(primary).toHaveAttribute('href', /^https:\/\//);
     await expect(page.getByRole('button', { name: 'Download workflow' })).toHaveCount(0);
-    // The preview region of the current lean page (`CompactVectorDiagram`,
-    // `a1681ad`) and the labelled image stage inside it. `StaticWorkflowPreview`
-    // carried the same two facts as `[data-static-preview] > [role="img"]`.
-    await expect(page.locator('[data-compact-vector-diagram] [role="img"]').first()).toBeVisible();
+    await expect(page.getByTestId('chart-preview-region').getByRole('status')).toContainText('Workflow structure summary');
 
     await focusByKeyboard(page, primary);
     await expect(primary).toBeFocused();
@@ -80,24 +54,24 @@ test.describe('workflow detail accessibility evidence', () => {
     expect(focusStyle.outlineWidth !== '0px' || focusStyle.boxShadow !== 'none').toBe(true);
 
     await setTwoHundredPercentVisualZoom(page);
-    await assertNoHorizontalOverflow(page, 'link-only detail at 200% visual zoom');
+    await assertNoHorizontalOverflow(page, 'workflow detail at 200% visual zoom');
   });
 
-  test('interactive shell keeps reduced-motion and static fallback text truthful', async ({ page }) => {
+  test('interactive shell resolves slug IDs, keeps reduced-motion, and loads packed chart by keyboard', async ({ page }) => {
+    const subject = firstLeanSubject();
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1280, height: 900 });
-    await openLinkOnlyDetail(page);
-
-    await page.getByRole('link', { name: /Open the interactive view/i }).click();
+    await page.goto(appPath(`/w/view/?id=${encodeURIComponent(subject.slug)}`));
     await expect(page).toHaveURL(/\/w\/view\/\?id=[^&]+/);
+    await expect(page.getByRole('heading', { level: 1, name: subject.title })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('main')).toHaveCount(1);
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Workflow canvas' }).getByRole('status'))
-      .toContainText('Static preview unavailable for this release.');
+      .toContainText('Workflow structure summary');
 
-    const explore = page.getByRole('button', { name: 'Explore interactive canvas' });
-    await expect(explore).toBeVisible();
-    const motion = await explore.evaluate((element) => ({
+    const loadCanvas = page.getByRole('button', { name: 'Load interactive canvas' });
+    await expect(loadCanvas).toBeVisible();
+    const motion = await loadCanvas.evaluate((element) => ({
       reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       transitionMs: Number.parseFloat(getComputedStyle(element).transitionDuration) || 0,
       animationMs: Number.parseFloat(getComputedStyle(element).animationDuration) || 0,
@@ -106,8 +80,8 @@ test.describe('workflow detail accessibility evidence', () => {
     expect(motion.transitionMs).toBeLessThanOrEqual(0.01);
     expect(motion.animationMs).toBeLessThanOrEqual(0.01);
 
-    await focusByKeyboard(page, explore);
-    await expect(explore).toBeFocused();
+    await focusByKeyboard(page, loadCanvas);
+    await expect(loadCanvas).toBeFocused();
     await page.keyboard.press('Enter');
     const diagram = page.getByRole('group', { name: /Workflow diagram/ });
     const fallback = page.getByRole('status').filter({

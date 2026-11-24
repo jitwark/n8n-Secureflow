@@ -17,6 +17,11 @@ const unknownInnocentJson = JSON.stringify({
   ],
   connections: { Start: { main: [[{ node: 'Unknown', type: 'main', index: 0 }]] } },
 });
+// Broken JavaScript code triggers real DEGRADED status (JAVASCRIPT_PARSE_FAILED) under standard@3.0.0.
+const degradedJsJson = JSON.stringify({
+  nodes: [{ id: 'c1', name: 'Code', type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { jsCode: 'function ( {' } }],
+  connections: {},
+});
 // `parameters` is not an object, so the generic fallback is refused and the worker
 // returns INDETERMINATE with a null assessment (ADR-generic-node-semantic-fallback §4).
 const unreadableParametersJson = JSON.stringify({
@@ -28,7 +33,7 @@ const unreadableParametersJson = JSON.stringify({
 });
 const basePath = (process.env.PLAYWRIGHT_BASE_PATH ?? process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 const scannerPath = `${basePath}/scanner/`;
-const viewports = [320, 768, 1024, 1440];
+const viewports = [320, 375, 768, 1024, 1440];
 
 type WorkerResultV2 = {
   kind: string;
@@ -197,10 +202,20 @@ async function tabUntilFocused(page: Page, target: Locator, maxTabs = 80): Promi
   throw new Error(`Keyboard focus did not reach ${await target.getAttribute('aria-label') ?? await target.textContent()}`);
 }
 
+async function expandTechnicalDetails(page: Page): Promise<void> {
+  const details = page.locator('#scanner-technical-details');
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await details.locator('> summary').click();
+  }
+  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
+}
+
 async function scan(page: Page, workflow: string): Promise<void> {
   await fillWorkflow(page, workflow);
   await page.getByRole('button', { name: 'Scan workflow' }).click();
-  await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#scanner-technical-details')).not.toHaveAttribute('open', '');
+  await expandTechnicalDetails(page);
 }
 
 function capturePageErrors(page: Page): string[] {
@@ -295,17 +310,24 @@ test.describe('scanner report admission', () => {
     await expect(page.getByText(/No findings were returned for this scan\./).first()).toBeVisible();
     await assertNoOverflow(page);
 
-    // 2. Readable unmodelled node: DEGRADED with both coverage codes, still graded.
+    // 2. Readable unmodelled node under standard@3.0.0: COMPLETE with both coverage diagnostics, still graded.
     await clearWorkerResults(page);
     await page.goto(scannerPath);
     await scan(page, unknownInnocentJson);
-    await expect(page.getByLabel('Analysis status: Standard scan')).toBeVisible();
-    await expect(page.getByText(/Some node behavior is not modelled/i).first()).toBeVisible();
-    await expect(page.getByText('SEMANTIC_CATALOGUE_MISS · DEGRADED')).toBeVisible();
-    await expect(page.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · DEGRADED')).toBeVisible();
+    await expect(page.getByLabel('Analysis status: Analysis complete')).toBeVisible();
+    await expect(page.getByText('SEMANTIC_CATALOGUE_MISS · NONE')).toBeVisible();
+    await expect(page.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · NONE')).toBeVisible();
     await expectWorkerGradeRendered(page);
 
-    // 3. Unmodelled node with a raw secret: DEGRADED, graded, finding retained and redacted,
+    // 2b. Broken JavaScript code triggers real DEGRADED status, still graded.
+    await clearWorkerResults(page);
+    await page.goto(scannerPath);
+    await scan(page, degradedJsJson);
+    await expect(page.getByLabel('Analysis status: Partial analysis')).toBeVisible();
+    await expect(page.getByText('JAVASCRIPT_PARSE_FAILED · DEGRADED')).toBeVisible();
+    await expectWorkerGradeRendered(page);
+
+    // 3. Unmodelled node with a raw secret: COMPLETE under standard@3.0.0, graded, finding retained and redacted,
     //    and both downloads carry the real v2 envelope rather than the compatibility projection.
     await clearWorkerResults(page);
     await page.goto(scannerPath);
@@ -325,7 +347,7 @@ test.describe('scanner report admission', () => {
     expect(jsonPath, 'the JSON download produced a file').not.toBeNull();
     const exported = JSON.parse(fs.readFileSync(jsonPath!, 'utf8'));
     expect(exported.report.schemaVersion).toBe('scanner-result-v2');
-    expect(exported.report.analysis.status).toBe('DEGRADED');
+    expect(exported.report.analysis.status).toBe('COMPLETE');
     expect(exported.report.assessment.grade).toBe(workerAssessment.grade);
     expect(exported.report.findings.map((finding: { ruleId: string }) => finding.ruleId)).toContain('RAW_SECRET_INDICATOR');
     expect(JSON.stringify(exported)).not.toContain(RAW_SECRET);
@@ -344,7 +366,7 @@ test.describe('scanner report admission', () => {
     expect(run.invocations[0].toolExecutionNotifications.map((item: { descriptor: { id: string } }) => item.descriptor.id))
       .not.toContain('POLICY_EXECUTION_FAILED');
     expect(run.results.map((item: { ruleId: string }) => item.ruleId)).toContain('RAW_SECRET_INDICATOR');
-    expect(run.properties).toMatchObject({ analysisStatus: 'DEGRADED', riskGrade: workerAssessment.grade, secureflow: expect.objectContaining({ analysisStatus: 'DEGRADED' }) });
+    expect(run.properties).toMatchObject({ analysisStatus: 'COMPLETE', riskGrade: workerAssessment.grade, secureflow: expect.objectContaining({ analysisStatus: 'COMPLETE' }) });
     expect(JSON.stringify(sarif)).not.toContain(RAW_SECRET);
 
     // 4. Genuinely unreadable parameters: worker assessment null, explicit No grade.
@@ -417,9 +439,9 @@ test.describe('scanner report admission', () => {
     await scan(page, fallbackJson);
 
     await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible();
-    await expect(page.getByLabel('Analysis status: Standard scan')).toBeVisible();
-    await expect(page.getByText('SEMANTIC_CATALOGUE_MISS · DEGRADED').first()).toBeVisible();
-    await expect(page.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · DEGRADED').first()).toBeVisible();
+    await expect(page.getByLabel('Analysis status: Analysis complete')).toBeVisible();
+    await expect(page.getByText('SEMANTIC_CATALOGUE_MISS · NONE').first()).toBeVisible();
+    await expect(page.getByText('GENERIC_NODE_UNMODELED_CAPABILITY · NONE').first()).toBeVisible();
     expect(await page.locator('body').innerText()).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
   });
 
@@ -454,6 +476,7 @@ test.describe('scanner report admission', () => {
     await settleAfterFrame(page);
 
     await expectNoReportOrExport(page);
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Cancel scan' })).toHaveCount(0);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
@@ -489,6 +512,7 @@ test.describe('scanner report admission', () => {
     await expect(alert).toContainText('TIMEOUT');
     await expect(page.getByRole('button', { name: 'Retry scan' })).toBeVisible();
     await expectNoReportOrExport(page);
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toHaveCount(0);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Cancel scan' })).toHaveCount(0);
@@ -512,7 +536,8 @@ test.describe('scanner report admission', () => {
     const retry = page.getByRole('button', { name: 'Retry scan' });
     await expect(retry).toBeVisible();
     await retry.click();
-    await expect(page.getByRole('heading', { name: 'Analysis coverage', level: 2 })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Decision and next step', level: 2 })).toBeVisible({ timeout: 15000 });
+    await expandTechnicalDetails(page);
     await expect(pageErrors).toEqual([]);
   });
 });

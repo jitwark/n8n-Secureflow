@@ -6,9 +6,15 @@ import { buildAiCapabilityGraph } from './ai-capability-graph';
 import { isCataloguedHumanGate } from './human-gate-catalog';
 import { createTaintState, isTainted, orderedTaintLabels, type TaintState } from '../taint/taint-lattice';
 import { incomingTaintFrom, type TaintPropagationResult } from '../taint/taint-propagation';
+import { evaluateAiAgentEgress, type AiAgentEgressOptions } from './ai-egress-analysis';
 
 export const MAX_AI_CAPABILITY_FINDINGS = 25;
 export type AiCapabilityAnalysisResult = { findings: ScanFinding[]; diagnostics: AnalysisDiagnostic[] };
+export type { AiAgentEgressOptions };
+
+export function analyzeAiAgentEgress(workflow: NormalizedWorkflow, options?: AiAgentEgressOptions): ScanFinding[] {
+  return evaluateAiAgentEgress(workflow, options, MAX_AI_CAPABILITY_FINDINGS);
+}
 
 type TaintCouplingV2 =
   | Readonly<{ status: 'ABSENT' }>

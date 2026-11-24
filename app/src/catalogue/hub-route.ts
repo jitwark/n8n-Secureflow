@@ -3,14 +3,20 @@ import { compareCanonicalStrings } from '@hub/contracts/stable-order';
 import { allEntries } from './prerender-list';
 import type { HubIndex, HubInfo, HubKind } from './hub-types';
 
-export const HUB_PAGE_SIZE = 24;
-// Collection pages are intentionally bounded for static hosting. The complete
-// catalogue remains available through the library search and client detail
-// shell; only the first, quality-ranked slice is emitted per hub.
+export const HUB_PAGE_SIZE = 8;
 export const MAX_STATIC_HUB_PAGES = 1;
 export const MAX_STATIC_HUBS_PER_KIND = 24;
+
 export function libraryTagHref(slug: string): string {
   return `/library/?tag=${encodeURIComponent(normalizeDiscoverySlug(slug))}`;
+}
+
+export function libraryHubHref(kind: HubKind, slug: string): string {
+  const normalized = normalizeDiscoverySlug(slug);
+  if (kind === 'integration') return `/library/?integration=${encodeURIComponent(normalized)}`;
+  if (kind === 'trigger') return `/library/?trigger=${encodeURIComponent(normalized)}`;
+  if (kind === 'security') return `/library/?grade=${encodeURIComponent(normalized.toUpperCase())}`;
+  return libraryTagHref(slug);
 }
 
 export function hubsForKind(index: HubIndex, kind: HubKind): Record<string, HubInfo> {

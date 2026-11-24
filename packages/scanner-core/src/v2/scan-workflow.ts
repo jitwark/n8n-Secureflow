@@ -32,12 +32,14 @@ import { scoreFindingsV2 } from '../result-v2/scoring';
 import type { FindingV2, AnalysisDiagnosticV2 } from '../../../../contracts/scanner-v2-evidence';
 import type { ScannerResultV2 } from '../../../../contracts/scanner-v2-result';
 import {
-  ADMITTED_ENGINE_ID, ADMITTED_ENGINE_VERSION, ADMITTED_PROFILE_ID, ADMITTED_PROFILE_VERSION,
+  ADMITTED_ENGINE_ID, ADMITTED_ENGINE_VERSION,
   BUILTIN_RULESET_AUTHORITY_V2, BUILTIN_SEMANTICS_AUTHORITY_V2, ENGINE_BUILD_DIGEST_V2,
   authorityIsIntact, createAdmittedCapabilityRegistry, createAdmittedRuleView, createAdmittedSemanticView,
   PROFILE_MANIFEST_DIGEST_V2,
 } from './admitted-registry';
-import { BETA_DEFAULT_PROFILE_MANIFEST } from '../capabilities/profile-manifest';
+import {
+  BETA_DEFAULT_PROFILE_MANIFEST, type ProfileManifestV2, resolveAdmittedProfileManifest,
+} from '../capabilities/profile-manifest';
 import { classifyBudgetOutcome } from '../workflow-v2/budget-outcomes';
 import { spanLossIsSecurityRequired } from './span-loss-classification';
 import { extractAdmittedBytes } from './scan-request-bytes';
@@ -47,7 +49,7 @@ export type ScanWorkflowV2Success = Readonly<{ ok: true; result: ScannerResultV2
 export type ScanWorkflowV2Request = Readonly<{ bytes: Uint8Array; profile: Readonly<{ id: string; version: string }>; target?: unknown; limits?: unknown; approvedDomains?: readonly string[] }>;
 export type ScanWorkflowV2Result = ScanWorkflowV2Success | ScanWorkflowV2Failure;
 
-type PreparedRequest = { bytes: Uint8Array; target: TargetContextV3; limits: ScannerLimitsV2; approvedDomains: readonly string[]; advisoryRequest?: AdvisoryRequestV3 };
+type PreparedRequest = { bytes: Uint8Array; manifest: ProfileManifestV2; target: TargetContextV3; limits: ScannerLimitsV2; approvedDomains: readonly string[]; advisoryRequest?: AdvisoryRequestV3 };
 type NormalizedSuccess = Extract<SecurityWorkflowResult, { ok: true }>;
 const REQUEST_KEYS = ['bytes', 'profile', 'target', 'limits', 'approvedDomains', 'advisoryRequest'] as const;
 const PROFILE_KEYS = ['id', 'version'] as const;
@@ -59,7 +61,8 @@ function prepared(input: unknown): PreparedRequest | ScanWorkflowV2Failure {
   const root = record(input, REQUEST_KEYS, ['bytes', 'profile']); if (!root) return failure('INVALID_CONFIG', 'Scanner request is not a closed data object.');
   const profile = record(root.profile, PROFILE_KEYS, ['id', 'version']);
   if (!profile || typeof profile.id !== 'string' || typeof profile.version !== 'string') return failure('INVALID_CONFIG', 'Scanner profile reference is malformed.');
-  if (profile.id !== ADMITTED_PROFILE_ID || profile.version !== ADMITTED_PROFILE_VERSION) return failure('PROFILE_NOT_ADMITTED', 'Scanner profile is not admitted.');
+  const manifest = resolveAdmittedProfileManifest(profile);
+  if (!manifest) return failure('PROFILE_NOT_ADMITTED', 'Scanner profile is not admitted.');
   const partialLimits = root.limits === undefined ? undefined : record(root.limits, LIMIT_KEYS);
   if (root.limits !== undefined && !partialLimits) return failure('INVALID_CONFIG', 'Scanner limits are malformed.');
   const limits = resolveScannerLimits(partialLimits); if (!limits) return failure('INVALID_CONFIG', 'Scanner limits are invalid.');
@@ -72,7 +75,7 @@ function prepared(input: unknown): PreparedRequest | ScanWorkflowV2Failure {
   if (!rawTarget) return failure('INVALID_CONFIG', 'Scanner target is malformed.');
   const advisory = root.advisoryRequest === undefined ? undefined : advisoryRequest(root.advisoryRequest);
   if (root.advisoryRequest !== undefined && advisory === undefined) return failure('INVALID_CONFIG', 'Scanner advisory request is malformed.');
-  try { return { bytes, limits, approvedDomains, target: validateTargetContextV3(rawTarget, { allowedConfigurationKeys: BUILTIN_SEMANTIC_CATALOGUE_V2.configurationKeys }), ...(advisory === undefined ? {} : { advisoryRequest: advisory }) }; }
+  try { return { bytes, manifest, limits, approvedDomains, target: validateTargetContextV3(rawTarget, { allowedConfigurationKeys: BUILTIN_SEMANTIC_CATALOGUE_V2.configurationKeys }), ...(advisory === undefined ? {} : { advisoryRequest: advisory }) }; }
   catch (error) { const reason = error instanceof Error ? error.message : ''; return failure(reason.includes('UNKNOWN_CONFIGURATION_KEY') ? 'UNKNOWN_CONFIGURATION_KEY' : 'INVALID_CONFIG', 'Scanner target is invalid.'); }
 }
 function semanticView(workflow: SecurityWorkflowV2): { view: SemanticCatalogueViewV2 } | ScanWorkflowV2Failure {
@@ -108,9 +111,9 @@ function addDiagnostics(schedule: { executions: readonly CapabilityExecutionV2[]
  * loss that removed the spans a security classification is stated through withholds the assessment.
  * The outcome classifies; the diagnostic registry supplies the effect the record must carry.
  */
-function spanLossDiagnostics(usage: SourceSpanUsageV2): Readonly<{ diagnostics: readonly AnalysisDiagnosticV2[] }> | ScanWorkflowV2Failure {
+function spanLossDiagnostics(usage: SourceSpanUsageV2, manifest: ProfileManifestV2): Readonly<{ diagnostics: readonly AnalysisDiagnosticV2[] }> | ScanWorkflowV2Failure {
   if (usage.omitted === 0) return { diagnostics: [] };
-  const outcome = classifyBudgetOutcome({ budget: 'maxStoredSourceSpans', securityRequired: spanLossIsSecurityRequired(BETA_DEFAULT_PROFILE_MANIFEST) });
+  const outcome = classifyBudgetOutcome({ budget: 'maxStoredSourceSpans', securityRequired: spanLossIsSecurityRequired(manifest) });
   if (outcome.kind !== 'DIAGNOSTIC') return failure('TOOL_INVARIANT_FAILED', 'Stored-span exhaustion has no diagnostic outcome.');
   return { diagnostics: [createDiagnostic(outcome.code, 'source-normalization', true)] };
 }
@@ -173,25 +176,34 @@ function buildScanContext(input: unknown): ({
     if (error instanceof SemanticCatalogueAdmissionError) return semanticCatalogueFailure(error);
     throw error;
   }
-  const context: AnalyzerContextV2 = Object.freeze({ source: parsed.document, workflow: normalized.workflow, target: request.target, limits: request.limits, semantics: semantics.view, rules: createAdmittedRuleView(), priorOutcomes: new Map() });
+  const context: AnalyzerContextV2 = Object.freeze({ source: parsed.document, workflow: normalized.workflow, target: request.target, limits: request.limits, semantics: semantics.view, rules: createAdmittedRuleView(request.manifest), priorOutcomes: new Map() });
   return { request, parsed: parsed.document, spanUsage: parsed.sourceSpanUsage, sourceWorkUnits: parsed.sourceWorkUnits, normalized, semanticContext, context };
 }
 export function scanWorkflowV2(input: unknown): ScanWorkflowV2Result {
   try {
     const built = buildScanContext(input); if ('ok' in built) return built;
     const { request, parsed, spanUsage, sourceWorkUnits, normalized, semanticContext, context } = built;
-    const schedule = scanCapabilitiesV2(context, BETA_DEFAULT_PROFILE_MANIFEST, createAdmittedCapabilityRegistry(request.approvedDomains));
-    const flowWitnesses = compileWorkflowFlowWitnesses({ workflow: normalized.workflow, semantics: context.semantics, limits: request.limits, semanticSha256: normalized.semanticSha256 });
-    const spanLoss = spanLossDiagnostics(spanUsage); if ('ok' in spanLoss) return spanLoss;
-    const extra = [...spanLoss.diagnostics, ...ambiguityDiagnostics(normalized.workflow), ...semanticContext.diagnostics, ...flowWitnesses.diagnostics];
+    const hasTaintIntegrity = request.manifest.capabilities.some((capability) => capability.id === 'taint-integrity');
+    const registry = hasTaintIntegrity
+      ? createAdmittedCapabilityRegistry(request.approvedDomains, {
+        manifest: request.manifest,
+        getTaint: createScanLocalTaint(context, produceScanLocalTaintV1),
+        getFieldFlow: createFieldFlowAccessorV1({ workflow: normalized.workflow, semantics: context.semantics, limits: request.limits, semanticSha256: normalized.semanticSha256 }),
+        mergeLegacyTaint: true,
+      })
+      : createAdmittedCapabilityRegistry(request.approvedDomains, { manifest: request.manifest });
+    const schedule = scanCapabilitiesV2(context, request.manifest, registry);
+    const flowWitnesses = hasTaintIntegrity ? undefined : compileWorkflowFlowWitnesses({ workflow: normalized.workflow, semantics: context.semantics, limits: request.limits, semanticSha256: normalized.semanticSha256 });
+    const spanLoss = spanLossDiagnostics(spanUsage, request.manifest); if ('ok' in spanLoss) return spanLoss;
+    const extra = [...spanLoss.diagnostics, ...ambiguityDiagnostics(normalized.workflow), ...semanticContext.diagnostics, ...(flowWitnesses ? flowWitnesses.diagnostics : [])];
     const advisoryFacts = buildAdvisoryFactsV1({ target: request.target, ...(request.advisoryRequest === undefined ? {} : { request: request.advisoryRequest }) });
-    const flowCandidate: CapabilityCandidateV2 = { findings: [], diagnostics: [], facts: [...flowWitnesses.facts, ...advisoryFacts], traces: flowWitnesses.traces, seen: 0, analyzed: 0, skipped: 0, omitted: 0 };
+    const flowCandidate: CapabilityCandidateV2 = { findings: [], diagnostics: [], facts: flowWitnesses ? [...flowWitnesses.facts, ...advisoryFacts] : advisoryFacts, traces: flowWitnesses ? flowWitnesses.traces : [], seen: 0, analyzed: 0, skipped: 0, omitted: 0 };
     const completed = addDiagnostics({ ...schedule, candidates: [...schedule.candidates, flowCandidate] }, extra, normalized.semanticSha256);
     const native = awaitableInsights(context);
     const findings = finalFindings(completed.candidates, context.rules.rules, normalized.semanticSha256);
     const assessment = scoreFindingsV2(findings, native.complexity);
     const limits = { schemaVersion: request.limits.schemaVersion, digest: bytesToHex(sha256(canonicalJsonBytes(request.limits))), usage: limitUsage(request.limits, parsed, sourceWorkUnits, normalized, findings.length, completed.diagnostics.length, spanUsage) };
-    const composed = composeScannerResultV2({ engine: { id: ADMITTED_ENGINE_ID, version: ADMITTED_ENGINE_VERSION, buildDigest: ENGINE_BUILD_DIGEST_V2 }, input: { rawSha256: parsed.rawSha256, semanticSha256: normalized.semanticSha256, ambiguitySha256: normalized.ambiguitySha256, ambiguityCount: normalized.ambiguityCount, utf8Bytes: parsed.utf8Bytes }, profile: { id: ADMITTED_PROFILE_ID, version: ADMITTED_PROFILE_VERSION }, ruleset: { ...BUILTIN_RULESET_AUTHORITY_V2, rules: context.rules.rules }, semantics: BUILTIN_SEMANTICS_AUTHORITY_V2, target: request.target, limits, analysis: { executions: completed.executions, diagnostics: completed.diagnostics, candidates: completed.candidates }, facts: rekeyFacts(semanticContext.facts, normalized.semanticSha256), workflow: native.workflow, assessment, stats: { rejectedCandidates: 0, collapsedCandidates: 0, omittedFindings: completed.candidates.reduce((sum, candidate) => sum + candidate.omitted, 0) } });
+    const composed = composeScannerResultV2({ engine: { id: ADMITTED_ENGINE_ID, version: ADMITTED_ENGINE_VERSION, buildDigest: ENGINE_BUILD_DIGEST_V2 }, input: { rawSha256: parsed.rawSha256, semanticSha256: normalized.semanticSha256, ambiguitySha256: normalized.ambiguitySha256, ambiguityCount: normalized.ambiguityCount, utf8Bytes: parsed.utf8Bytes }, profile: { id: request.manifest.id, version: request.manifest.version }, ruleset: { ...BUILTIN_RULESET_AUTHORITY_V2, rules: context.rules.rules }, semantics: BUILTIN_SEMANTICS_AUTHORITY_V2, target: request.target, limits, analysis: { executions: completed.executions, diagnostics: completed.diagnostics, candidates: completed.candidates }, facts: rekeyFacts(semanticContext.facts, normalized.semanticSha256), workflow: native.workflow, assessment, stats: { rejectedCandidates: 0, collapsedCandidates: 0, omittedFindings: completed.candidates.reduce((sum, candidate) => sum + candidate.omitted, 0) } });
     if (!composed.ok) return failure('TOOL_INVARIANT_FAILED', 'Scanner result composition failed.');
     if (composed.result.stats.serializedBytes > request.limits.maxSerializedResultBytes) return failure('WORKFLOW_TOO_COMPLEX', 'Scanner result exceeds the configured serialization limit.', 'SERIALIZED_RESULT_LIMIT');
     return { ok: true, result: composed.result };
@@ -205,7 +217,7 @@ export function scanWorkflowDormantHardenedV2(input: unknown): DormantHardenedSc
     const built = buildScanContext(input); if ('ok' in built) return built;
     const { context, normalized } = built;
     const getTaint = createScanLocalTaint(context, produceScanLocalTaintV1); const getFieldFlow = createFieldFlowAccessorV1({ workflow: context.workflow, semantics: context.semantics, limits: context.limits, semanticSha256: normalized.semanticSha256 });
-    const registry = createBetaHardenedCapabilityRegistry({ getTaint, getFieldFlow });
+    const registry = createBetaHardenedCapabilityRegistry({ getTaint, getFieldFlow, mergeLegacyTaint: false });
     const ids = ['graph-semantics', 'taint-confidentiality', 'taint-integrity', 'agentic-control'] as const;
     const candidates: CapabilityCandidateV2[] = [];
     const byCapability = new Map<string, CapabilityCandidateV2>();

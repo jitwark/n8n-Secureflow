@@ -1,4 +1,5 @@
 import type { Manifest } from '../catalogue/manifest';
+import { resolvePackedPath } from './artifact-integrity';
 
 export type ProgressCallback = (loadedBytes: number, totalBytes: number) => void;
 
@@ -8,6 +9,7 @@ export type SearchReleaseIdentity = {
   schemaVersion: string;
   generatedAt: string;
   searchIndexSha256: string;
+  contentSha256?: string;
 };
 
 export type VerifiedSearchIndex = {
@@ -33,9 +35,9 @@ export class SearchIndexError extends Error {
 }
 
 export function searchReleaseIdentityFromManifest(manifest: Manifest): SearchReleaseIdentity {
-  const artifact = manifest.artifacts.find((candidate) => candidate.path === 'search-index.json');
-  if (!artifact) throw new SearchIndexError('schema', 'Release manifest has no search index artifact');
-  return { schemaVersion: manifest.schemaVersion, generatedAt: manifest.generatedAt, searchIndexSha256: artifact.sha256 };
+  const resolved = resolvePackedPath(manifest, 'search-index.json');
+  if (!resolved.expectation) throw new SearchIndexError('schema', 'Release manifest has no search index artifact');
+  return { schemaVersion: manifest.schemaVersion, generatedAt: manifest.generatedAt, searchIndexSha256: resolved.expectation.sha256 };
 }
 
 export function formatSearchReleaseIdentity(identity: SearchReleaseIdentity): string {
@@ -43,7 +45,8 @@ export function formatSearchReleaseIdentity(identity: SearchReleaseIdentity): st
 }
 
 export function sameSearchReleaseIdentity(left: SearchReleaseIdentity, right: SearchReleaseIdentity): boolean {
-  return left.schemaVersion === right.schemaVersion && left.generatedAt === right.generatedAt && left.searchIndexSha256 === right.searchIndexSha256;
+  if (left.schemaVersion !== right.schemaVersion || left.generatedAt !== right.generatedAt) return false;
+  return (left.contentSha256 ?? left.searchIndexSha256) === (right.contentSha256 ?? right.searchIndexSha256);
 }
 
 export function classifySearchError(error: unknown): SearchIndexFailureKind {

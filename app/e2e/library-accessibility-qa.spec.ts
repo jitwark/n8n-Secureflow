@@ -16,7 +16,7 @@ async function openLibrary(page: Page, pathname = '/library/'): Promise<Locator>
 
 async function openLibraryWithExtendedIndex(page: Page): Promise<Locator> {
   const extendedIndex = page.waitForResponse(
-    (response) => /\/data\/search-index-extended\.json$/.test(new URL(response.url()).pathname),
+    (response) => /\/data\/search-index-extended\.json(?:\.gzbin)?$/.test(new URL(response.url()).pathname),
     { timeout: 20_000 },
   );
   const results = await openLibrary(page);

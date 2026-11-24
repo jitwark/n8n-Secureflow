@@ -1,6 +1,7 @@
 import { sitePath } from '../ui/site-url.mjs';
+import type { Manifest } from '../catalogue/manifest';
 import type { FacetDataPayload } from '@hub/contracts/facet-artifact';
-import { expectedArtifact, verifyArtifactBytes } from './artifact-integrity';
+import { expectedArtifact, getCachedManifestForPromise, resolvePackedPath, setKnownManifest, verifyArtifactBytes } from './artifact-integrity';
 import { getCachedFacets, setCachedFacets } from './index-cache';
 
 export type FacetsFailureReason = 'unavailable' | 'http' | 'malformed' | 'absent' | 'incomplete' | 'stale';
@@ -46,20 +47,23 @@ export type FacetsFetchResult =
  */
 const SEARCH_INDEX_ARTIFACTS = ['search-index.json', 'search-index-extended.json'] as const;
 
-function searchableEntryCount(manifest: { artifacts: readonly { path: string; entryCount?: number }[] }): number | undefined {
+function searchableEntryCount(manifest: Manifest): number | undefined {
   let total = 0;
   for (const path of SEARCH_INDEX_ARTIFACTS) {
-    const artifact = manifest.artifacts.find((candidate) => candidate.path === path);
-    if (artifact?.entryCount === undefined) return undefined;
-    total += artifact.entryCount;
+    const resolved = resolvePackedPath(manifest, path);
+    if (resolved.entryCount === undefined) return undefined;
+    total += resolved.entryCount;
   }
   return total;
 }
 
 export async function fetchFacetsResult(): Promise<FacetsFetchResult> {
   const { loadManifest } = await import('../catalogue/manifest');
-  const manifest = await loadManifest().catch(() => undefined);
-  const releaseSha = expectedArtifact(manifest, 'facets.json')?.sha256 ?? expectedArtifact(manifest, 'search-index.json')?.sha256;
+  const manifestPromise = loadManifest();
+  const manifest = getCachedManifestForPromise(manifestPromise) ?? (await manifestPromise.catch(() => undefined));
+  if (manifest) setKnownManifest(manifest, manifestPromise);
+  const releaseSha = expectedArtifact(manifest, 'facets.json')?.sha256
+    ?? resolvePackedPath(manifest, 'search-index.json').expectation?.sha256;
 
   if (releaseSha) {
     const cached = await getCachedFacets(releaseSha);

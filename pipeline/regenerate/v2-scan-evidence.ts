@@ -55,6 +55,10 @@ const RIGHTS: Record<V2RescanRecord['rightsClass'], true> = { redistributable: t
 const STATUSES: Record<CorpusV2InputReceiptStatus, true> = { AVAILABLE: true, MISSING: true, SOURCE_UNAVAILABLE: true, UNPARSEABLE: true, REJECTED: true };
 const DIGEST = /^[0-9a-f]{64}$/;
 
+function isRetainedAssessment(verdict: V2RetainedVerdict | undefined): verdict is V2RetainedVerdict {
+  return verdict !== undefined && verdict.scannerVersion !== 'not-scanned';
+}
+
 function assertOptions(options: V2ScanEvidenceOptions): void {
   const unknown = Object.keys(options).filter((key) => !V2_SCAN_EVIDENCE_OPTION_KEYS.includes(key as typeof V2_SCAN_EVIDENCE_OPTION_KEYS[number]));
   // No option may relabel a state: the derivation is a function of the receipts alone.
@@ -110,7 +114,7 @@ export function classifyV2ScanFreshness(
     }
     return 'NO_RESULT';
   }
-  if (record.retainedVerdict !== null) return 'HISTORICAL';
+  if (isRetainedAssessment(record.retainedVerdict ?? undefined)) return 'HISTORICAL';
   return 'UNSCANNED';
 }
 
@@ -138,7 +142,8 @@ export function buildV2ScanEvidence(
     const rightsClass = options.rightsClassOf(receipt.entryId);
     if (!RIGHTS[rightsClass]) throw new TypeError(`v2 scan evidence: unknown rights class for ${receipt.entryId}.`);
     const bytes = receipt.status === 'AVAILABLE' ? options.readBytes(receipt.entryId) : undefined;
-    const retainedVerdict = options.retainedVerdictOf?.(receipt.entryId) ?? null;
+    const candidateVerdict = options.retainedVerdictOf?.(receipt.entryId);
+    const retainedVerdict = isRetainedAssessment(candidateVerdict) ? candidateVerdict : null;
     const draft: V2ScanEvidenceRecord = Object.freeze({
       schemaVersion: V2_SCAN_EVIDENCE_SCHEMA_VERSION,
       entryId: receipt.entryId,

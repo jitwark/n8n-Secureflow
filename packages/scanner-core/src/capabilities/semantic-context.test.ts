@@ -188,19 +188,19 @@ describe('semantic context resolver', () => {
   });
 
 
-  it('maps an unreadable node to catalogue misses at the caller requiredness', () => {
+  it('maps an unreadable node to advisory catalogue misses regardless of caller requiredness', () => {
     const text = '{"nodes":[{"type":"@example/unknown.node","parameters":"not-an-object"}],"connections":{}}';
     const required = resolve(text, { required: true });
     const optional = resolve(text, { required: false });
-    expect(required.diagnostics).toEqual([expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'INDETERMINATE', assessmentEligible: false, location: expect.objectContaining({ pointer: '/nodes/0' }) })]);
-    expect(optional.diagnostics).toEqual([expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'DEGRADED', assessmentEligible: true })]);
+    expect(required.diagnostics).toEqual([expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) })]);
+    expect(optional.diagnostics).toEqual([expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) })]);
   });
 
-  it('covers a readable unmodelled node with both degraded fallback diagnostics at any requiredness', () => {
+  it('covers a readable unmodelled node with both advisory fallback diagnostics at any requiredness', () => {
     const text = '{"nodes":[{"type":"@example/unknown.node","parameters":{"apiKey":"x"}}],"connections":{}}';
     const expected = [
-      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', category: 'CATALOGUE', aggregateEffect: 'DEGRADED', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
-      expect.objectContaining({ code: 'GENERIC_NODE_UNMODELED_CAPABILITY', category: 'CATALOGUE', aggregateEffect: 'DEGRADED', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
+      expect.objectContaining({ code: 'SEMANTIC_CATALOGUE_MISS', category: 'CATALOGUE', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
+      expect.objectContaining({ code: 'GENERIC_NODE_UNMODELED_CAPABILITY', category: 'CATALOGUE', aggregateEffect: 'NONE', assessmentEligible: true, location: expect.objectContaining({ pointer: '/nodes/0' }) }),
     ];
     expect(resolve(text, { required: true }).diagnostics).toEqual(expected);
     expect(resolve(text, { required: false }).diagnostics).toEqual(expected);

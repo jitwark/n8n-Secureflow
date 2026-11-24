@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import type * as NodeFs from 'node:fs';
 
@@ -51,5 +56,28 @@ describe('main v2 dispatch', () => {
       schemaVersion: 'n8n-scan-v2',
       exitReason: 'UNDER_THRESHOLD',
     });
+  });
+
+  it('defaults to pretty when stdout is a TTY without --format and json when piped or explicitly --format json', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sf-main-tty-'));
+    try {
+      writeFileSync(join(dir, 'wf.json'), '{"nodes":[],"connections":{}}\n');
+      writeFileSync(join(dir, 'tty.mjs'), 'Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });\n');
+      const mainDist = fileURLToPath(new URL('../../dist/main.js', import.meta.url));
+      const ttyRun = spawnSync(process.execPath, ['--import', './tty.mjs', mainDist, 'scan', 'wf.json'], { cwd: dir, encoding: 'utf8' });
+      expect(ttyRun.status).toBe(0);
+      expect(ttyRun.stdout).toContain('LOW');
+      expect(ttyRun.stdout.trimStart().startsWith('{')).toBe(false);
+
+      const explicitJson = spawnSync(process.execPath, ['--import', './tty.mjs', mainDist, 'scan', 'wf.json', '--format', 'json'], { cwd: dir, encoding: 'utf8' });
+      expect(explicitJson.status).toBe(0);
+      expect(JSON.parse(explicitJson.stdout)).toMatchObject({ schemaVersion: 'n8n-scan-v2', artifacts: { profile: { id: 'standard', version: '3.0.0' } } });
+
+      const pipedRun = spawnSync(process.execPath, [mainDist, 'scan', 'wf.json'], { cwd: dir, encoding: 'utf8' });
+      expect(pipedRun.status).toBe(0);
+      expect(JSON.parse(pipedRun.stdout)).toMatchObject({ schemaVersion: 'n8n-scan-v2', artifacts: { profile: { id: 'standard', version: '3.0.0' } } });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

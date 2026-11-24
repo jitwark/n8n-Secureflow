@@ -3,6 +3,7 @@ import type { AnalysisDiagnosticV2 } from '@hub/contracts/scanner-v2-result';
 import type { ScannerReportModelV2 } from '../scanner-v2-presentation';
 import { scanAnalysisPresentation } from '../analysis-language';
 import { safeReportText } from '../report/report-safe-content';
+import { getCoverageMeter } from './coverage-meter';
 
 type ReportCoverageProps = { model: ScannerReportModelV2 };
 
@@ -72,6 +73,7 @@ function DiagnosticExplanation({ diagnostic }: { diagnostic: AnalysisDiagnosticV
 export function ReportCoverage({ model }: ReportCoverageProps) {
   const { analysis, limits } = model.v2;
   const presentation = scanAnalysisPresentation(model);
+  const coverageMeter = getCoverageMeter(model);
   const statusTone = presentation.tone === 'complete'
     ? 'border-sev-low bg-raised text-sev-low'
     : presentation.tone === 'neutral'
@@ -96,17 +98,27 @@ export function ReportCoverage({ model }: ReportCoverageProps) {
   const unlinked = analysis.diagnostics.filter((diagnostic) => !referencedIds.has(diagnostic.id));
 
   return (
-    <section aria-labelledby="scanner-v2-coverage-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-5">
+    <section aria-labelledby="scanner-v2-coverage-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h2 id="scanner-v2-coverage-heading" className="font-display text-lg font-semibold text-ink">Analysis coverage</h2>
           <p className="mt-1 text-sm leading-6 text-ink-muted">Execution coverage is evidence about what the scanner examined, not proof that unexamined behavior is safe.</p>
         </div>
-        <span role="status" className={`inline-flex items-center gap-1.5 self-start rounded-control border px-2.5 py-1 font-mono text-2xs font-bold uppercase tracking-wider ${statusTone}`} aria-label={`Analysis status: ${presentation.label}`}>
+        <span role="status" className={`inline-flex shrink-0 items-center gap-1.5 self-start rounded-control border px-2.5 py-1 font-mono text-2xs font-bold uppercase tracking-wider ${statusTone}`} aria-label={`Analysis status: ${presentation.label}`}>
           <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {presentation.label}
         </span>
       </div>
+
+      {coverageMeter ? <div className="mt-4 rounded-control border border-hairline bg-raised/40 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-mono font-semibold text-ink">{coverageMeter.label}</span>
+          <span className="font-mono text-ink-muted">{coverageMeter.percentage}% semantic coverage</span>
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-hairline">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${coverageMeter.percentage}%` }} />
+        </div>
+      </div> : null}
 
       <div className="mt-5">
         <h3 className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">Capability execution</h3>
@@ -115,10 +127,10 @@ export function ReportCoverage({ model }: ReportCoverageProps) {
             const referenced = capability.diagnosticIds
               .map((id) => diagnosticsById.get(id))
               .filter((diagnostic): diagnostic is AnalysisDiagnosticV2 => diagnostic !== undefined);
-            return <li key={capability.id} className="rounded-control border border-hairline bg-raised/40 p-3 text-sm">
+            return <li key={capability.id} className="min-w-0 rounded-control border border-hairline bg-raised/40 p-3 text-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span className="font-mono font-semibold text-ink">{safeReportText(capability.id, 100)}{capability.required ? ' · required' : ' · optional'}</span>
-                <span className="text-ink-muted">{safeReportText(capability.status, 40)} · {capability.analyzed}/{capability.seen} analyzed · {capability.skipped} skipped · {capability.omitted} omitted</span>
+                <span className="break-words font-mono font-semibold text-ink">{safeReportText(capability.id, 100)}{capability.required ? ' · required' : ' · optional'}</span>
+                <span className="break-words text-ink-muted">{safeReportText(capability.status, 40)} · {capability.analyzed}/{capability.seen} analyzed · {capability.skipped} skipped · {capability.omitted} omitted</span>
               </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">{CAPABILITY_STATUS_EXPLANATIONS[capability.status] ?? UNKNOWN_STATUS_EXPLANATION}</p>
               {referenced.length > 0 ? <ul aria-label={`Referenced diagnostics for ${safeReportText(capability.id, 100)}`} className="mt-2 space-y-2">
@@ -151,7 +163,7 @@ export function ReportCoverage({ model }: ReportCoverageProps) {
       <div className="mt-5 border-t border-hairline pt-4">
         <h3 className="font-mono text-2xs font-semibold uppercase tracking-wider text-ink-muted">Coverage diagnostics</h3>
         {unlinked.length > 0 ? <ul aria-label="Analysis diagnostics" className="mt-3 space-y-2">
-          {unlinked.map((diagnostic) => <li key={diagnostic.id} className="rounded-control border border-sev-medium bg-raised p-2">
+          {unlinked.map((diagnostic) => <li key={diagnostic.id} className={`min-w-0 rounded-control border bg-raised p-2 ${diagnostic.aggregateEffect === 'NONE' ? 'border-hairline' : 'border-sev-medium'}`}>
             <DiagnosticExplanation diagnostic={diagnostic} />
             <p className="mt-1 text-xs leading-5 text-ink-muted">{NOT_LINKED_NOTE}</p>
           </li>)}

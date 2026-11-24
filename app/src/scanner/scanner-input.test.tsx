@@ -132,7 +132,7 @@ describe('ScannerInput', () => {
 
     await waitFor(() => expect(onScan).toHaveBeenCalledWith({
       json: '{"nodes":[],"connections":{}}',
-      profile: 'beta-default', // ScannerInput.submit sends the only admitted profile (scanner-input.tsx:84)
+      profile: 'standard',
       approvedDomains: [],
     }));
   });
@@ -194,7 +194,7 @@ describe('ScannerInput', () => {
 
     await waitFor(() => expect(onScan).toHaveBeenCalledWith({
       json: '{"nodes":[]}',
-      profile: 'beta-default',
+      profile: 'standard',
       approvedDomains: [],
     }));
     expect(fetchMock).not.toHaveBeenCalled();
@@ -202,12 +202,16 @@ describe('ScannerInput', () => {
     expect(webSocketMock).not.toHaveBeenCalled();
   });
 
-  it('exposes only the default scan profile and submits it', () => {
+  it('defaults to Standard scan profile and lets the user toggle Strict CI mode', () => {
     const onScan = vi.fn();
     render(<ScannerInput isScanning={false} onScan={onScan} />);
 
-    expect(screen.getByText('Default scan')).toBeTruthy(); // chip copy (scanner-input.tsx:134); only admitted profile id is 'beta-default' (scanner-input.tsx:8)
-    expect(screen.queryByText('Standard')).toBeNull();
+    const standardButton = screen.getByRole('radio', { name: /Standard/i });
+    const strictButton = screen.getByRole('radio', { name: /Strict/i });
+    expect(standardButton.getAttribute('aria-checked')).toBe('true');
+    expect(strictButton.getAttribute('aria-checked')).toBe('false');
+    expect(standardButton.className).toContain('min-h-11');
+    expect(strictButton.className).toContain('min-h-11');
 
     fireEvent.change(screen.getByLabelText('Workflow JSON'), {
       target: { value: '{"nodes":[],"connections":{}}' },
@@ -216,7 +220,18 @@ describe('ScannerInput', () => {
 
     expect(onScan).toHaveBeenCalledWith({
       json: '{"nodes":[],"connections":{}}',
-      profile: 'beta-default',
+      profile: 'standard',
+      approvedDomains: [],
+    });
+
+    fireEvent.click(strictButton);
+    expect(strictButton.getAttribute('aria-checked')).toBe('true');
+    expect(standardButton.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Scan workflow' }));
+
+    expect(onScan).toHaveBeenLastCalledWith({
+      json: '{"nodes":[],"connections":{}}',
+      profile: 'strict',
       approvedDomains: [],
     });
   });
@@ -233,19 +248,17 @@ describe('ScannerInput', () => {
 
     expect(onScan).toHaveBeenCalledWith({
       json: '{"nodes":[],"connections":{}}',
-      profile: 'beta-default',
+      profile: 'standard',
       approvedDomains: [],
     });
   });
 
-  it('does not advertise a competing Standard mode in the scanner guide', () => {
+  it('documents v0.3 Standard and Strict profiles accurately in the scanner guide', () => {
     render(<ScannerLimits />);
 
-    expect(screen.getByText('Default scan')).toBeTruthy();
+    expect(screen.getByText('Standard & Strict')).toBeTruthy();
     expect(screen.getByText('Workflow content stays local')).toBeTruthy();
-    expect(screen.queryByText('Deep scan')).toBeNull();
-    expect(screen.queryByText(/Standard/)).toBeNull();
-    expect(screen.queryByText('Two depths')).toBeNull();
+    expect(screen.queryByText(/defined but not admitted/i)).toBeNull();
   });
 
   it('rejects an oversized file before constructing FileReader', () => {

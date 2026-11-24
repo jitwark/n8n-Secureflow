@@ -41,7 +41,7 @@ describe('FeaturedRail', () => {
 
     fireEvent.mouseOver(card);
 
-    const prefetchLink = document.head.querySelector('link[rel="prefetch"][href="/w/entry-0/"]');
+    const prefetchLink = document.head.querySelector('link[rel="prefetch"][href="/w/view/?id=entry-0"]');
     expect(prefetchLink).not.toBeNull();
     expect(prefetchLink?.getAttribute('as')).toBe('document');
   });
@@ -58,7 +58,7 @@ describe('FeaturedRail', () => {
 
     fireEvent.touchStart(card);
 
-    const prefetchLink = document.head.querySelector('link[rel="prefetch"][href="/w/entry-1/"]');
+    const prefetchLink = document.head.querySelector('link[rel="prefetch"][href="/w/view/?id=entry-1"]');
     expect(prefetchLink).not.toBeNull();
     expect(prefetchLink?.getAttribute('as')).toBe('document');
   });
@@ -76,7 +76,7 @@ describe('FeaturedRail', () => {
     fireEvent.mouseOver(card);
     fireEvent.touchStart(card);
 
-    const links = document.head.querySelectorAll('link[rel="prefetch"][href="/w/entry-0/"]');
+    const links = document.head.querySelectorAll('link[rel="prefetch"][href="/w/view/?id=entry-0"]');
     expect(links).toHaveLength(1);
   });
 });

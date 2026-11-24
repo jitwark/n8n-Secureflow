@@ -106,10 +106,10 @@ function FacetSheetContent({
         }
       }}
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
-      className="fixed inset-x-0 bottom-0 m-0 max-h-[85vh] w-full max-w-none rounded-t-panel bg-page p-0 text-ink shadow-[0_8px_24px_-12px_rgba(0,0,0,0.7)] backdrop:bg-black/60 open:animate-none md:inset-x-auto md:bottom-auto md:left-1/2 md:top-20 md:w-[min(32rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-panel md:border md:border-hairline md:max-w-xl"
+      className="fixed inset-x-0 bottom-0 m-0 max-h-[85vh] w-full max-w-none overflow-hidden rounded-t-panel bg-page p-0 text-ink shadow-[0_8px_24px_-12px_rgba(0,0,0,0.7)] backdrop:bg-black/60 open:animate-none md:inset-x-auto md:bottom-auto md:left-1/2 md:top-20 md:w-[min(32rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-panel md:border md:border-hairline md:max-w-xl"
     >
-      <div className="flex max-h-[85vh] flex-col">
-        <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
+      <div className="flex max-h-[85vh] flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-hairline px-4 py-3">
           <h2 id="mobile-filters-title" className="font-display text-lg font-semibold">
             Filters
           </h2>
@@ -122,10 +122,10 @@ function FacetSheetContent({
             Close
           </button>
         </header>
-        <div className="overflow-y-auto px-4 py-4">
-          <FacetRail counts={counts} filters={draft} onFilterChange={setDraft} className="w-full" />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <FacetRail counts={counts} filters={draft} onFilterChange={setDraft} showHeader={false} className="w-full" />
         </div>
-        <footer className="flex gap-2 border-t border-hairline bg-page px-4 py-3">
+        <footer className="flex shrink-0 gap-2 border-t border-hairline bg-page px-4 py-3">
           <button
             type="button"
             onClick={() => setDraft({ trigger: [], capability: [], complexity: '', grade: '', rights: '', integration: [], tag: [] })}
@@ -136,7 +136,7 @@ function FacetSheetContent({
           <button
             type="button"
             onClick={apply}
-            className="h-11 flex-1 rounded-control bg-accent px-3 text-sm font-semibold text-page transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-2 focus-visible:ring-offset-page active:bg-accent/80"
+            className="h-11 flex-1 rounded-control bg-accent px-3 text-sm font-semibold text-accent-ink transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-2 focus-visible:ring-offset-page active:brightness-90"
           >
             Apply filters
           </button>

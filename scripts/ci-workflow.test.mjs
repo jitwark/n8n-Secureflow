@@ -46,7 +46,13 @@ describe('the CI workflow shipped to the standalone repository', () => {
 if (activeRootWorkflow !== null) describe('active repository packed CLI matrix', () => {
   it('runs the packed CLI contract on Linux, Windows, and macOS', () => {
     expect(activeRootWorkflow).toContain('packed-cli:');
-    expect(activeRootWorkflow).toContain('os: [ubuntu-24.04, windows-2025, macos-14]');
+    const runnerMatrix = (job) => {
+      const match = activeRootWorkflow.match(new RegExp(`^  ${job}:[\\s\\S]*?^        os: \\[([^\\]]+)\\]`, 'mu'));
+      return match?.[1].split(',').map((runner) => runner.trim());
+    };
+    const approvedRunners = ['ubuntu-24.04', 'windows-2025', 'macos-15'];
+    expect(runnerMatrix('quality')).toEqual(approvedRunners);
+    expect(runnerMatrix('packed-cli')).toEqual(approvedRunners);
     expect(activeRootWorkflow).not.toContain('working-directory: community-hub');
     expect(activeRootWorkflow).toContain('cache-dependency-path: package-lock.json');
     expect(activeRootWorkflow).toContain('run: node scripts/verify-packed-cli.mjs');

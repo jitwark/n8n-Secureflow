@@ -31,7 +31,13 @@ class FakeWorker {
         this.onmessage?.({ data: { kind: 'result-v2', id: message.id, result: FakeWorker.craftedV2Result } } as MessageEvent);
         return;
       }
-      const result = scanWorkflowV2({ bytes: new TextEncoder().encode(message.json!), profile: { id: 'beta-default', version: '2.0.0' } });
+      const result = scanWorkflowV2({
+        bytes: new TextEncoder().encode(message.json!),
+        profile: {
+          id: message.profile ?? 'standard',
+          version: message.profile === 'standard' || message.profile === 'strict' || !message.profile ? '3.0.0' : '2.0.0',
+        },
+      });
       if (result.ok) {
         FakeWorker.capture?.(result.result);
         this.onmessage?.({ data: { kind: 'progress', id: message.id, phase: 'analyse', pct: 60 } } as MessageEvent);
@@ -301,6 +307,21 @@ describe('runBrowserScanV2', () => {
     if (expected.ok && outcome.ok) {
       expect(canonicalJsonBytes(captured[0])).toEqual(canonicalJsonBytes(expected.result));
       expect(canonicalJsonBytes(outcome.result)).toEqual(canonicalJsonBytes(expected.result));
+    }
+  });
+
+  it('defaults to standard@3.0.0 when profile is omitted and forwards strict/beta-hardened profiles', async () => {
+    const standardOutcome = await runBrowserScanV2({ json: risky, approvedDomains: [] });
+    expect(standardOutcome.ok).toBe(true);
+    if (standardOutcome.ok) {
+      expect(standardOutcome.result.profile).toEqual({ id: 'standard', version: '3.0.0' });
+    }
+    expect(workerFor().lastRequest?.profile).toBe('standard');
+
+    const strictOutcome = await runBrowserScanV2({ json: risky, profile: 'strict', approvedDomains: [] });
+    expect(strictOutcome.ok).toBe(true);
+    if (strictOutcome.ok) {
+      expect(strictOutcome.result.profile).toEqual({ id: 'strict', version: '3.0.0' });
     }
   });
 });

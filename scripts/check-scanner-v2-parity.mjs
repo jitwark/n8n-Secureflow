@@ -123,7 +123,7 @@ function envelopeResult(run) {
 function coreScanBytes(bytes) { return scanWorkflowV2({ bytes, profile: V2_ADAPTER_PROFILE }); }
 function coreScan(fixture) { return coreScanBytes(bytesFor(fixture)); }
 function v2Command() {
-  const parsed = parseArgumentsV2(['--schema', 'v2', 'scan', '-', '--format', 'json']);
+  const parsed = parseArgumentsV2(['--schema', 'v2', 'scan', '-', '--profile', 'beta-default', '--format', 'json']);
   return parsed.ok && parsed.command.kind === 'scan' ? parsed.command : undefined;
 }
 async function scanPackageFixture(fixture) {
@@ -134,7 +134,7 @@ async function scanPackageFixture(fixture) {
   return result ? { ok: true, result } : (envelopeFailure(run) ?? closedFailure('TOOL_INVARIANT_FAILED'));
 }
 async function scanPipelineFixture(fixture) {
-  const run = await runPipelineCli(['--schema', 'v2', 'scan', '-', '--format', 'json'], { stdin: bytesFor(fixture) });
+  const run = await runPipelineCli(['--schema', 'v2', 'scan', '-', '--profile', 'beta-default', '--format', 'json'], { stdin: bytesFor(fixture) });
   const result = envelopeResult(run);
   return result ? { ok: true, result } : (envelopeFailure(run) ?? closedFailure('TOOL_INVARIANT_FAILED'));
 }

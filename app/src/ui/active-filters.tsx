@@ -47,10 +47,10 @@ export function ActiveFilters({ filters, onFilterChange }: ActiveFiltersProps) {
           type="button"
           aria-label={`Remove ${filter.label}`}
           onClick={() => remove(filter)}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-hairline bg-raised px-3 py-1 font-mono text-xs font-bold text-ink transition-colors hover:border-hairline-strong hover:bg-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border active:bg-panel"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-accent-border bg-accent-dim px-3 py-1 font-mono text-xs font-semibold text-accent-text transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border active:bg-raised"
         >
           <span>{filter.label}</span>
-          <span className="text-ink-muted">×</span>
+          <span className="text-accent-text">×</span>
         </button>
       ))}
       <button

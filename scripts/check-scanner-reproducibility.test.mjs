@@ -242,7 +242,14 @@ describe('comparePackageTrees', () => {
     const right = tree({ 'package/real.js': BUNDLE });
     fs.symlinkSync('real.js', path.join(left, 'package/link.js'));
     fs.symlinkSync('real.js', path.join(right, 'package/link.js'));
-    const result = comparePackageTrees({ leftRoot: left, rightRoot: right, expected: { 'package/link.js': { kind: 'symlink', target: 'other.js' } } });
+    const result = comparePackageTrees({
+      leftRoot: left,
+      rightRoot: right,
+      expected: {
+        'package/real.js': sha256(BUNDLE),
+        'package/link.js': { kind: 'symlink', target: 'other.js' },
+      },
+    });
     expect(result.ok).toBe(false);
     expect(result.failures).toEqual(['expected-symlink-target-mismatch: package/link.js']);
   });

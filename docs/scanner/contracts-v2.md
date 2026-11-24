@@ -3,7 +3,7 @@
 > Status: admitted-core contract reference; external conformance remains gated
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer
-> Source of truth: [`contracts/scanner-v2-result.ts`](../../contracts/scanner-v2-result.ts), [`contracts/scanner-v2-source.ts`](../../contracts/scanner-v2-source.ts), [`contracts/scanner-v2-evidence.ts`](../../contracts/scanner-v2-evidence.ts), [`contracts/scanner-limits-v2.ts`](../../contracts/scanner-limits-v2.ts), and [`openspec/changes/world-class-scanner-cli/result-v2-contract.md`](../../openspec/changes/world-class-scanner-cli/result-v2-contract.md)
+> Source of truth: [`contracts/scanner-v2-result.ts`](../../contracts/scanner-v2-result.ts), [`contracts/scanner-v2-source.ts`](../../contracts/scanner-v2-source.ts), [`contracts/scanner-v2-evidence.ts`](../../contracts/scanner-v2-evidence.ts), and [`contracts/scanner-limits-v2.ts`](../../contracts/scanner-limits-v2.ts)
 
 This page is the map to the closed v2 request, result, evidence, capability, diagnostic, limits, and
 identity contracts. It documents the admitted `beta-default@2.0.0` path; the existing v1 contracts
@@ -158,8 +158,9 @@ returns a typed item failure; an isolated capability boundary produces required 
 evidence according to its manifest row. Every result usage row records maximum, examined, omitted,
 and exhaustion state. Rows exist only for the measured budgets; every other budget's state is
 declared once in `ADMITTED_LIMIT_STATES` and stated in `--help`, never published as a literal-zero
-row. The full outcome table is in
-[`result-v2-contract.md`](../../openspec/changes/world-class-scanner-cli/result-v2-contract.md).
+row. The outcome table was written as `result-v2-contract.md` in the retired
+`world-class-scanner-cli` change package; the shipped clause is
+[`scanner-v2-result.ts`](../../contracts/scanner-v2-result.ts).
 
 `ADMITTED_LIMIT_STATES` in [`scanner-limits-v2.ts`](../../contracts/scanner-limits-v2.ts) is the
 single classification for every one of the 26 numeric fields:

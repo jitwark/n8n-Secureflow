@@ -50,7 +50,7 @@ export function ThemeToggle() {
       aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       aria-describedby={saveError ? 'theme-save-status' : undefined}
       onClick={toggleTheme}
-      className={`min-h-11 min-w-11 rounded-control border border-hairline px-3 text-sm transition-colors active:scale-[0.98] hover:border-structure focus-visible:outline-offset-2 ${isDark ? 'bg-accent text-accent-ink' : 'bg-raised text-ink'}`}
+      className="min-h-11 min-w-11 shrink-0 rounded-control border border-hairline bg-panel px-3 text-sm font-medium text-ink transition-colors hover:border-hairline-strong hover:bg-raised active:scale-[0.98] focus-visible:outline-offset-2"
     >
       <span aria-hidden="true">{isDark ? 'Light' : 'Dark'}</span>
     </button>

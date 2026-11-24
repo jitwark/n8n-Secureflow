@@ -11,7 +11,7 @@ describe('ThemeToggle', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders an accessible dark-mode toggle and persists its selected theme', () => {
+  it('renders a secondary ghost/outline dark-mode toggle and persists its selected theme', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
     render(<ThemeToggle />);
 
@@ -19,12 +19,14 @@ describe('ThemeToggle', () => {
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(button.classList.contains('min-h-11')).toBe(true);
     expect(button.classList.contains('min-w-11')).toBe(true);
-    expect(button.classList.contains('bg-accent')).toBe(true);
+    expect(button.classList.contains('bg-accent')).toBe(false);
+    expect(button.classList.contains('bg-panel')).toBe(true);
+    expect(button.classList.contains('border-hairline')).toBe(true);
 
     fireEvent.click(button);
 
     expect(button.getAttribute('aria-pressed')).toBe('false');
-    expect(button.classList.contains('bg-raised')).toBe(true);
+    expect(button.classList.contains('bg-panel')).toBe(true);
     expect(button.classList.contains('bg-accent')).toBe(false);
     expect(window.localStorage.getItem('n8n-secureflow-theme')).toBe('light');
     expect(document.documentElement.dataset.theme).toBe('light');

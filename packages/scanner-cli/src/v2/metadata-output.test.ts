@@ -23,6 +23,11 @@ describe('metadata-output', () => {
     expect(parsed.rules.map((r: { ruleId: string }) => r.ruleId)).toEqual([
       'N8N_EXECUTE_COMMAND', 'N8N_CODE_NODE', 'RAW_AUTH_HEADER', 'RAW_SECRET_INDICATOR',
       'UNAPPROVED_DOMAIN', 'UNKNOWN_NODE_PACKAGE', 'WEBHOOK_EXPOSURE',
+      'JAVASCRIPT_DYNAMIC_EXECUTION', 'PYTHON_DYNAMIC_EXECUTION',
+      'TAINTED_COMMAND', 'TAINTED_SQL_QUERY', 'TAINTED_REQUEST_URL', 'TAINTED_FILE_PATH',
+      'TAINTED_CODE_INPUT', 'TAINTED_REQUEST_HEADER', 'TAINTED_AI_PROMPT',
+      'AI_AGENT_UNGATED_TOOL', 'EXPRESSION_SANDBOX_ESCAPE', 'EXPRESSION_ENV_EXPOSURE',
+      'AGENT_EGRESS_UNRESTRICTED', 'UNAUTHENTICATED_TRIGGER_TO_SINK',
     ]);
     const table = emitRulesDocumentV2('table');
     expect(table).toContain('Rule ID');
@@ -47,14 +52,20 @@ describe('metadata-output', () => {
   it('emits profiles, version, and validation documents with exact authority', () => {
     const pJson = JSON.parse(emitProfilesDocumentV2('json'));
     expect(pJson.schemaVersion).toBe('n8n-scan-profiles-v2');
-    expect(pJson.profiles[0].id).toBe('beta-default');
-    expect(pJson.profiles[0].admitted).toBe(true);
-    expect(pJson.profiles[0].advertised).toBe(true);
-    expect(pJson.profiles[1].id).toBe('beta-hardened');
-    expect(pJson.profiles[1].admitted).toBe(false);
-    expect(pJson.profiles[1].advertised).toBe(true);
-    const hardenedCaps = pJson.profiles[1].capabilities.map((c: { id: string }) => c.id);
-    expect(new Set(hardenedCaps).size).toBe(hardenedCaps.length); // No duplicate capability IDs!
+    expect(
+      pJson.profiles.map((p: { id: string; version: string; admitted: boolean; advertised: boolean }) => ({
+        id: p.id, version: p.version, admitted: p.admitted, advertised: p.advertised,
+      })),
+    ).toEqual([
+      { id: 'beta-default', version: '2.0.0', admitted: true, advertised: true },
+      { id: 'beta-hardened', version: '2.0.0', admitted: true, advertised: true },
+      { id: 'standard', version: '3.0.0', admitted: true, advertised: true },
+      { id: 'strict', version: '3.0.0', admitted: true, advertised: true },
+    ]);
+    for (const profile of pJson.profiles) {
+      const caps = profile.capabilities.map((c: { id: string }) => c.id);
+      expect(new Set(caps).size).toBe(caps.length); // No duplicate capability IDs!
+    }
 
     const vJson = JSON.parse(emitVersionDocumentV2('json'));
     expect(vJson.schemaVersion).toBe('n8n-scan-version-v2');

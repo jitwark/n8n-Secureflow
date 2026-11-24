@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { firstLeanSubject, firstPrerenderedSubject } from './detail-subjects';
+import { firstLeanSubject, firstPrerenderedSubject, viewHref } from './detail-subjects';
 
 /**
  * Phase 4.3 browser acceptance for the four bounded frontend P2s, against the
@@ -146,26 +146,31 @@ async function assertSeverityCountsAreNotLiveRegions(page: Page, surface: string
   expect(await summary.innerText(), `${surface}: severity counts`).toMatch(/\d+\s*critical/);
 }
 
+function parseTranslate(transform: string | null): { x: number; y: number; scale: number } {
+  const match = /translate\(([-\d.e+]+),\s*([-\d.e+]+)\)\s*scale\(([-\d.e+]+)\)/.exec(transform ?? '');
+  if (!match) throw new Error(`unexpected SVG group transform: ${transform ?? '<missing>'}`);
+  return { x: Number(match[1]), y: Number(match[2]), scale: Number(match[3]) };
+}
+
 /**
  * FE-07 through the browser's own input pipeline, so the component's `setPointerCapture` has an
  * active pointer to capture — a synthesized `PointerEvent` cannot be captured and throws.
  */
 async function dragPreview(page: Page, pointerType: 'mouse' | 'pen' | 'touch'): Promise<void> {
-  const viewport = page.locator('[data-canvas-viewport]').first();
-  // Direct child: the serialized SVG inside the stage may itself carry `role="img"`.
-  const stage = viewport.locator('> [role="img"]');
-  const target = page.locator('[data-canvas-viewport] [data-viewport-target]').first();
-  const panTransform = () => target.evaluate((element) => (element as HTMLElement).style.transform);
-  await expect(stage, 'canvas stage').toHaveCount(1);
+  const chart = page.getByTestId('workflow-chart').first();
+  const viewport = chart.getByTestId('workflow-canvas-viewport');
+  const stage = viewport.locator('svg[role="group"][aria-roledescription="Workflow diagram"]');
+  const target = stage.locator('> g').first();
+  await expect(stage, 'interactive workflow SVG').toHaveCount(1);
   await viewport.scrollIntoViewIfNeeded();
-  await viewport.getByRole('button', { name: 'Reset zoom to 100%' }).click();
+  await chart.getByRole('button', { name: 'Reset workflow view to fit' }).click();
 
-  const before = await panTransform();
-  const box = await stage.boundingBox();
-  if (!box) throw new Error('canvas stage has no box');
+  const beforeAttr = await target.getAttribute('transform');
+  const before = parseTranslate(beforeAttr);
+  const box = await viewport.boundingBox();
+  if (!box) throw new Error('canvas viewport has no box');
   const start = { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
   const end = { x: start.x + DRAG.dx, y: start.y + DRAG.dy };
-  const dragged = `translate(${DRAG.dx}px, ${DRAG.dy}px) scale(1)`;
 
   const client = await page.context().newCDPSession(page);
   if (pointerType === 'touch') {
@@ -182,8 +187,12 @@ async function dragPreview(page: Page, pointerType: 'mouse' | 'pen' | 'touch'): 
     await dispatch('mouseReleased', end.x, end.y, 0);
   }
 
-  await expect.poll(panTransform, { message: `${pointerType} drag pans the preview` }).toBe(dragged);
-  expect(before, `${pointerType} drag changed the pan state`).not.toBe(dragged);
+  await expect.poll(async () => {
+    const after = parseTranslate(await target.getAttribute('transform'));
+    return Math.round(after.x - before.x) === DRAG.dx && Math.round(after.y - before.y) === DRAG.dy;
+  }, { message: `${pointerType} drag pans the canvas` }).toBe(true);
+  const draggedAttr = await target.getAttribute('transform');
+  expect(draggedAttr, `${pointerType} drag changed the pan state`).not.toBe(beforeAttr);
 
   // Releasing ends the gesture: a later move must not keep panning.
   await client.send('Input.dispatchMouseEvent', {
@@ -191,7 +200,8 @@ async function dragPreview(page: Page, pointerType: 'mouse' | 'pen' | 'touch'): 
     pointerType: pointerType === 'touch' ? 'mouse' : pointerType,
   });
   await page.waitForTimeout(150);
-  expect(await panTransform(), `${pointerType} release stops panning`).toBe(dragged);
+  expect(await target.getAttribute('transform'), `${pointerType} release stops panning`).toBe(draggedAttr);
+  await client.detach();
 }
 
 for (const width of WIDTHS) {
@@ -270,23 +280,22 @@ for (const width of WIDTHS) {
     expect(pageErrors).toEqual([]);
   });
 
-  test(`static preview pans by pointer while severity counts stay out of live regions at ${width}px`, async ({ page }) => {
+  test(`interactive canvas pans by pointer while severity counts stay out of live regions at ${width}px`, async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
 
-    // The lean page renders `FindingsSummary`, the surface FE-05 changed.
     const lean = firstLeanSubject();
-    await page.goto(`${basePath}/w/${lean.slug}/`);
+    await page.goto(`${basePath}${viewHref(lean)}`);
     await expect(page.getByRole('heading', { name: lean.title })).toBeVisible({ timeout: 30_000 });
-    await assertSeverityCountsAreNotLiveRegions(page, `lean detail at ${width}px`);
+    await assertSeverityCountsAreNotLiveRegions(page, `detail view (lean) at ${width}px`);
 
-    // FE-07 on the page type that hydrates `canvas-viewport.tsx`: lean pages are served
-    // without React and pan from the static behaviour script instead.
     const prerendered = firstPrerenderedSubject();
-    await page.goto(`${basePath}/w/${prerendered.slug}/`);
+    await page.goto(`${basePath}${viewHref(prerendered)}`);
     await expect(page.getByRole('heading', { name: prerendered.title })).toBeVisible({ timeout: 30_000 });
-    await assertSeverityCountsAreNotLiveRegions(page, `prerendered detail at ${width}px`);
+    await assertSeverityCountsAreNotLiveRegions(page, `detail view (representative) at ${width}px`);
+    await page.getByRole('button', { name: /Load interactive canvas/i }).click();
+    await expect(page.getByRole('group', { name: /Workflow diagram/ })).toBeVisible({ timeout: 30_000 });
 
     for (const pointerType of ['touch', 'pen', 'mouse'] as const) await dragPreview(page, pointerType);
 

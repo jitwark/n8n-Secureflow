@@ -32,18 +32,28 @@ describe('v2 help authority', () => {
   });
 
   it('states defaults, limits, and profile admission truth', () => {
-    expect(GENERAL_HELP_V2).toContain('format: json');
-    expect(GENERAL_HELP_V2).toContain('profile: beta-default');
+    expect(GENERAL_HELP_V2).toContain('format: pretty (TTY) or json (non-TTY)');
+    expect(GENERAL_HELP_V2).toContain('profile: standard');
     expect(GENERAL_HELP_V2).toContain('fail-on: INFO');
     expect(GENERAL_HELP_V2).toContain('concurrency: 1 (maximum 16)');
     expect(GENERAL_HELP_V2).toContain('require-complete: false');
     expect(GENERAL_HELP_V2).toContain('include: **/*.json');
     expect(GENERAL_HELP_V2).toContain('exclude: .git/**, node_modules/**');
-    expect(GENERAL_HELP_V2).toContain('beta-hardened@2.0.0: defined but not admitted or selectable');
+    expect(GENERAL_HELP_V2).toContain('standard@3.0.0: admitted and selectable (default)');
+    expect(GENERAL_HELP_V2).toContain('strict@3.0.0: admitted and selectable (alias: ci)');
+    expect(GENERAL_HELP_V2).toContain('beta-default@2.0.0: admitted and selectable');
+    expect(GENERAL_HELP_V2).toContain('beta-hardened@2.0.0: admitted and selectable');
     expect(GENERAL_HELP_V2).toContain('maxSerializedResultBytes=5000000');
     expect(GENERAL_HELP_V2).toContain('maxRuleOperations=1000000');
     expect(GENERAL_HELP_V2).toContain('maxSourceWork=1000000');
     expect(getHelpV2('scan')).toContain('--allow-unsigned-development-rules');
+    expect(getHelpV2('scan')).toContain('--min-severity');
+    expect(getHelpV2('scan')).toContain('--min-confidence');
+    expect(getHelpV2('scan')).toContain('--baseline');
+    expect(getHelpV2('scan')).toContain('pretty|table|json|ndjson|sarif|markdown');
+    expect(getHelpV2('scan')).toContain('NONE');
+    expect(getHelpV2('profiles')).toContain('standard');
+    expect(getHelpV2('profiles')).toContain('strict');
     expect(getHelpV2('profiles')).toContain('beta-hardened');
   });
 

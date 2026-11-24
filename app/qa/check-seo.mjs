@@ -130,7 +130,7 @@ function checkJsonLd(relPath, page) {
     // `author` is optional: a withheld contact identity is omitted, never reassigned.
     required(nodeWithType(nodes, 'SoftwareSourceCode'), ['name', 'description', 'programmingLanguage', 'codeRepository', 'dateModified', 'isAccessibleForFree'], relPath);
     required(nodeWithType(nodes, 'BreadcrumbList'), ['itemListElement'], relPath);
-  } else if (normalized.startsWith('integrations/') || normalized.startsWith('tags/') || normalized.startsWith('triggers/') || normalized.startsWith('grades/') || normalized.startsWith('complexity/')) {
+  } else if (normalized.startsWith('integrations/') || normalized.startsWith('tags/') || normalized.startsWith('triggers/') || normalized.startsWith('grades/') || normalized.startsWith('complexity/') || normalized.startsWith('security/')) {
     required(nodeWithType(nodes, 'CollectionPage'), ['name', 'description'], relPath);
     if (RELEASE_CONFIGURED) required(nodeWithType(nodes, 'CollectionPage'), ['url'], relPath);
     const itemList = nodeWithType(nodes, 'ItemList');

@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { appPath } from './app-paths';
 
-const SEARCH_ARTIFACT = /\/data\/(?:manifest\.json|facets\.json|search-index(?:-extended)?\.json|semantic-index\.json)$/;
-const PRIMARY_INDEX = /\/data\/search-index\.json$/;
+const SEARCH_ARTIFACT = /\/data\/(?:manifest\.json|facets\.json|search-index(?:-extended)?\.json(?:\.gzbin)?|semantic-index\.json(?:\.gzbin)?)$/;
+const PRIMARY_INDEX = /\/data\/search-index\.json(?:\.gzbin)?$/;
 declare global {
   interface Window { __homeSearchWorkerReady?: boolean }
 }
@@ -42,7 +42,7 @@ test('homepage keeps search artifacts cold until focus and reuses the warm load'
       }
     };
   });
-  await page.route('**/data/search-index.json', async (route) => {
+  await page.route('**/data/search-index.json*', async (route) => {
     primaryIndexRequests += 1;
     notifyPrimaryIndexRequest();
     await primaryIndexGate;
@@ -96,6 +96,7 @@ test('homepage keeps search artifacts cold until focus and reuses the warm load'
     expect(response.ok()).toBe(true);
     await page.waitForFunction(() => window.__homeSearchWorkerReady === true, undefined, { timeout: 30_000 });
     await expect(page.getByRole('option').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'View all results' })).toHaveAttribute('href', /\/library\/\?q=slack$/);
     expect(primaryIndexRequests).toBe(1);
     expect(searchRequests.filter((url) => PRIMARY_INDEX.test(new URL(url).pathname))).toHaveLength(1);
   } finally {

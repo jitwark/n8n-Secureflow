@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SCANNER_LIMITS_V2 } from '@hub/contracts';
 import { parseSourceDocument } from '../source/source-parser';
 import { normalizeSecurityWorkflow } from '../workflow-v2/normalize-security-workflow';
-import { BETA_HARDENED_PROFILE_MANIFEST, isProfileAdmitted } from './profile-manifest';
+import { BETA_HARDENED_PROFILE_MANIFEST, STANDARD_PROFILE_MANIFEST, computeProfileManifestDigest, isProfileAdmitted } from './profile-manifest';
 import type { AnalyzerContextV2 } from './scheduler';
 import { createBetaHardenedCapabilityRegistry, scanHardenedCapabilitiesV2 } from './beta-hardened';
 import { countInconsistency, omissionInconsistency } from './count-lattice';
@@ -27,12 +27,19 @@ function emptyTaint(context: AnalyzerContextV2) {
   return createScanLocalTaint(context, () => ({ status: 'COMPLETE', findings: [], diagnostics: [] }));
 }
 
+function unadmittedHardenedManifest() {
+  const { digest: _removed, ...body } = { ...BETA_HARDENED_PROFILE_MANIFEST, scoringPolicyVersion: 'unadmitted@0.0.0' };
+  return Object.freeze({ ...body, digest: computeProfileManifestDigest(body) });
+}
+
 describe('beta-hardened capability adapter', () => {
-  it('defines hardened capability order but never admits or executes it', () => {
+  it('admits beta-hardened while closing synthetic unadmitted hardened manifests', () => {
     let invoked = false;
     const registry = createBetaHardenedCapabilityRegistry({ onRun: () => { invoked = true; } });
-    const result = scanHardenedCapabilitiesV2(contextFor('{"nodes":[],"connections":{}}'), BETA_HARDENED_PROFILE_MANIFEST, registry);
-    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(false);
+    const unadmitted = unadmittedHardenedManifest();
+    const result = scanHardenedCapabilitiesV2(contextFor('{"nodes":[],"connections":{}}'), unadmitted, registry);
+    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(true);
+    expect(isProfileAdmitted(unadmitted)).toBe(false);
     expect(invoked).toBe(false);
     expect(result.candidates).toEqual([]);
     expect(result.executions.map(({ id, required, status }) => ({ id, required, status }))).toEqual(BETA_HARDENED_PROFILE_MANIFEST.capabilities.map(({ id, required }) => ({ id, required, status: required ? 'FAILED' : 'DEGRADED' })));
@@ -145,9 +152,10 @@ describe('beta-hardened capability adapter', () => {
     }
   });
 
-  it('reports a count row for every capability declared by the hardened manifest without admitting it', () => {
-    const result = scanHardenedCapabilitiesV2(contextFor('{"nodes":[],"connections":{}}'), BETA_HARDENED_PROFILE_MANIFEST, createBetaHardenedCapabilityRegistry());
-    expect(isProfileAdmitted(BETA_HARDENED_PROFILE_MANIFEST)).toBe(false);
+  it('reports a count row for every capability declared by an unadmitted manifest without executing it', () => {
+    const unadmitted = unadmittedHardenedManifest();
+    const result = scanHardenedCapabilitiesV2(contextFor('{"nodes":[],"connections":{}}'), unadmitted, createBetaHardenedCapabilityRegistry());
+    expect(isProfileAdmitted(unadmitted)).toBe(false);
     expect(result.candidates).toEqual([]);
     // Unadmitted, but every declared capability still publishes the counters of the failure it was
     // closed with: nothing ran and one unit was omitted.
@@ -155,16 +163,16 @@ describe('beta-hardened capability adapter', () => {
       .toEqual(BETA_HARDENED_PROFILE_MANIFEST.capabilities.map(({ id, required }) => ({ id, status: required ? 'FAILED' : 'DEGRADED', seen: 0, analyzed: 0, skipped: 0, omitted: 1 })));
   });
 
-  it('completes the agentic capability for an agent whose input is not tainted', () => {
+  it('completes the agentic capability for an agent whose input is not tainted and egress is allowlisted', () => {
     const context = contextFor(JSON.stringify({
       nodes: [
         { id: 'start', name: 'Start', type: 'n8n-nodes-base.manualTrigger', parameters: {} },
         { id: 'agent', name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', parameters: {} },
-        { id: 'tool', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', parameters: {} },
+        { id: 'tool', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', parameters: { url: 'https://trusted.example/api' } },
       ],
       connections: { Start: { main: [[{ node: 'Agent', type: 'main', index: 0 }]] }, Tool: { ai_tool: [[{ node: 'Agent', type: 'ai_tool', index: 0 }]] } },
     }));
-    const registry = createBetaHardenedCapabilityRegistry({ getTaint: emptyTaint(context) });
+    const registry = createBetaHardenedCapabilityRegistry({ getTaint: emptyTaint(context), approvedDomains: ['trusted.example'] });
     const spec = registry.get('agentic-control');
     if (spec === undefined) throw new Error('Missing hardened runner: agentic-control');
     const candidate = spec.run(context);
@@ -176,14 +184,14 @@ describe('beta-hardened capability adapter', () => {
       nodes: [
         { id: 'start', name: 'Start', type: 'n8n-nodes-base.customTrigger', parameters: {} },
         { id: 'agent', name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', parameters: {} },
-        { id: 'tool', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', parameters: {} },
+        { id: 'tool', name: 'Tool', type: 'n8n-nodes-base.httpRequestTool', parameters: { url: 'https://trusted.example/api' } },
       ],
       connections: { Start: { main: [[{ node: 'Agent', type: 'main', index: 0 }]] }, Tool: { ai_tool: [[{ node: 'Agent', type: 'ai_tool', index: 0 }]] } },
     }));
     const getTaint = createScanLocalTaint(context, () => ({
       status: 'COMPLETE', findings: [], diagnostics: [{ code: 'REQUIRED_STAGE_FAILURE', category: 'POLICY', location: { path: '/nodes/0' } }],
     }));
-    const registry = createBetaHardenedCapabilityRegistry({ getTaint });
+    const registry = createBetaHardenedCapabilityRegistry({ getTaint, approvedDomains: ['trusted.example'] });
     const spec = registry.get('agentic-control');
     if (spec === undefined) throw new Error('Missing hardened runner: agentic-control');
     const candidate = spec.run(context);
@@ -203,5 +211,31 @@ describe('beta-hardened capability adapter', () => {
     expect(candidate.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'OPTIONAL_LIMIT_EXCEEDED', observed: 1, maximum: 0, omitted: 1, aggregateEffect: 'DEGRADED', assessmentEligible: true }),
     ]));
+  });
+
+  it('keeps genuine coupling or non-trigger REQUIRED_STAGE_FAILURE fail-closed even under v3', () => {
+    const context = contextFor(JSON.stringify({
+      nodes: [
+        { id: 'start', name: 'Start', type: 'n8n-nodes-base.manualTrigger', parameters: {} },
+        { id: 'agent', name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent', parameters: {} },
+      ],
+      connections: { Start: { main: [[{ node: 'Agent', type: 'main', index: 0 }]] } },
+    }));
+    const getTaint = createScanLocalTaint(context, () => ({
+      status: 'COMPLETE', findings: [],
+      diagnostics: [{ code: 'REQUIRED_STAGE_FAILURE', category: 'POLICY', location: { path: '/nodes/0' } }],
+    }));
+    const registry = createBetaHardenedCapabilityRegistry({ manifest: STANDARD_PROFILE_MANIFEST, getTaint });
+    const graphCandidate = registry.get('graph-semantics')!.run(context);
+    expect(graphCandidate.diagnostics.map(({ code }) => code)).toContain('REQUIRED_STAGE_FAILURE');
+    expect(graphCandidate.omitted).toBeGreaterThan(0);
+
+    const noLocationTaint = createScanLocalTaint(context, () => ({
+      status: 'COMPLETE', findings: [],
+      diagnostics: [{ code: 'REQUIRED_STAGE_FAILURE', category: 'POLICY' }],
+    }));
+    const noLocReg = createBetaHardenedCapabilityRegistry({ manifest: STANDARD_PROFILE_MANIFEST, getTaint: noLocationTaint });
+    const agentCandidate = noLocReg.get('agentic-control')!.run(context);
+    expect(agentCandidate.diagnostics.map(({ code }) => code)).toContain('REQUIRED_STAGE_FAILURE');
   });
 });

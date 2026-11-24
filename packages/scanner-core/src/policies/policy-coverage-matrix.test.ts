@@ -114,6 +114,10 @@ const catalogExpectations = ([
   ['TAINTED_REQUEST_HEADER', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
   ['TAINTED_AI_PROMPT', 'MEDIUM', 'LOW', 'LOW', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
   ['AI_AGENT_UNGATED_TOOL', 'MEDIUM', 'LOW', 'LOW', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
+  ['EXPRESSION_SANDBOX_ESCAPE', 'CRITICAL', 'HIGH', 'HIGH', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
+  ['EXPRESSION_ENV_EXPOSURE', 'HIGH', 'HIGH', 'HIGH', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
+  ['AGENT_EGRESS_UNRESTRICTED', 'HIGH', 'MEDIUM', 'MEDIUM', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
+  ['UNAUTHENTICATED_TRIGGER_TO_SINK', 'CRITICAL', 'HIGH', 'HIGH', 'REPORT_ONLY', 'REVIEW', 'DISPLAY', ['beta-hardened']],
 ] as const satisfies readonly CatalogRow[]).map(([policyId, defaultSeverity, defaultConfidence, precision, policyEffect, curationAction, serveAction, profiles]) => ({
   policyId,
   defaultSeverity,

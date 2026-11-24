@@ -6,6 +6,8 @@ import { resolveNodeSemantics, validateSemanticNodeType } from './catalogue-reso
 import type { ResolvedNodeSemanticsV2, SemanticCatalogueV2, SemanticProvenanceV2 } from './catalogue-schema';
 import { admitScopedCatalogue } from './scoped-catalogue-admission';
 import { resolveScopedNodeSemantics } from './scoped-catalogue-resolver';
+import { REVIEWED_SCOPED_AUTHORITY_DIGEST, reviewedScopedAuthorityIsIntact } from './noop-admission-authority';
+import { resolveReviewedNoopCandidate } from './reviewed-noop-candidate';
 
 /**
  * Generic semantic fallback for node types the admitted catalogue does not model.
@@ -126,7 +128,12 @@ export const SCOPED_GMAIL_BUNDLE = admitScopedCatalogue({ ...SCOPED_GMAIL_BODY, 
 
 /** Exact reviewed scopes only; never substitutes a legacy or generic catalogue resolution. */
 export function resolveReviewedScopedSemantics(query: NodeSemanticsQueryV2): ResolvedNodeSemanticsV2 | null {
-  return resolveScopedPilot(query) ?? null;
+  const scoped = resolveScopedPilot(query);
+  if (scoped !== undefined) return scoped;
+  if (query.type !== 'n8n-nodes-base.noOp') return null;
+  const candidate = resolveReviewedNoopCandidate(query);
+  return candidate !== null && reviewedScopedAuthorityIsIntact(SCOPED_GMAIL_BUNDLE_DIGEST, REVIEWED_SCOPED_AUTHORITY_DIGEST)
+    ? candidate : null;
 }
 
 export function reviewedScopedSemanticsAreIntact(expectedDigest: string): boolean {
@@ -193,6 +200,18 @@ export function resolveNodeSemanticsForScan(
   const scoped = resolveScopedPilot(query);
   if (scoped !== undefined) {
     if (scoped !== null) return Object.freeze({ semantics: scoped, origin: 'CATALOGUE' as const });
+    if (query.scoringEligibility !== 'ELIGIBLE') return null;
+    return Object.freeze({ semantics: createGenericFallbackSemantics(query.type), origin: 'GENERIC_FALLBACK' as const });
+  }
+  if (query.type === 'n8n-nodes-base.noOp') {
+    // Reuse the shared reviewed resolver used by formal coverage so runtime and measurement agree.
+    // Calling the legacy resolver here only validates observed versions: malformed strings must
+    // keep failing closed while well-formed unsupported versions still reach generic fallback.
+    if (typeof query.typeVersion === 'string') resolveNodeSemantics(catalogue, {
+      nodeType: query.type, version: query.typeVersion, operation: typeof operation === 'string' ? operation : null,
+    });
+    const reviewed = resolveReviewedScopedSemantics(query);
+    if (reviewed !== null) return Object.freeze({ semantics: reviewed, origin: 'CATALOGUE' as const });
     if (query.scoringEligibility !== 'ELIGIBLE') return null;
     return Object.freeze({ semantics: createGenericFallbackSemantics(query.type), origin: 'GENERIC_FALLBACK' as const });
   }

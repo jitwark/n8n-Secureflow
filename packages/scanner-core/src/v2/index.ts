@@ -19,4 +19,15 @@ export { validateTargetContextV3, type TargetContextV3 } from '../semantics/targ
 export { buildAdvisoryFactsV1, type AdvisoryInventoryStateV3, type AdvisoryRequestV3 } from '../advisories/advisory-evaluation';
 export type { AdvisoryRecordV2, AdvisoryReviewStateV2 } from '../advisories/advisory-schema';
 
+export {
+  ADMITTED_PROFILE_MANIFESTS_V2,
+  BETA_DEFAULT_PROFILE_MANIFEST,
+  BETA_HARDENED_PROFILE_MANIFEST,
+  DEFAULT_PROFILE_REF,
+  STANDARD_PROFILE_MANIFEST,
+  STRICT_PROFILE_MANIFEST,
+  resolveAdmittedProfileManifest,
+} from '../capabilities/profile-manifest';
+export { createAdmittedRuleView } from './admitted-registry';
+
 export { admitAdvisoryCatalogue, createAdvisoryCatalogueDigest, AdvisoryAdmissionError } from '../advisories/advisory-admission';

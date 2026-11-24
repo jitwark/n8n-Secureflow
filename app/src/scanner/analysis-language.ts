@@ -109,7 +109,8 @@ function isPositiveModelCoverageOnly(input: AnalysisPresentationInput): boolean 
   const modelDiagnosticIds = new Set<string>();
   for (const diagnostic of diagnostics) {
     if (!MODEL_COVERAGE_CODES.has(diagnostic.code)) return false;
-    if (diagnostic.aggregateEffect !== 'DEGRADED' || diagnostic.assessmentEligible !== true) return false;
+    if ((diagnostic.aggregateEffect !== 'NONE' && diagnostic.aggregateEffect !== 'DEGRADED')
+      || diagnostic.assessmentEligible !== true) return false;
     if ((diagnostic.omitted !== undefined && (!isCount(diagnostic.omitted) || diagnostic.omitted > 0))
       || !isId(diagnostic.id) || !isId(diagnostic.capabilityId)) return false;
     if (modelDiagnosticIds.has(diagnostic.id)) return false;
@@ -137,13 +138,13 @@ function isPositiveModelCoverageOnly(input: AnalysisPresentationInput): boolean 
 
 export function analysisPresentation(input: AnalysisPresentationInput): AnalysisPresentation {
   const status = input.status;
-  const knownStatus = status === 'COMPLETE' || status === 'DEGRADED' || status === 'INDETERMINATE';
+  const knownStatus = status === 'COMPLETE' || status === 'LIMITED' || status === 'DEGRADED' || status === 'INDETERMINATE';
 
   if (status === 'INDETERMINATE') {
     return presentation('Analysis incomplete', INCOMPLETE_SUMMARY, 'warning', false);
   }
   if (input.assessment !== 'present') {
-    if (status === 'DEGRADED') {
+    if (status === 'DEGRADED' || status === 'LIMITED') {
       return presentation('Assessment unavailable', 'Analysis is partial and the available evidence cannot support a risk decision; no grade is shown.', 'warning', false);
     }
     if (status === 'COMPLETE') {
@@ -156,6 +157,9 @@ export function analysisPresentation(input: AnalysisPresentationInput): Analysis
   }
   if (status === 'COMPLETE') {
     return presentation('Analysis complete', COMPLETE_SUMMARY, 'complete', true);
+  }
+  if (status === 'LIMITED') {
+    return presentation('Partial analysis', PARTIAL_SUMMARY, 'warning', true);
   }
   if (isPositiveModelCoverageOnly(input)) {
     return presentation('Standard scan', STANDARD_SUMMARY, 'neutral', true, true);
@@ -228,7 +232,7 @@ export function corpusCoverageLabel(kind: CorpusCoverageKind): AnalysisLabel {
 
 export function analysisStatusLabel(status?: string | null): AnalysisLabel | null {
   if (status === 'COMPLETE') return CORPUS_LABELS.completed;
-  if (status === 'DEGRADED') return CORPUS_LABELS.degraded;
+  if (status === 'DEGRADED' || status === 'LIMITED') return CORPUS_LABELS.degraded;
   if (status === 'INDETERMINATE') return CORPUS_LABELS.indeterminate;
   return null;
 }

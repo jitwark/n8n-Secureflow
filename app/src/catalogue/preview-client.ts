@@ -124,6 +124,9 @@ export async function loadPreviewById(id: string, signal?: AbortSignal): Promise
   } catch (cause) {
     return isAbortError(cause) ? { ok: false, reason: 'aborted' } : { ok: false, reason: 'network' };
   }
+  if (manifest.artifacts.length > 0 && !manifest.artifacts.some((item) => item.path.startsWith('previews/'))) {
+    return { ok: false, reason: 'not-found' };
+  }
   const shard = Object.hasOwn(manifest.catalogueShards, id) ? manifest.catalogueShards[id] : undefined;
   if (shard === undefined) return { ok: false, reason: 'not-found' };
 

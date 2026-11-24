@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -99,14 +99,20 @@ export async function buildScannerCli() {
       ...Object.fromEntries(plan.map((entry) => [entry.name, fileURLToPath(new URL(entry.source, packageDirectory))])),
     },
     bundle: true,
+    splitting: true,
+    minify: true,
+    chunkNames: 'chunks/[name]-[hash]',
     platform: 'node',
     format: 'esm',
     outdir: fileURLToPath(outputDirectory),
     sourcemap: 'external',
   });
   const subpathOutputs = plan.map((entry) => fileURLToPath(new URL(entry.importFile, packageDirectory)));
-  for (const output of [outputFile, mcpOutputFile, scanWorkerOutputFile, ...subpathOutputs]) {
-    const sourceMap = JSON.parse(await readFile(`${output}.map`, 'utf8'));
+  const chunkDirectory = fileURLToPath(new URL('./chunks', outputDirectory));
+  const chunkEntries = await readdir(chunkDirectory).catch(() => []);
+  const chunkMaps = chunkEntries.filter((name) => name.endsWith('.js.map')).map((name) => path.join(chunkDirectory, name));
+  for (const mapFile of [...[outputFile, mcpOutputFile, scanWorkerOutputFile, ...subpathOutputs].map((file) => `${file}.map`), ...chunkMaps]) {
+    const sourceMap = JSON.parse(await readFile(mapFile, 'utf8'));
     validateScannerSourceMap(sourceMap);
   }
   await assertScanWorkerAsset();

@@ -6,7 +6,8 @@ export const V2_COMMANDS = Object.freeze([
 export type V2CommandName = (typeof V2_COMMANDS)[number];
 
 export type V2OptionName =
-  | '--help' | '--schema' | '--format' | '--profile' | '--fail-on' | '--require-complete' | '--audit-supply-chain' | '--include-readiness'
+  | '--help' | '--schema' | '--format' | '--profile' | '--fail-on' | '--min-severity' | '--min-confidence' | '--baseline'
+  | '--require-complete' | '--audit-supply-chain' | '--include-readiness'
   | '--max-concurrency' | '--concurrency' | '--timeout' | '--output' | '--config'
   | '--rules' | '--catalogue' | '--limits' | '--target' | '--n8n-version' | '--edition'
   | '--deployment' | '--role' | '--task-runner' | '--community-package' | '--configuration'
@@ -29,9 +30,12 @@ const EVERY = V2_COMMANDS;
 export const V2_OPTIONS: readonly V2HelpOption[] = Object.freeze([
   { name: '--help', value: '', commands: ALL, description: 'Show deterministic help for the selected v2 command.' },
   { name: '--schema', value: '<v2>', commands: EVERY, description: 'Select the versioned v2 grammar.' },
-  { name: '--format', value: '<json|ndjson|sarif|table>', commands: ALL, description: 'Select the output format.', default: 'json for scan; json for metadata' },
-  { name: '--profile', value: '<beta-default>', commands: SCAN, description: 'Select the admitted analysis profile.', default: 'beta-default' },
-  { name: '--fail-on', value: '<CRITICAL|HIGH|MEDIUM|LOW|INFO>', commands: SCAN, description: 'Fail when a finding meets or exceeds this severity.', default: 'INFO' },
+  { name: '--format', value: '<pretty|table|json|ndjson|sarif|markdown>', commands: ALL, description: 'Select the output format.', default: 'pretty on TTY, json otherwise; json for metadata' },
+  { name: '--profile', value: '<standard|strict|beta-default|beta-hardened>', commands: SCAN, description: 'Select the admitted analysis profile (ci aliases strict).', default: 'standard' },
+  { name: '--fail-on', value: '<CRITICAL|HIGH|MEDIUM|LOW|INFO|NONE>', commands: SCAN, description: 'Fail when a finding meets or exceeds this severity (NONE exits 0 on findings).', default: 'INFO' },
+  { name: '--min-severity', value: '<CRITICAL|HIGH|MEDIUM|LOW|INFO>', commands: SCAN, description: 'Filter reported findings to this severity or higher.' },
+  { name: '--min-confidence', value: '<HIGH|MEDIUM|LOW>', commands: SCAN, description: 'Filter reported findings to this confidence or higher.' },
+  { name: '--baseline', value: '<local-file>', commands: SCAN, description: 'Suppress finding IDs present in a prior JSON scan or baseline file.' },
   { name: '--require-complete', value: '', commands: SCAN, description: 'Treat DEGRADED analysis as a failure.', default: 'false' },
   { name: '--audit-supply-chain', value: '', commands: SCAN, description: 'Emit canonical advisory status and request metadata; no admitted snapshot is available and no network is used.', default: 'false' },
   { name: '--include-readiness', value: '', commands: SCAN, description: 'Include preflight readiness assessment in json, ndjson, or table output.', default: 'false' },
@@ -135,7 +139,7 @@ export const V2_CANONICAL_CLAIMS = Object.freeze([
   'v2 is offline and never initiates network requests (HTTP, DNS, sockets, telemetry, or remote imports).',
   'Labels and output identities never contain absolute paths or workflow source content.',
   'File output uses a same-directory temporary file and atomic replace; failures and cancellation preserve the prior file.',
-  'beta-default@2.0.0 is admitted; beta-hardened@2.0.0 is defined but not admitted or selectable.',
+  'standard@3.0.0 (default), strict@3.0.0 (alias: ci), beta-default@2.0.0, and beta-hardened@2.0.0 are admitted and selectable.',
   'No shipped path produces a redacted artifact: maxRedactionPatches and maxRedactedArtifactBytes bound redaction-v2, which is development-only and unwired.',
   'No shipped path admits an external rule pack: --rules and --catalogue accept only builtin, and --allow-unsigned-development-rules is refused because Ed25519 trust-store admission is deferred.',
   'Published on npm as sfscanner.',
@@ -165,7 +169,7 @@ function renderCommand(command: V2CommandName): V2CommandHelp {
   const options = V2_OPTIONS.filter((option) => option.commands.includes(command));
   const lines = [`sfscanner v2 ${command}`, '', 'Usage:', ...usage, '', 'Options:', ...options.map((option) => optionLine(option, command))];
   if (command === 'scan') lines.push('', 'Inputs are sorted by normalized relative label; stdin (-) cannot join a batch.');
-  if (command === 'profiles') lines.push('', 'beta-default is admitted. beta-hardened is defined but not admitted or selectable.');
+  if (command === 'profiles') lines.push('', 'Admitted profiles: standard@3.0.0 (default), strict@3.0.0 (alias: ci), beta-default@2.0.0, and beta-hardened@2.0.0.');
   if (command === 'validate-config') lines.push('', 'Only the explicitly supplied local config file is read.');
   if (command === 'fix') lines.push('',
     'Output is one JSON n8n-scan-fix-v2 document; --format and --help are not admitted for fix.',
@@ -187,11 +191,14 @@ const generalLines = [
   '  sfscanner --schema v2 profiles [--format json|table]',
   '  sfscanner --schema v2 validate-config <local-file> [--format json|table]',
   '  sfscanner --schema v2 version [--format json|table]', '', 'Commands:',
-  'Defaults:', '  format: json; profile: beta-default; fail-on: INFO; require-complete: false; concurrency: 1 (maximum 16); timeout: 30000ms.',
+  'Defaults:', '  format: pretty (TTY) or json (non-TTY); profile: standard; fail-on: INFO; require-complete: false; concurrency: 1 (maximum 16); timeout: 30000ms.',
   '  include: **/*.json; exclude: .git/**, node_modules/**; rules/catalogue/limits: builtin.',
   '  target facts: edition UNKNOWN; deployment UNKNOWN; role UNKNOWN; task-runner UNKNOWN.',
-  '', 'Profiles:', '  beta-default@2.0.0: admitted and selectable.',
-  '  beta-hardened@2.0.0: defined but not admitted or selectable.', '', 'Limits:',
+  '', 'Profiles:',
+  '  standard@3.0.0: admitted and selectable (default).',
+  '  strict@3.0.0: admitted and selectable (alias: ci).',
+  '  beta-default@2.0.0: admitted and selectable.',
+  '  beta-hardened@2.0.0: admitted and selectable.', '', 'Limits:',
   ...Object.entries(V2_LIMITS).map(([name, value]) => `  ${name}=${value}${limitStateMarker(name as V2LimitName)}`), '',
   'Exit codes and precedence:', '  130 CANCELLED; 4 INTERNAL; 2 USAGE; 1 FINDING_THRESHOLD or REQUIRE_COMPLETE; 3 ITEM_FAILURE; 0 UNDER_THRESHOLD.',
   '  Pre-scan usage/configuration/admission failures emit no machine envelope and exit 2; stdout cancellation emits a valid envelope and exits 130.',

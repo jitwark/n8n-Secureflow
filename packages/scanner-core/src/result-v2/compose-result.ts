@@ -62,7 +62,7 @@ export function composeScannerResultV2(input: ComposeScannerResultV2Input): Comp
     if (!facts.some((fact) => fact.kind.startsWith('advisory.'))) facts.push(...rekeyFacts(buildAdvisoryFactsV1({ target }), context.semanticSha256));
     facts.sort((a, b) => compareStrings(a.factId, b.factId));
     const traces = evidenceTraces([...readArray(value.traces), ...candidates.flatMap((candidate) => readArray(readRecord(candidate, ['findings', 'diagnostics', 'facts', 'traces', 'seen', 'analyzed', 'skipped', 'omitted']).traces))], context);
-    const findings = evidenceFindings([...readArray(value.findings), ...candidates.flatMap((candidate) => readArray(readRecord(candidate, ['findings', 'diagnostics', 'facts', 'traces', 'seen', 'analyzed', 'skipped', 'omitted']).findings))], context, admittedFindingRulesV2(readRecord(value.ruleset, ['id', 'version', 'digest', 'signatureStatus', 'rules']).rules));
+    const findings = evidenceFindings([...readArray(value.findings), ...candidates.flatMap((candidate) => readArray(readRecord(candidate, ['findings', 'diagnostics', 'facts', 'traces', 'seen', 'analyzed', 'skipped', 'omitted']).findings))], context, admittedFindingRulesV2(readRecord(value.ruleset, ['id', 'version', 'digest', 'signatureStatus', 'rules']).rules, value.profile));
     const limits = closedLimits(value.limits);
     const stats = value.stats === undefined ? undefined : exactRecord(value.stats, ['rejectedCandidates', 'collapsedCandidates', 'omittedFindings', 'serializedBytes']);
     const analysis = composeAnalysis(value.analysis, candidates, limits, stats);

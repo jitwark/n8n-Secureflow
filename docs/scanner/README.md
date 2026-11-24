@@ -1,11 +1,11 @@
 # Scanner documentation
 
-> Status: current versioned references; website update delivered and verified
-> Last verified: 2026-11-14
+> Status: current versioned references; internal NoOp retained-projection measurement and bounded independent review accepted
+> Last verified: 2026-11-21
 > Owner: Scanner maintainer
 > Source of truth: [scanner core](../../packages/scanner-core/src/v2/scan-workflow.ts), [contracts](../../contracts/), and [programme status](programme-status.md)
 
-Start with [programme status](programme-status.md), the [website update](website-update.md), and the planning-only [v0.3 roadmap](v0.3-roadmap.md). Both hosts have verified delivery and32accepted live cases each. The original formal-coverage targets remain missed; earlier Candidate6/Candidate8 packets are dated history.
+Start with [programme status](programme-status.md), the [website update](website-update.md), and the [v0.3 roadmap](v0.3-roadmap.md). The internal first-batch measurement records 1,445/144,043 formal reviewed executable instances and 0/9,669 fully modelled workflows. The bounded independent review passed. Canonical `CURRENT-STATE.json` and `BACKUP-RECEIPT.json` track the final recovery seal. Published npm, site, dataset, Action and public `main` remain unchanged; earlier Candidate6/Candidate8 packets are dated history.
 
 The scanner reviews workflow JSON locally after the page and real worker resources load, without executing workflow code. v1 remains the native compatibility surface and v2 is explicitly versioned.
 

@@ -96,6 +96,13 @@ describe('DetailBody', () => {
     expect(view.getByLabelText('AI-generated description')).toBeTruthy();
   });
 
+  it('publishes plain generated description when descriptionContent is stripped on packed entries with valid gemini provenance', () => {
+    const { container } = render(<DetailBody entry={{ ...entry('link_only'), description: 'Packed workflow summary.', descriptionSource: 'generated', descriptionProvenance: { source: 'gemini', model: 'explicit-model' }, descriptionContent: undefined }} related={[]} />);
+    const view = within(container);
+    expect(view.getByText('Packed workflow summary.')).toBeTruthy();
+    expect(view.getByLabelText('AI-generated description')).toBeTruthy();
+  });
+
   it('rejects structured content for upstream entries and renders only the upstream description', () => {
     const upstreamDescription = 'Authoritative plain upstream description.';
     const { container } = render(<DetailBody entry={{ ...entry('link_only'), description: upstreamDescription, descriptionSource: 'upstream', descriptionProvenance: { source: 'upstream' }, descriptionContent }} related={[]} />);

@@ -19,8 +19,13 @@ async function loadWorkerListener(): Promise<MessageListener> {
 function send(listener: MessageListener, json: string, id: string): void {
   listener({ data: { kind: 'scan', id, json, profile: 'beta-default' } } as MessageEvent<ScanWorkerRequest>);
 }
-function sendV2(listener: MessageListener, json: string, id: string): void {
-  listener({ data: { kind: 'scan-v2', id, json, profile: 'beta-default' } } as MessageEvent<ScanWorkerRequest>);
+function sendV2(
+  listener: MessageListener,
+  json: string,
+  id: string,
+  profile: 'standard' | 'strict' | 'beta-default' | 'beta-hardened' = 'beta-default',
+): void {
+  listener({ data: { kind: 'scan-v2', id, json, profile } } as MessageEvent<ScanWorkerRequest>);
 }
 
 
@@ -343,6 +348,23 @@ describe('scan worker parser boundary', () => {
       const nodes = Array.from({ length: 25 }, (_, index) => node(index));
       sendV2(listener, JSON.stringify({ name: '25 nodes', nodes, connections: {} }), 'v2-25-nodes');
       expect(lastResponse()).toMatchObject({ kind: 'result-v2', id: 'v2-25-nodes' });
+    });
+  });
+
+  describe('v0.3 multi-profile scan-v2 support', () => {
+    it.each([
+      ['standard', '3.0.0'],
+      ['strict', '3.0.0'],
+      ['beta-hardened', '2.0.0'],
+      ['beta-default', '2.0.0'],
+    ] as const)('runs %s at engine version %s', async (profile, version) => {
+      const listener = await loadWorkerListener();
+      sendV2(listener, SAFE_SAMPLE_WORKFLOW, `v2-${profile}`, profile);
+      expect(lastResponse()).toMatchObject({
+        kind: 'result-v2',
+        id: `v2-${profile}`,
+        result: { profile: { id: profile, version }, analysis: { status: 'COMPLETE' } },
+      });
     });
   });
 });

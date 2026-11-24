@@ -104,18 +104,28 @@ describe('MCP JSON-RPC envelope', () => {
     expect((await handleMcpRequest({ jsonrpc: '2.0', id: 40, method: 'tools/list' }))?.result).toBeDefined();
   });
 
-  it('scans the documented ./-name input escape', async () => {
+  it('scans the documented ./-name input escape and defaults to no-color pretty plus structuredContent', async () => {
     await withTempDirectory(async (directory) => {
       await copyFile(cleanWorkflow, join(directory, '-name.json'));
       const response = await handleMcpRequest({
         jsonrpc: '2.0', id: 60, method: 'tools/call',
         params: { name: 'n8n_scan', arguments: { inputs: ['./-name.json'] } },
       }, { cwd: directory });
-      const result = response?.result as { isError?: boolean; structuredContent?: { exitCode?: number }; content: Array<{ text: string }> };
+      const result = response?.result as {
+        isError?: boolean;
+        structuredContent?: { exitCode?: number; profile?: { id: string; version: string }; grade?: string; score?: number; findings?: unknown[] };
+        content: Array<{ text: string }>;
+      };
       expect(result.isError).toBe(false);
-      expect(result.structuredContent?.exitCode).toBe(0);
-      const document = JSON.parse(result.content[0]!.text) as { results: Array<{ input: string }> };
-      expect(document.results.map((item) => item.input)).toEqual(['-name.json']);
+      expect(result.structuredContent).toMatchObject({
+        exitCode: 0,
+        profile: { id: 'standard', version: '3.0.0' },
+        grade: 'LOW',
+        score: 0,
+        findings: [],
+      });
+      expect(result.content[0]!.text).toContain('-name.json');
+      expect(result.content[0]!.text).not.toContain('\u001b[');
     });
   });
 
@@ -127,7 +137,7 @@ describe('MCP JSON-RPC envelope', () => {
       // file is named directly and the glob still has to select it by its normalized label.
       const response = await handleMcpRequest({
         jsonrpc: '2.0', id: 61, method: 'tools/call',
-        params: { name: 'n8n_scan', arguments: { inputs: ['./-name.json', 'clean.json'], include: ['**/-name.json'] } },
+        params: { name: 'n8n_scan', arguments: { inputs: ['./-name.json', 'clean.json'], format: 'json', include: ['**/-name.json'] } },
       }, { cwd: directory });
       const result = response?.result as { isError?: boolean; structuredContent?: { exitCode?: number }; content: Array<{ text: string }> };
       expect(result.isError).toBe(false);
@@ -145,7 +155,7 @@ describe('MCP JSON-RPC envelope', () => {
       }));
       const response = await handleMcpRequest({
         jsonrpc: '2.0', id: 63, method: 'tools/call',
-        params: { name: 'n8n_scan', arguments: { inputs: ['webhook-auth.json'], failOn: 'CRITICAL' } },
+        params: { name: 'n8n_scan', arguments: { inputs: ['webhook-auth.json'], format: 'json', failOn: 'CRITICAL' } },
       }, { cwd: directory });
       const result = response?.result as { isError?: boolean; structuredContent?: { exitCode?: number }; content: Array<{ text: string }> };
       expect(result.isError).toBe(false);
@@ -153,6 +163,45 @@ describe('MCP JSON-RPC envelope', () => {
       const document = JSON.parse(result.content[0]!.text) as { results: Array<{ result?: { analysis: { status: string }; findings: Array<{ ruleId: string }> } }> };
       expect(document.results[0]?.result?.analysis.status).toBe('COMPLETE');
       expect(document.results[0]?.result?.findings.map(({ ruleId }) => ruleId)).toEqual(['WEBHOOK_EXPOSURE', 'WEBHOOK_EXPOSURE']);
+    });
+  });
+
+  it('supports v0.3 filtering, failOn NONE, approvedDomains, markdown format, and structured finding summaries without secret leaks', async () => {
+    const canary = ['sk', 'mcp-canary-leak-check-1234567890'].join('-');
+    await withTempDirectory(async (directory) => {
+      await writeFile(join(directory, 'risky.json'), JSON.stringify({
+        nodes: [
+          { id: 'cmd', name: 'Shell', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: 'ls' } },
+          { id: 'http', name: 'Call', type: 'n8n-nodes-base.httpRequest', typeVersion: 4, parameters: { url: 'https://approved.example.com/hook', apiKey: canary } },
+        ],
+        connections: {},
+      }));
+      const res = await handleMcpRequest({
+        jsonrpc: '2.0', id: 64, method: 'tools/call',
+        params: {
+          name: 'n8n_scan',
+          arguments: {
+            inputs: ['risky.json'],
+            format: 'markdown',
+            failOn: 'NONE',
+            minSeverity: 'HIGH',
+            minConfidence: 'MEDIUM',
+            approvedDomains: ['approved.example.com'],
+          },
+        },
+      }, { cwd: directory });
+      const result = res?.result as {
+        isError?: boolean;
+        structuredContent?: { exitCode?: number; findings?: Array<{ ruleId: string; remediation?: string }> };
+        content: Array<{ text: string }>;
+      };
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent?.exitCode).toBe(0);
+      expect(result.content[0]!.text).toContain('N8N_EXECUTE_COMMAND');
+      expect(result.content[0]!.text).toContain('RAW_SECRET_INDICATOR');
+      expect(result.structuredContent?.findings?.map((f) => f.ruleId)).toEqual(['N8N_EXECUTE_COMMAND', 'RAW_SECRET_INDICATOR']);
+      expect(result.structuredContent?.findings?.[0]?.remediation).toBeTruthy();
+      expect(JSON.stringify(result)).not.toContain(canary);
     });
   });
 

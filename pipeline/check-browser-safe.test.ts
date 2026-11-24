@@ -167,6 +167,13 @@ describe('emitted scanner worker gate', () => {
     expect(findEmittedArtifactViolations('module.process(input);', 'fixture.js')).toEqual([]);
   });
 
+  it('masks the @lezer/lr process/browser wrapper across minified module parameter names', () => {
+    expect(findEmittedArtifactViolations(
+      'var c,a;e.exports=(null==(c=r.g.process)?void 0:c.env)&&"object"==typeof(null==(a=r.g.process)?void 0:a.env)?r.g.process:r(5116)',
+      '447.js',
+    )).toEqual([]);
+  });
+
   it('detects forbidden code inside a template substitution but ignores template text', () => {
     expect(findEmittedArtifactViolations('const message = `fetch(url) ${fetch(url)}`;', 'template.js'))
       .toEqual([expect.objectContaining({ name: 'fetch API reference' })]);

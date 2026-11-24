@@ -1,7 +1,8 @@
 import type { SourceMemberRefV2, SubjectV2 } from '@hub/contracts/scanner-v2-source';
+import { isAdvisoryFactKindV1 } from '@hub/contracts/scanner-v2-advisory';
+import { FIELD_FLOW_PROPERTY_TYPES_V1 } from '@hub/contracts/scanner-v2-field-flow';
 import type { ScannerReportModelV2 } from '../scanner-v2-presentation';
 import { safeReportText } from '../report/report-safe-content';
-import { isAdvisoryFactKindV1 } from '@hub/contracts/scanner-v2-advisory';
 import { AdvisoryFactDetails } from './report-advisory';
 
 type ReportEvidenceProps = { model: ScannerReportModelV2 };
@@ -24,6 +25,9 @@ const FACT_FIELDS: Readonly<Record<string, readonly string[]>> = {
   'node.configuration.v2': ['observation', 'header', 'literalValue', 'parameterPath', 'secretKind', 'indicator', 'hasLiteralValue'],
   'code.indicator.v2': ['language', 'indicator', 'member', 'start', 'end', 'parseState'],
   'dataflow.summary.v2': ['flowKind', 'sink', 'parameterPath', 'referenceRoot', 'propertyPath', 'sourceNodeId', 'sourceNodeName', 'propertyPathComplete', 'humanGatePresent', 'humanGateDominates', 'taintLabels'],
+  'dataflow.provenance.v1': Object.keys(FIELD_FLOW_PROPERTY_TYPES_V1['dataflow.provenance.v1']),
+  'dataflow.summary.v3': Object.keys(FIELD_FLOW_PROPERTY_TYPES_V1['dataflow.summary.v3']),
+  'dataflow.coverage.v1': Object.keys(FIELD_FLOW_PROPERTY_TYPES_V1['dataflow.coverage.v1']),
   'destination.v2': ['parameterPath', 'scheme', 'hostname', 'authorityState', 'valueMode'],
   'destination.v3': ['parameterPath', 'scheme', 'hostname', 'authorityState', 'valueMode', 'reason', 'omitted', 'inventoryStatus'],
   'destination.coverage.v1': ['inventoryStatus', 'nodesExamined', 'pathsConfigured', 'recordsEmitted', 'errors', 'omitted', 'errorCodes'],
@@ -88,14 +92,14 @@ export function ReportEvidence({ model }: ReportEvidenceProps) {
             const fields = (allowlist ?? []).flatMap((key) => Object.prototype.hasOwnProperty.call(fact.properties, key)
               ? [[key, displayFactValue(fact.properties[key])] as const]
               : []);
-            return <li key={fact.factId} className="rounded-control border border-hairline bg-raised/40 p-3">
-              <p className="font-mono text-xs font-semibold text-ink">{safeReportText(fact.kind, 100)}</p>
+            return <li key={fact.factId} className="min-w-0 rounded-control border border-hairline bg-raised/40 p-3">
+              <p className="break-words font-mono text-xs font-semibold text-ink">{safeReportText(fact.kind, 100)}</p>
               {isAdvisoryFactKindV1(fact.kind) ? <AdvisoryFactDetails fact={fact} /> : allowlist === undefined ? <p className="mt-2 text-sm text-ink-muted">{UNKNOWN_KIND_NOTE}</p> : <>
-                <p className="mt-1 text-xs leading-5 text-ink-muted">{fact.subject.kind === 'WORKFLOW' ? 'Workflow-wide fact.' : sourceSpanLabel(fact.subject)}</p>
+                <p className="mt-1 break-words text-xs leading-5 text-ink-muted">{fact.subject.kind === 'WORKFLOW' ? 'Workflow-wide fact.' : sourceSpanLabel(fact.subject)}</p>
                 {fields.length === 0 ? <p className="mt-2 text-sm text-ink-muted">{NO_FIELDS_NOTE}</p> : <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-                  {fields.map(([key, value]) => <div key={key}>
+                  {fields.map(([key, value]) => <div key={key} className="min-w-0">
                     <dt className="font-mono text-2xs uppercase tracking-wider text-ink-muted">{key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().replace(/^./, (letter) => letter.toUpperCase())}</dt>
-                    <dd className="mt-0.5 text-ink">{value}</dd>
+                    <dd className="mt-0.5 [overflow-wrap:anywhere] text-ink">{value}</dd>
                   </div>)}
                 </dl>}
               </>}

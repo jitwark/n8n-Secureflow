@@ -66,5 +66,6 @@ describe('TagsIndexPage', () => {
     // The ItemList itself only ever carried the published slice -- that part
     // was already true and stays true.
     expect(data.items).toHaveLength(MAX_STATIC_HUBS_PER_KIND);
+    expect((data.items as Array<{ path: string }>)[0]?.path).toMatch(/^\/library\/\?tag=/);
   });
 });

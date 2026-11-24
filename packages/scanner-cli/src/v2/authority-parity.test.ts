@@ -21,11 +21,17 @@ import {
 } from './contracts';
 import type { BatchResultV2 } from './batch-runner';
 import { explainDocumentV2, profilesDocumentV2, rulesDocumentV2, versionDocumentV2 } from './commands';
-import { projectBatchV2 } from './json-output';
+import { DEFAULT_PROJECTION_OPTIONS, projectBatchV2, serializeEnvelopeV2 } from './json-output';
 import { handleMcpRequest } from './mcp';
 import { serializeNdjsonV2 } from './ndjson-output';
+import { serializeSarifV2 } from '@hub/scanner-core/report/sarif-v2/output';
+import { BUILTIN_SEMANTIC_CATALOGUE_V2 } from '../../../scanner-core/src/semantics/builtin-catalogue';
+import { resolveNodeSemanticsForScan } from '../../../scanner-core/src/semantics/generic-fallback';
+import { parseSourceDocument } from '../../../scanner-core/src/source/source-parser';
+import { normalizeSecurityWorkflow } from '../../../scanner-core/src/workflow-v2/normalize-security-workflow';
 import { BUILTIN_SCOPED_SEMANTICS_AUTHORITY_V2 as coreScoped, authorityIsIntact } from '../../../scanner-core/src/v2/admitted-registry';
 import { resolveReviewedScopedSemantics, reviewedScopedSemanticsAreIntact } from '../../../scanner-core/src/semantics/generic-fallback';
+import { reviewedScopedAuthorityIsIntact } from '../../../scanner-core/src/semantics/noop-admission-authority';
 
 function scannedWorkflow() {
   const scanned = scanWorkflowV2({
@@ -43,6 +49,27 @@ function scannedBatch(): BatchResultV2 {
     ok: true, items: [{ label: 'workflow.json', status: 'COMPLETED', result: { ok: true, result } }],
     cancelled: false, completed: 1, failed: 0, concurrency: 1,
   };
+}
+
+function scannedNoop(parameters: unknown, typeVersion: unknown = 1) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ nodes: [{ id: 'noop', name: 'NoOp', type: 'n8n-nodes-base.noOp', typeVersion, parameters }], connections: {} }));
+  const result = scanWorkflowV2({ bytes, profile: { id: 'beta-default', version: '2.0.0' }, limits: DEFAULT_SCANNER_LIMITS_V2 });
+  if (!result.ok) throw new Error(result.code);
+  return result.result;
+}
+
+function batchOf(result: ReturnType<typeof scannedNoop>): BatchResultV2 {
+  return { ok: true, items: [{ label: 'noop.json', status: 'COMPLETED', result: { ok: true, result } }],
+    cancelled: false, completed: 1, failed: 0, concurrency: 1 };
+}
+
+function resolvedNoopSemanticId(parameters: unknown): string | null {
+  const bytes = new TextEncoder().encode(JSON.stringify({ nodes: [{ id: 'noop', name: 'NoOp', type: 'n8n-nodes-base.noOp', typeVersion: 1, parameters }], connections: {} }));
+  const parsed = parseSourceDocument(bytes);
+  if (!parsed.ok) throw new Error(parsed.code);
+  const normalized = normalizeSecurityWorkflow(parsed.document);
+  if (!normalized.ok) throw new Error(normalized.code);
+  return resolveNodeSemanticsForScan(BUILTIN_SEMANTIC_CATALOGUE_V2, normalized.workflow.nodes[0]!)?.semantics.semanticId ?? null;
 }
 
 describe('published authority pins', () => {
@@ -66,8 +93,10 @@ describe('published authority pins', () => {
     });
     expect(source.documentsRecords['message-mcp.gmail'].some((ref) => ref.endsWith('MessageDescription.js'))).toBe(false);
     expect(authorityIsIntact()).toBe(true);
-    expect(reviewedScopedSemanticsAreIntact(cliScoped.digest)).toBe(true);
+    expect(reviewedScopedSemanticsAreIntact(cliScoped.gmailDigest)).toBe(true);
     expect(reviewedScopedSemanticsAreIntact('0'.repeat(64))).toBe(false);
+    expect(reviewedScopedAuthorityIsIntact(cliScoped.gmailDigest, cliScoped.digest)).toBe(true);
+    expect(reviewedScopedAuthorityIsIntact(cliScoped.gmailDigest, '0'.repeat(64))).toBe(false);
   });
 
   it.each([
@@ -103,6 +132,34 @@ describe('published authority pins', () => {
 });
 
 describe('machine identity parity', () => {
+  it.each([
+    ['admitted', { options: { nested: true } }, 'COMPLETE', 'noop.passthrough'],
+    ['refused selector', { operation: 'run' }, 'COMPLETE', 'generic.fallback'],
+  ] as const)('preserves core/CLI %s workflow semantics on JSON, NDJSON and SARIF', (label, parameters, status, semanticId) => {
+    const core = scannedNoop(parameters);
+    const batch = batchOf(core);
+    const jsonText = serializeEnvelopeV2(batch, { ...DEFAULT_PROJECTION_OPTIONS, format: 'json' });
+    const json = JSON.parse(jsonText) as { schemaVersion: string; results: Array<{ ok: boolean; result: typeof core }> };
+    expect(json.schemaVersion).toBe('n8n-scan-v2');
+    expect(json.results[0]?.result).toMatchObject({ analysis: { status }, semantics: { digest: core.semantics.digest }, engine: { buildDigest: core.engine.buildDigest } });
+    expect(resolvedNoopSemanticId(parameters)).toBe(semanticId);
+    expect(core.analysis.diagnostics.some(({ code }) => code === 'SEMANTIC_CATALOGUE_MISS')).toBe(label === 'refused selector');
+
+    const ndjsonLines = serializeNdjsonV2(batch).trimEnd().split('\n').map((line) => JSON.parse(line) as { type: string; item?: { ok: boolean; result?: typeof core } });
+    const ndjsonResult = ndjsonLines.find(({ type }) => type === 'result')?.item?.result;
+    expect(ndjsonResult).toMatchObject({ analysis: { status }, semantics: { digest: core.semantics.digest }, engine: { buildDigest: core.engine.buildDigest } });
+
+    if (!batch.ok) throw new Error(batch.code);
+    const sarifText = serializeSarifV2({ items: batch.items });
+    const sarif = JSON.parse(sarifText) as { version: string; $schema: string; runs: Array<{ tool: { driver: { name: string } }; results: unknown[] }> };
+    expect(sarif.version).toBe('2.1.0');
+    expect(sarif.$schema).toBe('https://json.schemastore.org/sarif-2.1.0.json');
+    expect(sarif.runs).toHaveLength(1);
+    expect(sarif.runs[0]?.tool.driver.name).toBe('secureflow-scanner');
+    expect(sarif.runs[0]?.results).toHaveLength(core.findings.length);
+    expect(label).toBeTruthy();
+  });
+
   it('reports the core engine build digest in the version document', () => {
     const result = scannedWorkflow();
     const version = versionDocumentV2();
@@ -121,7 +178,7 @@ describe('machine identity parity', () => {
       ruleset: BUILTIN_RULESET_AUTHORITY_V2.digest, semantics: BUILTIN_SEMANTICS_AUTHORITY_V2.digest,
       scopedSemantics: cliScoped,
     })).digest('hex');
-    expect(envelopeTool).toEqual({ name: 'n8n-scan', version: '0.1.0', buildDigest: expectedDigest });
+    expect(envelopeTool).toEqual({ name: 'n8n-scan', version: '0.3.0', buildDigest: expectedDigest });
 
     const explained = explainDocumentV2('N8N_EXECUTE_COMMAND');
     expect(explained.ok).toBe(true);
@@ -139,7 +196,7 @@ describe('machine identity parity', () => {
       await writeFile(join(directory, 'workflow.json'), '{"nodes":[],"connections":{}}');
       const response = await handleMcpRequest({
         jsonrpc: '2.0', id: 1, method: 'tools/call',
-        params: { name: 'n8n_scan', arguments: { inputs: ['workflow.json'] } },
+        params: { name: 'n8n_scan', arguments: { inputs: ['workflow.json'], format: 'json' } },
       }, { cwd: directory });
       const payload = response?.result as { content: Array<{ text: string }> };
       const mcpEnvelope = JSON.parse(payload.content[0]!.text) as { tool: unknown };

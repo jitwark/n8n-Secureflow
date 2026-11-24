@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
+import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { expectedArtifact, verifyArtifactBytes } from './artifact-integrity';
+import {
+  decodeArtifactBytes,
+  expectedArtifact,
+  resolvePackedPath,
+  verifyArtifactBytes,
+} from './artifact-integrity';
 import type { Manifest } from '../catalogue/manifest';
 
 function hash(text: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(text)));
 }
 
-function manifestWith(...artifacts: { path: string; byteSize: number; sha256: string }[]): Manifest {
+function manifestWith(...artifacts: { path: string; byteSize: number; sha256: string; entryCount?: number }[]): Manifest {
   return {
     schemaVersion: 'manifest-v1',
     generatedAt: '2026-08-30T00:00:00.000Z',
@@ -65,5 +71,44 @@ describe('verifyArtifactBytes', () => {
   it('reports a match when no byteSize is supplied and the hash agrees', async () => {
     const text = '{"a":1}';
     await expect(verifyArtifactBytes(text, { sha256: hash(text) })).resolves.toBe('match');
+  });
+
+  it('verifies raw Uint8Array bytes directly without UTF-8 re-encoding', async () => {
+    const gz = new Uint8Array(gzipSync(Buffer.from('{"a":1}', 'utf8')));
+    const expectedSha = bytesToHex(sha256(gz));
+    await expect(verifyArtifactBytes(gz, { sha256: expectedSha, byteSize: gz.byteLength })).resolves.toBe('match');
+    await expect(verifyArtifactBytes(gz, { sha256: expectedSha, byteSize: gz.byteLength + 1 })).resolves.toBe('mismatch');
+  });
+});
+
+describe('resolvePackedPath and decodeArtifactBytes', () => {
+  it('prefers .json.gzbin over .json when both or .gzbin exist in manifest', () => {
+    const manifest = manifestWith(
+      { path: 'search-index.json', byteSize: 100, sha256: 'a'.repeat(64), entryCount: 10 },
+      { path: 'search-index.json.gzbin', byteSize: 40, sha256: 'b'.repeat(64), entryCount: 10 },
+    );
+    expect(resolvePackedPath(manifest, 'search-index.json')).toEqual({
+      path: 'search-index.json.gzbin',
+      expectation: { sha256: 'b'.repeat(64), byteSize: 40 },
+      entryCount: 10,
+    });
+  });
+
+  it('falls back to .json when .gzbin is absent or manifest is unavailable', () => {
+    const manifest = manifestWith({ path: 'search-index.json', byteSize: 100, sha256: 'a'.repeat(64), entryCount: 10 });
+    expect(resolvePackedPath(manifest, 'search-index.json')).toEqual({
+      path: 'search-index.json',
+      expectation: { sha256: 'a'.repeat(64), byteSize: 100 },
+      entryCount: 10,
+    });
+    expect(resolvePackedPath(undefined, 'search-index.json')).toEqual({ path: 'search-index.json' });
+  });
+
+  it('decompresses gzip magic-byte payloads and passes through plain UTF-8 bytes', async () => {
+    const plain = '{"hello":"gzbin"}';
+    const gz = new Uint8Array(gzipSync(Buffer.from(plain, 'utf8')));
+    const raw = new TextEncoder().encode(plain);
+    await expect(decodeArtifactBytes(gz)).resolves.toBe(plain);
+    await expect(decodeArtifactBytes(raw)).resolves.toBe(plain);
   });
 });

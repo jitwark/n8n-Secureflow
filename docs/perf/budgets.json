@@ -1,8 +1,8 @@
 {
   "schemaVersion": "performance-budgets-v1",
   "status": "provisional",
-  "lastMeasured": "2026-09-04",
-  "basis": "Local static export of the 11,464-entry corpus on 2026-09-04, after the REL-01 quarantine. Owner approval and real-device measurement remain open, so this stays provisional.",
+  "lastMeasured": "2026-11-24",
+  "basis": "Local static export of the v0.3 packed corpus on 2026-11-24: 33,723,431 bytes across 755 files. This describes the shipped build, not the retired per-workflow-page export, and the route caps still carry their 2026-09-04 measurements because `scripts/measure-budgets.mjs` reads `data/search-index.json`, which the packed export now ships as `data/search-index.json.gzbin` — so route re-measurement is a known open item rather than a validated value. Owner approval and real-device measurement remain open, so this stays provisional.",
   "routes": {
     "/": {
       "initialGzipBytes": 240000,
@@ -17,10 +17,10 @@
     "gzipBytes": 2621440
   },
   "export": {
-    "files": 18000,
-    "rawBytes": 943718400,
-    "htmlBytes": 560000000,
-    "note": "Measured 476,100,991 HTML bytes and 809,688,520 raw across 15,194 files on 2026-09-04. htmlBytes raised from 524,288,000, where the export had 0.014% headroom — roughly one more catalogue page before the build failed. 560,000,000 leaves 15.0%. rawBytes is deliberately NOT raised: 943,718,400 sits under a host site limit we do not control, so the correct response to pressure there is to ship fewer bytes, not to widen the cap. It has 14.2% headroom today. files has 15.6%."
+    "files": 1500,
+    "rawBytes": 36700160,
+    "htmlBytes": 10485760,
+    "note": "v0.3 packed-export ratchet. Measured 2026-11-24: 33,723,431 bytes across 755 files (32.16 MiB, of which 2,907,053 bytes are HTML across 50 documents), from a single client-resolved `/w/view/?id=...` route with 132 packed `.gzbin` buckets replacing the per-entry `/w/<slug>/` detail route. rawBytes is the < 35 MiB product target and sits well below the 1 GB GitHub Pages ceiling; it is deliberately NOT widened, because the correct response to pressure there is to ship fewer bytes. files drops from 18,000 to 1,500 — the old cap described the per-entry detail export, and keeping it would have let per-entry pages return without ever warning. htmlBytes drops from 560,000,000 to 10,485,760 for the same reason: HTML is now 50 documents, so a 560 MB allowance no longer measures anything."
   },
   "marginPolicy": {
     "minHeadroomPercent": 5,

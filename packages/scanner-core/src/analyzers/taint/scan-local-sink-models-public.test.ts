@@ -62,8 +62,8 @@ describe('source-bound terminal sink variants through the actual producer', () =
     expect(result.stats.omittedFindings).toBe(0);
   });
 
-  it('keeps public hardened admission closed', () => {
-    const result = scanWorkflowV2({ bytes: encode(workflowFor(variants[1])), profile: { ...profile, id: 'beta-hardened' } });
+  it('keeps unadmitted profile admission closed', () => {
+    const result = scanWorkflowV2({ bytes: encode(workflowFor(variants[1])), profile: { ...profile, id: 'unadmitted-profile' } });
     expect(result).toMatchObject({ ok: false, code: 'PROFILE_NOT_ADMITTED' });
   });
 });

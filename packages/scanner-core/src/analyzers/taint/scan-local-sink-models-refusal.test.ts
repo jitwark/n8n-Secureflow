@@ -25,19 +25,20 @@ describe('catalogued sinks without reviewed terminal models', () => {
     expect([...observed].sort()).toEqual(Object.values(TAINTED_RULE_SINK_CLASSES_V1).sort());
   });
 
-  it.each(unsupported)('$sink is UNKNOWN in the actual model, public result and dormant candidate', (item) => {
+  it.each(unsupported)('$sink is UNKNOWN in the actual model, COMPLETE without GRAPH_ANALYSIS_DEGRADED in public/dormant consumers', (item) => {
     const workflow = unknownWorkflow(item.type, item.parameters, 'version' in item ? item.version : 1);
     const compiled = compileFixture(workflow);
     expect(compiled.model).toEqual({ status: 'UNKNOWN', reason: 'NO_REVIEWED_SINK_MODEL' });
     expect(compiled.used()).toBeGreaterThan(0);
     const result = publicScan(workflow);
-    expect(result.analysis.status).toBe('DEGRADED');
-    expect(result.analysis.diagnostics).toContainEqual(expect.objectContaining({ code: 'GRAPH_ANALYSIS_DEGRADED', observed: 1, omitted: 0 }));
-    expect(result.facts.some((fact) => fact.kind.startsWith('dataflow.'))).toBe(false);
+    expect(result.analysis.status).toBe('COMPLETE');
+    expect(result.analysis.diagnostics.some((d) => d.code === 'GRAPH_ANALYSIS_DEGRADED')).toBe(false);
+    expect(result.facts.some((fact) => fact.kind === 'dataflow.provenance.v1' || fact.kind === 'dataflow.summary.v3')).toBe(false);
+    expect(result.findings.some((finding) => finding.ruleId.startsWith('TAINTED_'))).toBe(false);
     expect(result.traces).toEqual([]);
     const dormant = dormantScan(workflow).byCapability.get('taint-integrity')!;
     expect(dormant.findings).toEqual([]);
-    expect(dormant.diagnostics.length).toBeGreaterThan(0);
+    expect(dormant.diagnostics).toEqual([]);
     expect(compileFixture(workflow, 1).model.status).toBe('LIMITED');
   });
 
@@ -66,13 +67,15 @@ describe('supported sink model refusal boundaries', () => {
     expect(compileFixture(missing).model).toEqual({ status: 'UNKNOWN', reason: 'UNSUPPORTED_VERSION' });
   });
 
-  it.each(variants)('$name dynamic or disconnected input stays UNKNOWN at both consumers', (variant) => {
+  it.each(variants)('$name dynamic or disconnected input stays COMPLETE without dataflow findings or GRAPH_ANALYSIS_DEGRADED', (variant) => {
     const workflow = workflowFor(variant, variant.versions[0], { ...variant.extra,
       [variant.parameter]: '={{ $json.body[$json.key] }}' });
     for (const input of [workflow, { ...workflowFor(variant), connections: {} }]) {
       const result = publicScan(input);
-      expect(result.analysis.status).toBe('DEGRADED');
-      expect(result.facts.some((fact) => fact.kind.startsWith('dataflow.'))).toBe(false);
+      expect(result.analysis.status).toBe('COMPLETE');
+      expect(result.analysis.diagnostics.some((d) => d.code === 'GRAPH_ANALYSIS_DEGRADED')).toBe(false);
+      expect(result.facts.some((fact) => fact.kind === 'dataflow.provenance.v1' || fact.kind === 'dataflow.summary.v3')).toBe(false);
+      expect(result.findings.some((finding) => finding.ruleId.startsWith('TAINTED_'))).toBe(false);
       expect(dormantScan(input).byCapability.get('taint-integrity')?.findings).toEqual([]);
     }
   });

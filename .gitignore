@@ -95,3 +95,17 @@ test-results/
 # Authentic private workflow fixtures: unredistributable link-only bodies must not be committed.
 pipeline/scan/__fixtures__/
 
+# Local QA scratch, transcripts, and retired preflight artifacts.
+.firebase/
+app/out-canary/
+omp-session-*.html
+data/scanner/preflight-prerequisites.ndjson
+.trail/
+sfscanner/
+canary-*.png
+qa-*.png
+scanner-desktop.png
+0
+seen
+
+

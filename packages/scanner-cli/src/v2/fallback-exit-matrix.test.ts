@@ -77,7 +77,7 @@ type Envelope = {
     result: {
       engine: { version: string };
       profile: { id: string; version: string };
-      analysis: { status: string; diagnostics: Array<{ code: string; location?: { pointer?: string } }> };
+      analysis: { status: string; diagnostics: Array<{ code: string; aggregateEffect?: string; location?: { pointer?: string } }> };
       assessment: { grade?: string } | null;
       findings: Array<{ ruleId: string }>;
     };
@@ -89,8 +89,13 @@ const codesAt = (envelope: Envelope, pointer: string) =>
     .filter(({ location }) => location?.pointer === pointer)
     .map(({ code }) => code);
 
+const effectsAt = (envelope: Envelope, pointer: string) =>
+  envelope.results[0]!.result.analysis.diagnostics
+    .filter(({ location }) => location?.pointer === pointer)
+    .map(({ aggregateEffect }) => aggregateEffect);
+
 describe('fallback surface parity: public CLI runner, same candidate', () => {
-  it('carries both codes, DEGRADED, and a grade at the default exit', async () => {
+  it('carries both non-degrading codes, COMPLETE status, and a grade at the default exit', async () => {
     await withTempDirectory(async (directory) => {
       const result = await runFallback(directory);
       const envelope = JSON.parse(result.stdout) as Envelope;
@@ -98,28 +103,30 @@ describe('fallback surface parity: public CLI runner, same candidate', () => {
       expect(result.exitCode).toBe(0);
       expect(envelope.exitReason).toBe('UNDER_THRESHOLD');
       expect(envelope.results[0]!.result.engine.version).toBe('2.0.0');
-      expect(envelope.results[0]!.result.profile).toMatchObject({ id: 'beta-default', version: '2.0.0' });
-      expect(envelope.results[0]!.result.analysis.status).toBe('DEGRADED');
+      expect(envelope.results[0]!.result.profile).toMatchObject({ id: 'standard', version: '3.0.0' });
+      expect(envelope.results[0]!.result.analysis.status).toBe('COMPLETE');
       expect(codesAt(envelope, '/nodes/1')).toEqual([
         'SEMANTIC_CATALOGUE_MISS',
         'GENERIC_NODE_UNMODELED_CAPABILITY',
       ]);
+      expect(effectsAt(envelope, '/nodes/1')).toEqual(['NONE', 'NONE']);
       expect(envelope.results[0]!.result.assessment?.grade).toBeTruthy();
     });
   }, 20_000);
 
-  it('changes only the exit under --require-complete on an innocuous unknown', async () => {
+  it('keeps exit 0 under --require-complete on a non-degrading innocuous unknown', async () => {
     await withTempDirectory(async (directory) => {
       const result = await runFallback(directory, fallbackWorkflow, ['--require-complete', '--fail-on', 'CRITICAL']);
       const envelope = JSON.parse(result.stdout) as Envelope;
 
-      expect(result.exitCode).toBe(1);
-      expect(envelope.exitReason).toBe('REQUIRE_COMPLETE');
-      expect(envelope.results[0]!.result.analysis.status).toBe('DEGRADED');
+      expect(result.exitCode).toBe(0);
+      expect(envelope.exitReason).toBe('UNDER_THRESHOLD');
+      expect(envelope.results[0]!.result.analysis.status).toBe('COMPLETE');
       expect(codesAt(envelope, '/nodes/1')).toEqual([
         'SEMANTIC_CATALOGUE_MISS',
         'GENERIC_NODE_UNMODELED_CAPABILITY',
       ]);
+      expect(effectsAt(envelope, '/nodes/1')).toEqual(['NONE', 'NONE']);
       expect(envelope.results[0]!.result.assessment?.grade).toBeTruthy();
     });
   }, 20_000);
@@ -138,7 +145,7 @@ describe('fallback surface parity: public CLI runner, same candidate', () => {
       const envelope = JSON.parse(result.stdout) as Envelope;
 
       expect(result.exitCode).toBe(1);
-      expect(envelope.results[0]!.result.analysis.status).toBe('DEGRADED');
+      expect(envelope.results[0]!.result.analysis.status).toBe('COMPLETE');
       expect(envelope.results[0]!.result.findings.map(({ ruleId }) => ruleId)).toContain('RAW_SECRET_INDICATOR');
       expect(result.stdout).not.toContain(secret);
     });

@@ -1,5 +1,12 @@
 import { fetchExtendedIndex, type OptionalSearchPayloadResult } from './fetch-index';
 import { couldUseSemanticVectors, reportRankingImproved } from './semantic-vectors';
+import {
+  decodeResponsePayload,
+  getKnownManifest,
+  readResponseBytes,
+  resolvePackedPath,
+  setKnownManifest,
+} from './artifact-integrity';
 import { sitePath } from '../ui/site-url.mjs';
 
 /**
@@ -12,7 +19,12 @@ export type PayloadTarget = {
   version: () => number;
 };
 
-type DeferredResponse = { ok: boolean; status?: number; text: () => Promise<string> };
+type DeferredResponse = {
+  ok: boolean;
+  status?: number;
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+  text?: () => Promise<string>;
+};
 type SemanticHashCheck = 'match' | 'mismatch' | 'unverifiable';
 type DeferredAdapters = {
   fetch?: (input: string) => Promise<DeferredResponse>;
@@ -38,20 +50,23 @@ const defaultValidateSemanticIndex = async (json: string): Promise<void> => {
 /**
  * AUDIT-SEARCH-003: schema-valid alone accepts a stale semantic index served
  * from a mismatched CDN edge or cache. Binds it to the manifest's sha256,
- * degrading to `'unverifiable'` (accept unverified) rather than blocking
- * whenever the manifest is unreachable or has no entry for this artifact —
- * see `artifact-integrity.ts` for why that degrade is the right default for
- * an optional payload.
+ * degrading to `'unverifiable'` (accept unverified) whenever the manifest is
+ * unreachable or has no entry for this artifact.
  */
-const defaultVerifySemanticIndexHash = async (json: string): Promise<SemanticHashCheck> => {
-  const [{ loadManifest }, { expectedArtifact, verifyArtifactBytes }] = await Promise.all([
+const defaultVerifySemanticIndexHash = async (
+  payload: string | Uint8Array,
+  artifactPath = SEMANTIC_INDEX_PATH,
+): Promise<SemanticHashCheck> => {
+  const [{ loadManifest }, { expectedArtifact, getCachedManifestForPromise, setKnownManifest: cacheManifest, verifyArtifactBytes }] = await Promise.all([
     import('../catalogue/manifest'),
     import('./artifact-integrity'),
   ]);
-  const manifest = await loadManifest().catch(() => undefined);
-  const expected = expectedArtifact(manifest, SEMANTIC_INDEX_PATH);
+  const manifestPromise = loadManifest();
+  const manifest = getCachedManifestForPromise(manifestPromise) ?? (await manifestPromise.catch(() => undefined));
+  if (manifest) cacheManifest(manifest, manifestPromise);
+  const expected = expectedArtifact(manifest, artifactPath);
   if (!expected) return 'unverifiable';
-  return verifyArtifactBytes(json, expected);
+  return verifyArtifactBytes(payload, expected);
 };
 
 export function createDeferredPayloadController(adapters: DeferredAdapters = {}) {
@@ -59,7 +74,7 @@ export function createDeferredPayloadController(adapters: DeferredAdapters = {})
   const readExtended = adapters.fetchExtended ?? fetchExtendedIndex;
   const readNow = adapters.now ?? (() => Date.now());
   const validateSemanticIndex = adapters.validateSemanticIndex ?? defaultValidateSemanticIndex;
-  const verifySemanticIndexHash = adapters.verifySemanticIndexHash ?? defaultVerifySemanticIndexHash;
+  const customVerifySemanticIndexHash = adapters.verifySemanticIndexHash;
   let target: PayloadTarget | null = null;
   let extendedRequested = false;
   let semanticRequested = false;
@@ -121,32 +136,46 @@ export function createDeferredPayloadController(adapters: DeferredAdapters = {})
     const requestGeneration = generation;
     void (async () => {
       try {
-        const response = await readFetch(sitePath('/data/semantic-index.json'));
+        const resolved = resolvePackedPath(getKnownManifest(), SEMANTIC_INDEX_PATH);
+        const response = await readFetch(sitePath(`/data/${resolved.path}`));
         if (generation !== requestGeneration || handle.version() !== version) return;
         if (response.status === 404) return;
         if (!response.ok) {
           if ((response.status ?? 0) >= 500) { semanticRequested = false; scheduleRetry('semantic'); }
           return;
         }
-        const json = await response.text();
+        const payload = await readResponseBytes(response);
+        if (generation !== requestGeneration || handle.version() !== version) return;
+        if (!customVerifySemanticIndexHash) {
+          const hashCheck = await defaultVerifySemanticIndexHash(payload.rawBytes ?? payload.rawText, resolved.path);
+          if (hashCheck === 'mismatch') {
+            if (generation === requestGeneration && handle.version() === version) {
+              semanticRequested = false;
+              scheduleRetry('semantic');
+            }
+            return;
+          }
+          if (generation !== requestGeneration || handle.version() !== version) return;
+        }
+        let json: string;
         try {
+          json = await decodeResponsePayload(payload);
           await validateSemanticIndex(json);
         } catch {
           return;
         }
         if (generation !== requestGeneration || handle.version() !== version) return;
-        // A hash mismatch means these bytes aren't this release's — unlike a
-        // malformed payload (terminal, above), that's worth retrying: the
-        // artifact may simply not have reached this edge/cache yet.
-        const hashCheck = await verifySemanticIndexHash(json);
-        if (hashCheck === 'mismatch') {
-          if (generation === requestGeneration && handle.version() === version) {
-            semanticRequested = false;
-            scheduleRetry('semantic');
+        if (customVerifySemanticIndexHash) {
+          const hashCheck = await customVerifySemanticIndexHash(json);
+          if (hashCheck === 'mismatch') {
+            if (generation === requestGeneration && handle.version() === version) {
+              semanticRequested = false;
+              scheduleRetry('semantic');
+            }
+            return;
           }
-          return;
+          if (generation !== requestGeneration || handle.version() !== version) return;
         }
-        if (generation !== requestGeneration || handle.version() !== version) return;
         clearRetry('semantic');
         if (handle.deliverSemantic(json)) reportRankingImproved();
       } catch {
@@ -162,6 +191,7 @@ export function createDeferredPayloadController(adapters: DeferredAdapters = {})
     generation += 1;
     extendedRequested = false;
     semanticRequested = false;
+    setKnownManifest(undefined);
     clearRetry('extended');
     clearRetry('semantic');
   }

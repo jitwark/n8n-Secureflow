@@ -14,13 +14,15 @@ exploitability or safety.
 ## Profile coverage
 
 `beta-default` has seven `LEGACY_SCORE` policies. `beta-hardened` is defined with those seven plus
-ten `REPORT_ONLY` policies from bounded JavaScript, Python, taint, and AI capability analysis; the
-profile is not admitted or selectable, so those advisory policies do not run in a shipped scan.
+fourteen `REPORT_ONLY` policies from bounded JavaScript, Python, taint, expression, graph and AI
+capability analysis. Both profiles are admitted and selectable in v0.3; the advisory policies run
+and report, but their findings are report-only and cannot change the risk score or grade. The v0.3
+`standard@3.0.0` default and `strict@3.0.0` alias run the full rule set.
 
 | Profile | Policy count | Effect boundary | Completeness boundary |
 | --- | ---: | --- | --- |
 | `beta-default` | 7 | Scored findings from the declarative policy set | Node source spans exist from normalization; no code-source, JavaScript/Python, taint, or AI analyzer coverage |
-| `beta-hardened` | 17 | The same 7 scored policies plus 10 defined advisory policies; not admitted or selectable | Analyzer diagnostics and caps are defined, but no shipped scan runs the advisory analyzers |
+| `beta-hardened` | 21 | The same 7 scored policies plus 14 report-only advisory policies; admitted and selectable, report-only | Analyzer diagnostics and caps are defined and the advisory analyzers run, but their findings never change the score |
 
 ## Active policies
 
@@ -52,6 +54,10 @@ does not claim, and for the mappings this review rejected or narrowed.
 | Hardened | `TAINTED_REQUEST_HEADER` | CWE-113 | Selected external input reaches an HTTP Request header value in the catalogued parameter shape. | `REPORT_ONLY` / MEDIUM / MEDIUM; precision MEDIUM. | Allowlist header names/values, avoid forwarding inbound authorization, and use managed credentials. | Exact HTTP Request shape only; no downstream proxy policy, credential merge, or recipient behavior. `encodeURIComponent` clears only header taint in the current sanitizer model. |
 | Hardened | `TAINTED_AI_PROMPT` | CWE-77 [^prompt] + OWASP Agentic: Prompt Injection | Selected external input reaches prompt/text fields on catalogued LangChain agent/chain nodes. | `REPORT_ONLY` / MEDIUM / LOW; precision LOW. | Treat inbound text as untrusted, separate instructions from data, constrain tools, and add human approval for consequential actions. | Does not run a model or prove prompt injection, model behavior, hidden context, or tool execution. Only catalogued nodes and reviewed connection types are modeled. |
 | Hardened | `AI_AGENT_UNGATED_TOOL` | CWE-269 + OWASP Agentic: Excessive Agency | An AI agent has at least one reviewed `ai_tool` edge, receives modeled taint, and lacks a catalogued human gate dominating every path. | `REPORT_ONLY` / MEDIUM / LOW; precision LOW. | Add and test a human approval gate for consequential tools; minimize tools and validate arguments. | Structural gate evidence is not proof of meaningful review. Unrecognized tools/gates, hidden calls, alternate branches, and actual operator intent are not inferred. |
+| Hardened | `EXPRESSION_SANDBOX_ESCAPE` | CWE-94 | An n8n expression attempts to step outside its sandbox using catalogued escape primitives. Evidence is the expression span, never evaluated. | `REPORT_ONLY` / CRITICAL / HIGH; precision HIGH. | Remove the expression, replace it with a supported operation, and treat sandbox-bypass attempts as a change-review event rather than a data question. | Matches only catalogued escape primitives; an expression that escapes via an unrecognized route is missed. No expression is ever evaluated, so this is a shape claim, not proof of execution. |
+| Hardened | `EXPRESSION_ENV_EXPOSURE` | CWE-200 | An n8n expression reads environment or secret-backed roots (`$env`, `$secrets`, `$credentials`, `process.env`) into a reportable parameter. Evidence is the expression span. | `REPORT_ONLY` / HIGH / HIGH; precision HIGH. | Move the value to a managed credential, restrict which parameters receive it, and rotate anything exposed in a stored or shared workflow. | Detects member access only; values assembled from fragments or resolved at runtime are not reconstructed, and an expression that reads nothing sensitive produces no finding. |
+| Hardened | `AGENT_EGRESS_UNRESTRICTED` | CWE-918 + OWASP Agentic: Excessive Agency | An AI agent reaches an HTTP tool with no operator-supplied approved-domain list constraining its destination. | `REPORT_ONLY` / HIGH / MEDIUM; precision MEDIUM. | Supply an approved-domain allowlist, or gate the agent's HTTP tool behind human approval. | Structural evidence only: it cannot tell whether the destination is genuinely dangerous, and it does not evaluate the data that reaches it. An empty allowlist is reported, not silently treated as permissive. |
+| Hardened | `UNAUTHENTICATED_TRIGGER_TO_SINK` | CWE-306 | An unauthenticated webhook/form trigger reaches a catalogued consequential sink over reviewed `main` execution edges. | `REPORT_ONLY` / CRITICAL / HIGH; precision HIGH. | Add authentication at the trigger, or gate and validate the flow before the sink. | Exact trigger and sink catalogs over reviewed edges; unknown nodes, dynamic references, gateway-level auth and runtime reachability reduce recall. No proof that the branch executes. |
 
 ### CWE and OWASP mapping notes
 

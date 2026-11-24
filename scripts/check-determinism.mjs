@@ -27,8 +27,8 @@ const ALLOWLIST = [
   // Current time only selects stale scratch work for cleanup; it does not affect retained entries.
   { paths: { 'pipeline/acquire/clean-old-runs.ts': { 'Date.now': 1 }, 'pipeline/enrich/omp-packet.ts': { 'Date.now': 1 } }, reason: 'age cutoff for stale scratch cleanup' },
   // Defaults preserve unique temporary names in production; stable callers inject clock and RNG.
-  // batch-ledger, batch-runner-support, and bundle-promotion are existing temp identity sites outside this slice.
-  { paths: { 'pipeline/enrich/describe-spawn.ts': { 'Date.now': 1, 'Math.random': 1 }, 'pipeline/stage-ledger.ts': { 'Date.now': 1, 'Math.random': 1 }, 'pipeline/enrich/batch-ledger.ts': { 'Date.now': 1 }, 'pipeline/enrich/batch-runner-support.ts': { 'Date.now': 1 }, 'pipeline/export/bundle-promotion.ts': { 'Date.now': 1 } }, reason: 'temporary file/directory identity only; assigned writers expose deterministic clock/RNG inputs' },
+  // batch-ledger and batch-runner-support are existing temp identity sites outside this slice.
+  { paths: { 'pipeline/enrich/describe-spawn.ts': { 'Date.now': 1, 'Math.random': 1 }, 'pipeline/stage-ledger.ts': { 'Date.now': 1, 'Math.random': 1 }, 'pipeline/enrich/batch-ledger.ts': { 'Date.now': 1 }, 'pipeline/enrich/batch-runner-support.ts': { 'Date.now': 1 } }, reason: 'temporary file/directory identity only; assigned writers expose deterministic clock/RNG inputs' },
 ];
 
 function allowedCounts() {

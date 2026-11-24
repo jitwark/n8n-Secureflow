@@ -9,7 +9,7 @@ type AboutSectionProps = {
 
 export function AboutSection({ entry, compact = false }: AboutSectionProps) {
   const publishStructured = Boolean(entry.descriptionContent) && isDescriptionContentPublishable(entry);
-  const publishPlain = entry.descriptionSource === 'upstream';
+  const publishPlain = entry.descriptionSource === 'upstream' || (isDescriptionContentPublishable(entry) && Boolean(entry.description));
 
   return (
     <section aria-labelledby="about-heading" className="min-w-0 space-y-3">

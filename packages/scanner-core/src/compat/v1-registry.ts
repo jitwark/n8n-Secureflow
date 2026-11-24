@@ -27,7 +27,7 @@ export type V1EvidenceProjection = Readonly<{
   ruleId: string; evidenceSchemaId: string; properties: readonly V1EvidenceProperty[];
 }>;
 export type V1DiagnosticMapping = Readonly<{
-  v2Code: string; v1Code: AnalysisDiagnosticCode; category: AnalysisDiagnosticCategory; status: 'DEGRADED' | 'INDETERMINATE';
+  v2Code: string; v1Code: AnalysisDiagnosticCode; category: AnalysisDiagnosticCategory; status: 'NONE' | 'DEGRADED' | 'INDETERMINATE';
 }>;
 
 const entry = (ruleId: string, capabilityId: string, effect: 'SCORING' | 'REPORT_ONLY', severity: ScanSeverity, confidence: FindingConfidence, evidenceSchemaId: string): V1RuleRegistryEntry => Object.freeze({ ruleId, revision: '1', capabilityId, effect, severity, confidence, evidenceSchemaId, remediationId: 'r' });
@@ -104,7 +104,7 @@ const V1_DIAGNOSTIC_CROSSWALK_ENTRIES = [
   { v2Code: 'GRAPH_ENTRY_UNRESOLVED', v1Code: 'GRAPH_ANALYSIS_DEGRADED', category: 'GRAPH', status: 'DEGRADED' }, { v2Code: 'GRAPH_WORK_LIMIT_EXCEEDED', v1Code: 'ANALYSIS_LIMIT_EXCEEDED', category: 'LIMIT', status: 'DEGRADED' }, { v2Code: 'GRAPH_ANALYSIS_DEGRADED', v1Code: 'GRAPH_ANALYSIS_DEGRADED', category: 'GRAPH', status: 'DEGRADED' },
   { v2Code: 'MALFORMED_NODE_PARAMETERS', v1Code: 'MALFORMED_NODE_PARAMETERS', category: 'PARSER', status: 'INDETERMINATE' }, { v2Code: 'MALFORMED_CONNECTION_INDEX', v1Code: 'MALFORMED_CONNECTION_INDEX', category: 'GRAPH', status: 'INDETERMINATE' }, { v2Code: 'POLICY_EXECUTION_FAILED', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' },
   { v2Code: 'REQUIRED_CAPABILITY_FAILED', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' }, { v2Code: 'DEPENDENCY_UNAVAILABLE', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' }, { v2Code: 'UNKNOWN_SCORING_RULE', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' },
-  { v2Code: 'SEMANTIC_CATALOGUE_MISS', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' }, { v2Code: 'GENERIC_NODE_UNMODELED_CAPABILITY', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'DEGRADED' }, { v2Code: 'UNKNOWN_REPORT_ONLY_RULE', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'DEGRADED' },
+  { v2Code: 'SEMANTIC_CATALOGUE_MISS', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'NONE' }, { v2Code: 'GENERIC_NODE_UNMODELED_CAPABILITY', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'NONE' }, { v2Code: 'UNKNOWN_REPORT_ONLY_RULE', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'DEGRADED' },
   { v2Code: 'COMPATIBILITY_PROJECTION_LOSS', v1Code: 'POLICY_EXECUTION_FAILED', category: 'POLICY', status: 'INDETERMINATE' },
   { v2Code: 'REQUIRED_STAGE_FAILURE', v1Code: 'REQUIRED_STAGE_FAILURE', category: 'POLICY', status: 'INDETERMINATE' },
 ] as const satisfies readonly V1DiagnosticMapping[];

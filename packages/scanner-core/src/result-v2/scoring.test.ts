@@ -18,14 +18,30 @@ const edgeSubject = (id: string): FindingV2['subject'] => ({ kind: 'EDGE', edge:
 const score = (findings: readonly FindingV2[], complexity: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW'): AssessmentV2 => scoreFindingsV2(findings, complexity);
 
 describe('scoreFindingsV2', () => {
-  it.each([['CRITICAL', 55], ['HIGH', 35], ['MEDIUM', 18], ['LOW', 6], ['INFO', 1]] as const)('uses %s weight', (severity, expected) => {
-    expect(score([base('a', { severity })]).score).toBe(expected);
+  it.each([
+    ['CRITICAL', 80, 'CRITICAL'],
+    ['HIGH', 55, 'HIGH'],
+    ['MEDIUM', 25, 'MEDIUM'],
+    ['LOW', 6, 'LOW'],
+    ['INFO', 1, 'LOW'],
+  ] as const)('enforces monotonic floor and grade for a single %s finding', (severity, expectedScore, expectedGrade) => {
+    const result = score([base('a', { severity })]);
+    expect(result.score).toBe(expectedScore);
+    expect(result.grade).toBe(expectedGrade);
+  });
+
+  it('uses severity weights when additive scores exceed severity floors', () => {
+    expect(score([base('a', { ruleId: 'R1', severity: 'CRITICAL' }), base('b', { ruleId: 'R2', severity: 'HIGH' })]).score).toBe(90);
+    expect(score([base('a', { ruleId: 'R1', severity: 'HIGH' }), base('b', { ruleId: 'R2', severity: 'HIGH' })]).score).toBe(70);
+    expect(score([base('a', { ruleId: 'R1', severity: 'MEDIUM' }), base('b', { ruleId: 'R2', severity: 'MEDIUM' })]).score).toBe(36);
+    expect(score([base('a', { ruleId: 'R1', severity: 'LOW' })]).score).toBe(6);
+    expect(score([base('a', { ruleId: 'R1', severity: 'INFO' })]).score).toBe(1);
   });
 
   it('decays repeated eligible findings by rule and caps at twice the base weight', () => {
     const findings = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => base(id, { ruleId: 'REPEATED', severity: 'HIGH' }));
     expect(score(findings).score).toBe(70);
-    expect(score(findings.slice(0, 1)).score).toBe(35);
+    expect(score(findings.slice(0, 1)).score).toBe(55);
   });
 
   it.each([
@@ -52,9 +68,71 @@ describe('scoreFindingsV2', () => {
     expect(score(findings).score).toBe(8); // 6 + 6 * 25% = 7.5
   });
 
-  it('adds complexity before capping and grading', () => {
-    expect(score([base('a', { severity: 'HIGH' })], 'MEDIUM').score).toBe(45);
+  it('adds complexity before applying floors, capping, and grading', () => {
+    expect(score([base('a', { severity: 'HIGH' })], 'MEDIUM')).toMatchObject({ score: 55, grade: 'HIGH' });
+    expect(score([base('a', { severity: 'CRITICAL' })], 'HIGH')).toMatchObject({ score: 80, grade: 'CRITICAL' });
+    expect(score([base('a', { ruleId: 'R1', severity: 'MEDIUM' }), base('b', { ruleId: 'R2', severity: 'MEDIUM' })], 'MEDIUM').score).toBe(46);
+    expect(score([base('a', { ruleId: 'R1', severity: 'HIGH' }), base('b', { ruleId: 'R2', severity: 'HIGH' })], 'MEDIUM')).toMatchObject({ score: 80, grade: 'CRITICAL' });
     expect(score([base('a', { severity: 'CRITICAL' }), base('b', { ruleId: 'OTHER', severity: 'HIGH' })], 'HIGH').score).toBe(100);
+  });
+
+  it.each([
+    ['CRITICAL', [base('a', { ruleId: 'R1', severity: 'CRITICAL' }), base('b', { ruleId: 'R2', severity: 'MEDIUM' })], 80, 'CRITICAL'],
+    ['CRITICAL', [base('a', { ruleId: 'R1', severity: 'CRITICAL' }), base('b', { ruleId: 'R2', severity: 'MEDIUM' }), base('c', { ruleId: 'R3', severity: 'LOW' })], 80, 'CRITICAL'],
+    ['HIGH', [base('a', { ruleId: 'R1', severity: 'HIGH' }), base('b', { ruleId: 'R2', severity: 'MEDIUM' })], 55, 'HIGH'],
+    ['MEDIUM', [base('a', { ruleId: 'R1', severity: 'MEDIUM' }), base('b', { ruleId: 'R2', severity: 'LOW' })], 25, 'MEDIUM'],
+  ] as const)('lifts %s sub-floor additive combinations to monotonic floor', (_severity, findings, expectedScore, expectedGrade) => {
+    const result = score(findings);
+    expect(result.score).toBe(expectedScore);
+    expect(result.grade).toBe(expectedGrade);
+    expect(result.basisFindingIds).toHaveLength(findings.length);
+  });
+
+  it('preserves additive scores above severity floors, caps at 100, and aligns grade with score', () => {
+    const score92 = score([
+      base('a', { ruleId: 'R1', severity: 'CRITICAL' }),
+      base('b', { ruleId: 'R2', severity: 'MEDIUM' }),
+      base('c', { ruleId: 'R3', severity: 'MEDIUM' }),
+      base('d', { ruleId: 'R4', severity: 'INFO' }),
+    ]);
+    expect(score92).toMatchObject({ score: 92, grade: 'CRITICAL' });
+
+    const capped = score([
+      base('a', { ruleId: 'R1', severity: 'CRITICAL' }),
+      base('b', { ruleId: 'R2', severity: 'CRITICAL' }),
+      base('c', { ruleId: 'R3', severity: 'LOW' }),
+    ]);
+    expect(capped).toMatchObject({ score: 100, grade: 'CRITICAL' });
+
+    const contractGrade = (s: number) => (s >= 80 ? 'CRITICAL' : s >= 55 ? 'HIGH' : s >= 25 ? 'MEDIUM' : 'LOW');
+    for (const severity of ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const) {
+      const single = score([base('a', { severity })]);
+      expect(single.grade).toBe(contractGrade(single.score));
+    }
+  });
+
+  it('does not trigger severity floors for report-only, non-observed, or non-applicable findings', () => {
+    for (const severity of ['CRITICAL', 'HIGH', 'MEDIUM'] as const) {
+      const excluded = [
+        base('a', { ruleId: 'R1', severity, effect: 'REPORT_ONLY' }),
+        base('b', { ruleId: 'R2', severity, conclusion: 'POTENTIAL' }),
+        base('c', { ruleId: 'R3', severity, conclusion: 'UNKNOWN' }),
+        base('d', { ruleId: 'R4', severity, applicability: 'NOT_APPLICABLE' }),
+        base('e', { ruleId: 'R5', severity, applicability: 'UNKNOWN' }),
+      ];
+      expect(score(excluded)).toMatchObject({ score: 0, grade: 'LOW', basisFindingIds: [] });
+      expect(score([...excluded, base('f', { ruleId: 'R6', severity: 'LOW' })])).toMatchObject({
+        score: 6, grade: 'LOW', basisFindingIds: [digest('f')],
+      });
+    }
+
+    const mediumWithExcludedCritical = score([
+      base('a', { ruleId: 'R1', severity: 'CRITICAL', effect: 'REPORT_ONLY' }),
+      base('b', { ruleId: 'R2', severity: 'CRITICAL', conclusion: 'POTENTIAL' }),
+      base('c', { ruleId: 'R3', severity: 'CRITICAL', applicability: 'NOT_APPLICABLE' }),
+      base('d', { ruleId: 'R4', severity: 'MEDIUM' }),
+    ]);
+    expect(mediumWithExcludedCritical).toMatchObject({ score: 25, grade: 'MEDIUM', basisFindingIds: [digest('d')] });
   });
 
   it('uses exclusion precedence and exhaustively partitions findings in canonical order', () => {

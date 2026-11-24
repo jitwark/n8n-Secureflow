@@ -8,8 +8,8 @@ describe('RelatedLinks', () => {
     expect(screen.getByRole('link', { name: 'workflow_with_a_long_unbroken_title' }).className).toContain('break-words');
   });
 
-  it('encodes a generated slug as one workflow route segment', () => {
-    render(<RelatedLinks links={[{ id: 'related', slug: 'folder/name?one', title: 'Related workflow' }]} />);
-    expect(screen.getByRole('link', { name: 'Related workflow' }).getAttribute('href')).toBe('/w/folder%2Fname%3Fone/');
+  it('encodes the workflow target onto the client view route', () => {
+    render(<RelatedLinks links={[{ id: '', slug: 'folder/name?one', title: 'Related workflow' }]} />);
+    expect(screen.getByRole('link', { name: 'Related workflow' }).getAttribute('href')).toBe('/w/view/?id=folder%2Fname%3Fone');
   });
 });

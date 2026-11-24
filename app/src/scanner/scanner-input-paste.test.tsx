@@ -11,7 +11,7 @@ const workflowJson = JSON.stringify({
 
 const expectedRequest = {
   json: workflowJson,
-  profile: 'beta-default' as const, // ScannerInput.submit sends the only admitted profile (scanner-input.tsx:84)
+  profile: 'standard' as const,
   approvedDomains: [],
 };
 

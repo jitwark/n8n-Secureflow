@@ -264,7 +264,7 @@ Next's static export emits **six files per page** — `index.html` plus five RSC
 totalling 330–500 KB. Putting the long tail through it would have cost 4.3 GB against a **1 GB
 GitHub Pages ceiling** that the committed corpus already spends 517.6 MiB of (542,722,431 tracked
 bytes). Measured, not
-estimated by a page-weight measurement script retained in git history (see `docs/audit/HISTORY.md`).
+estimated, by a page-weight measurement script retained in git history.
 
 So the top 250 by quality go through Next with a deterministic static SVG preview, accessible node
 list, and an explicit action for the pan-and-zoom canvas; `scripts/generate-lean-pages.tsx` writes

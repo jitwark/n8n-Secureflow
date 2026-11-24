@@ -74,4 +74,52 @@ describe('worker / SearchEngine ranking', () => {
     expect(filtered?.ids).toEqual(['semantic-only']);
     expect(filtered?.items[0]?.semanticScore).toBeGreaterThan(0);
   });
+
+  it('keeps gmail and webhook precision-bounded without synonym explosion and ranks >=25 hits with semantic boost', () => {
+    const gmailEntries = Array.from({ length: 26 }, (_, i) => makeEntry({
+      id: `gmail-${i}`, slug: `gmail-${i}`, title: `Gmail automation ${i}`,
+      summary: i === 25 ? 'Priority urgent inbox triage' : `Gmail sync ${i}`,
+      rights: { status: 'link_only' },
+      structure: { nodeCount: 4, integrations: ['gmail'], trigger: 'Schedule', hasWebhook: false, nodeTypes: ['n8n-nodes-base.gmail'] },
+    }));
+    const emailEntries = Array.from({ length: 15 }, (_, i) => makeEntry({
+      id: `email-${i}`, slug: `email-${i}`, title: `Email SMTP sender ${i}`,
+      rights: { status: 'link_only' },
+      structure: { nodeCount: 4, integrations: ['smtp'], trigger: 'Schedule', hasWebhook: false, nodeTypes: ['n8n-nodes-base.emailSend'] },
+    }));
+    const webhookEntries = Array.from({ length: 16 }, (_, i) => makeEntry({
+      id: `webhook-${i}`, slug: `webhook-${i}`, title: `Webhook intake ${i}`,
+      rights: { status: 'link_only' },
+      structure: { nodeCount: 4, integrations: ['webhook'], trigger: 'Webhook', hasWebhook: true, nodeTypes: ['n8n-nodes-base.webhook'] },
+    }));
+    const httpEntries = Array.from({ length: 15 }, (_, i) => makeEntry({
+      id: `http-${i}`, slug: `http-${i}`, title: `HTTP REST client ${i}`,
+      rights: { status: 'link_only' },
+      structure: { nodeCount: 4, integrations: ['http'], trigger: 'Schedule', hasWebhook: false, nodeTypes: ['n8n-nodes-base.httpRequest'] },
+    }));
+    const all = [...gmailEntries, ...emailEntries, ...webhookEntries, ...httpEntries];
+    const index = buildSearchIndex(all);
+    const boostVec = buildSemanticVector({ title: 'gmail', summary: '', tags: '', integrations: 'gmail', trigger: '', content: 'gmail' });
+    const semanticIndex = JSON.stringify({
+      version: 1,
+      dimensions: SEMANTIC_DIMENSIONS,
+      documents: [
+        { id: 'gmail-25', vector: boostVec },
+        { id: 'email-0', vector: boostVec },
+      ],
+    });
+    const engine = new SearchEngine();
+    engine.init(index.serializedIndex, buildFacets(all), semanticIndex);
+
+    const gmailRes = engine.search(1, 'gmail', undefined, { limit: 30 });
+    expect(gmailRes?.total).toBe(26);
+    expect(gmailRes?.ids.every((id) => id.startsWith('gmail-'))).toBe(true);
+    expect(gmailRes?.ids).not.toContain('email-0');
+    expect(gmailRes?.items[0]?.id).toBe('gmail-25');
+    expect(gmailRes?.items[0]?.semanticScore).toBeGreaterThan(0);
+
+    const webhookRes = engine.search(2, 'webhook', undefined, { limit: 30 });
+    expect(webhookRes?.total).toBe(16);
+    expect(webhookRes?.ids.every((id) => id.startsWith('webhook-'))).toBe(true);
+  });
 });

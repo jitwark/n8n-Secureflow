@@ -1,0 +1,611 @@
+{
+  "schemaVersion": "v03-corpus-metrics-v1",
+  "generatedAt": "2026-11-24T01:36:00.996Z",
+  "scannerPackage": "sfscanner@0.3.0",
+  "corpus": {
+    "name": "01_deduplicated_master",
+    "totalJsonFiles": 18320,
+    "validWorkflows": 18320,
+    "invalidOrNonWorkflow": 0,
+    "avgNodes": 16.31,
+    "totalNodes": 298708
+  },
+  "profiles": {
+    "standard@3.0.0": {
+      "scope": "full",
+      "scannedWorkflows": 18320,
+      "parseOk": 18303,
+      "failedScans": 17,
+      "failureCodes": {
+        "SEMANTIC_CATALOGUE_INVALID": 16,
+        "TOOL_INVARIANT_FAILED": 1
+      },
+      "analysisStatus": {
+        "COMPLETE": 15220,
+        "LIMITED": 0,
+        "DEGRADED": 1285,
+        "INDETERMINATE": 1798
+      },
+      "degradedRatePercent": 7.01,
+      "unmodeledCatalogueWorkflows": 15476,
+      "unmodeledCatalogueRatePercent": 84.48,
+      "grades": {
+        "CRITICAL": 4462,
+        "HIGH": 1829,
+        "MEDIUM": 5039,
+        "LOW": 5175,
+        "UNKNOWN": 1798
+      },
+      "totalFindings": 63064,
+      "workflowsWithFindings": 14037,
+      "workflowsWithCriticalOrHigh": 7210,
+      "scoreDistribution": {
+        "count": 16505,
+        "min": 0,
+        "median": 28,
+        "p90": 100,
+        "max": 100,
+        "mean": 45.71
+      },
+      "findingsBySeverity": {
+        "CRITICAL": 11931,
+        "HIGH": 18573,
+        "MEDIUM": 11206,
+        "LOW": 21354
+      },
+      "findingsByRule": [
+        {
+          "ruleId": "N8N_CODE_NODE",
+          "severity": "LOW",
+          "findingCount": 19604,
+          "triggeredWorkflows": 7513,
+          "workflowPercent": 41.01
+        },
+        {
+          "ruleId": "WEBHOOK_EXPOSURE",
+          "severity": "MEDIUM",
+          "findingCount": 5177,
+          "triggeredWorkflows": 4771,
+          "workflowPercent": 26.04
+        },
+        {
+          "ruleId": "UNAUTHENTICATED_TRIGGER_TO_SINK",
+          "severity": "CRITICAL",
+          "findingCount": 11613,
+          "triggeredWorkflows": 3319,
+          "workflowPercent": 18.12
+        },
+        {
+          "ruleId": "TAINTED_AI_PROMPT",
+          "severity": "MEDIUM",
+          "findingCount": 3855,
+          "triggeredWorkflows": 2655,
+          "workflowPercent": 14.49
+        },
+        {
+          "ruleId": "EXPRESSION_ENV_EXPOSURE",
+          "severity": "HIGH",
+          "findingCount": 9972,
+          "triggeredWorkflows": 2202,
+          "workflowPercent": 12.02
+        },
+        {
+          "ruleId": "TAINTED_REQUEST_URL",
+          "severity": "HIGH",
+          "findingCount": 4069,
+          "triggeredWorkflows": 2174,
+          "workflowPercent": 11.87
+        },
+        {
+          "ruleId": "UNKNOWN_NODE_PACKAGE",
+          "severity": "LOW",
+          "findingCount": 1750,
+          "triggeredWorkflows": 1621,
+          "workflowPercent": 8.85
+        },
+        {
+          "ruleId": "AI_AGENT_UNGATED_TOOL",
+          "severity": "MEDIUM",
+          "findingCount": 1589,
+          "triggeredWorkflows": 1373,
+          "workflowPercent": 7.49
+        },
+        {
+          "ruleId": "RAW_AUTH_HEADER",
+          "severity": "HIGH",
+          "findingCount": 2130,
+          "triggeredWorkflows": 1029,
+          "workflowPercent": 5.62
+        },
+        {
+          "ruleId": "RAW_SECRET_INDICATOR",
+          "severity": "HIGH",
+          "findingCount": 1528,
+          "triggeredWorkflows": 885,
+          "workflowPercent": 4.83
+        },
+        {
+          "ruleId": "AGENT_EGRESS_UNRESTRICTED",
+          "severity": "HIGH",
+          "findingCount": 466,
+          "triggeredWorkflows": 406,
+          "workflowPercent": 2.22
+        },
+        {
+          "ruleId": "TAINTED_REQUEST_HEADER",
+          "severity": "MEDIUM",
+          "findingCount": 585,
+          "triggeredWorkflows": 274,
+          "workflowPercent": 1.5
+        },
+        {
+          "ruleId": "N8N_EXECUTE_COMMAND",
+          "severity": "CRITICAL",
+          "findingCount": 259,
+          "triggeredWorkflows": 104,
+          "workflowPercent": 0.57
+        },
+        {
+          "ruleId": "JAVASCRIPT_DYNAMIC_EXECUTION",
+          "severity": "HIGH",
+          "findingCount": 186,
+          "triggeredWorkflows": 95,
+          "workflowPercent": 0.52
+        },
+        {
+          "ruleId": "TAINTED_FILE_PATH",
+          "severity": "HIGH",
+          "findingCount": 110,
+          "triggeredWorkflows": 65,
+          "workflowPercent": 0.35
+        },
+        {
+          "ruleId": "TAINTED_SQL_QUERY",
+          "severity": "HIGH",
+          "findingCount": 96,
+          "triggeredWorkflows": 57,
+          "workflowPercent": 0.31
+        },
+        {
+          "ruleId": "TAINTED_COMMAND",
+          "severity": "CRITICAL",
+          "findingCount": 59,
+          "triggeredWorkflows": 36,
+          "workflowPercent": 0.2
+        },
+        {
+          "ruleId": "TAINTED_CODE_INPUT",
+          "severity": "HIGH",
+          "findingCount": 15,
+          "triggeredWorkflows": 15,
+          "workflowPercent": 0.08
+        },
+        {
+          "ruleId": "PYTHON_DYNAMIC_EXECUTION",
+          "severity": "HIGH",
+          "findingCount": 1,
+          "triggeredWorkflows": 1,
+          "workflowPercent": 0.01
+        }
+      ],
+      "newV3RulesSummary": {
+        "EXPRESSION_SANDBOX_ESCAPE": {
+          "findingCount": 0,
+          "triggeredWorkflows": 0,
+          "workflowPercent": 0
+        },
+        "EXPRESSION_ENV_EXPOSURE": {
+          "findingCount": 9972,
+          "triggeredWorkflows": 2202,
+          "workflowPercent": 12.02
+        },
+        "AGENT_EGRESS_UNRESTRICTED": {
+          "findingCount": 466,
+          "triggeredWorkflows": 406,
+          "workflowPercent": 2.22
+        },
+        "UNAUTHENTICATED_TRIGGER_TO_SINK": {
+          "findingCount": 11613,
+          "triggeredWorkflows": 3319,
+          "workflowPercent": 18.12
+        },
+        "JAVASCRIPT_DYNAMIC_EXECUTION": {
+          "findingCount": 186,
+          "triggeredWorkflows": 95,
+          "workflowPercent": 0.52
+        },
+        "PYTHON_DYNAMIC_EXECUTION": {
+          "findingCount": 1,
+          "triggeredWorkflows": 1,
+          "workflowPercent": 0.01
+        },
+        "AI_AGENT_UNGATED_TOOL": {
+          "findingCount": 1589,
+          "triggeredWorkflows": 1373,
+          "workflowPercent": 7.49
+        },
+        "TAINT_FLOW_TOTAL": {
+          "findingCount": 8789,
+          "triggeredWorkflows": 4366,
+          "workflowPercent": 23.83
+        },
+        "taintRules": {
+          "TAINTED_COMMAND": {
+            "findingCount": 59,
+            "triggeredWorkflows": 36,
+            "workflowPercent": 0.2
+          },
+          "TAINTED_SQL_QUERY": {
+            "findingCount": 96,
+            "triggeredWorkflows": 57,
+            "workflowPercent": 0.31
+          },
+          "TAINTED_REQUEST_URL": {
+            "findingCount": 4069,
+            "triggeredWorkflows": 2174,
+            "workflowPercent": 11.87
+          },
+          "TAINTED_FILE_PATH": {
+            "findingCount": 110,
+            "triggeredWorkflows": 65,
+            "workflowPercent": 0.35
+          },
+          "TAINTED_CODE_INPUT": {
+            "findingCount": 15,
+            "triggeredWorkflows": 15,
+            "workflowPercent": 0.08
+          },
+          "TAINTED_REQUEST_HEADER": {
+            "findingCount": 585,
+            "triggeredWorkflows": 274,
+            "workflowPercent": 1.5
+          },
+          "TAINTED_AI_PROMPT": {
+            "findingCount": 3855,
+            "triggeredWorkflows": 2655,
+            "workflowPercent": 14.49
+          }
+        },
+        "environmentIndicators": {
+          "EXPRESSION_ENVIRONMENT_ACCESS": {
+            "factCount": 0,
+            "workflows": 0
+          },
+          "EXPRESSION_SECRET_ACCESS": {
+            "factCount": 9972,
+            "workflows": 2202
+          },
+          "JAVASCRIPT_ENVIRONMENT_ACCESS": {
+            "factCount": 15,
+            "workflows": 7
+          },
+          "PYTHON_ENVIRONMENT_ACCESS": {
+            "factCount": 1,
+            "workflows": 1
+          }
+        }
+      },
+      "topDiagnostics": [
+        {
+          "code": "SEMANTIC_CATALOGUE_MISS",
+          "aggregateEffect": "NONE",
+          "occurrences": 67911,
+          "workflows": 15476
+        },
+        {
+          "code": "GENERIC_NODE_UNMODELED_CAPABILITY",
+          "aggregateEffect": "NONE",
+          "occurrences": 68389,
+          "workflows": 15475
+        },
+        {
+          "code": "MALFORMED_CONNECTION_INDEX",
+          "aggregateEffect": "INDETERMINATE",
+          "occurrences": 28546,
+          "workflows": 1676
+        },
+        {
+          "code": "DEPENDENCY_UNAVAILABLE",
+          "aggregateEffect": "DEGRADED",
+          "occurrences": 3724,
+          "workflows": 1237
+        },
+        {
+          "code": "JAVASCRIPT_SOURCE_UNAVAILABLE",
+          "aggregateEffect": "DEGRADED",
+          "occurrences": 2401,
+          "workflows": 718
+        },
+        {
+          "code": "EXPRESSION_PARSE_FAILED",
+          "aggregateEffect": "DEGRADED",
+          "occurrences": 684,
+          "workflows": 449
+        },
+        {
+          "code": "DUPLICATE_SECURITY_KEY",
+          "aggregateEffect": "INDETERMINATE",
+          "occurrences": 341,
+          "workflows": 285
+        },
+        {
+          "code": "REQUIRED_CAPABILITY_FAILED",
+          "aggregateEffect": "INDETERMINATE",
+          "occurrences": 116,
+          "workflows": 116
+        }
+      ]
+    },
+    "beta-default@2.0.0": {
+      "scope": "full",
+      "note": "Admitted v2 beta-default@2.0.0 on HEAD (beta-default@1.0.0 is not admitted by scanner-core; HEAD already classifies unmodelled-node diagnostics as NONE, tracked via unmodeledCatalogueWorkflows).",
+      "scannedWorkflows": 18320,
+      "parseOk": 18304,
+      "failedScans": 16,
+      "failureCodes": {
+        "SEMANTIC_CATALOGUE_INVALID": 16
+      },
+      "analysisStatus": {
+        "COMPLETE": 16505,
+        "LIMITED": 0,
+        "DEGRADED": 3,
+        "INDETERMINATE": 1796
+      },
+      "degradedRatePercent": 0.02,
+      "unmodeledCatalogueWorkflows": 15477,
+      "unmodeledCatalogueRatePercent": 84.48,
+      "grades": {
+        "CRITICAL": 693,
+        "HIGH": 943,
+        "MEDIUM": 7414,
+        "LOW": 7458,
+        "UNKNOWN": 1796
+      },
+      "totalFindings": 30451,
+      "workflowsWithFindings": 11682,
+      "workflowsWithCriticalOrHigh": 1641,
+      "scoreDistribution": {
+        "count": 16508,
+        "min": 0,
+        "median": 25,
+        "p90": 53,
+        "max": 100,
+        "mean": 26.92
+      },
+      "findingsBySeverity": {
+        "CRITICAL": 259,
+        "HIGH": 3658,
+        "MEDIUM": 5178,
+        "LOW": 21356
+      },
+      "findingsByRule": [
+        {
+          "ruleId": "N8N_CODE_NODE",
+          "severity": "LOW",
+          "findingCount": 19606,
+          "triggeredWorkflows": 7514,
+          "workflowPercent": 41.02
+        },
+        {
+          "ruleId": "WEBHOOK_EXPOSURE",
+          "severity": "MEDIUM",
+          "findingCount": 5178,
+          "triggeredWorkflows": 4772,
+          "workflowPercent": 26.05
+        },
+        {
+          "ruleId": "UNKNOWN_NODE_PACKAGE",
+          "severity": "LOW",
+          "findingCount": 1750,
+          "triggeredWorkflows": 1621,
+          "workflowPercent": 8.85
+        },
+        {
+          "ruleId": "RAW_AUTH_HEADER",
+          "severity": "HIGH",
+          "findingCount": 2130,
+          "triggeredWorkflows": 1029,
+          "workflowPercent": 5.62
+        },
+        {
+          "ruleId": "RAW_SECRET_INDICATOR",
+          "severity": "HIGH",
+          "findingCount": 1528,
+          "triggeredWorkflows": 885,
+          "workflowPercent": 4.83
+        },
+        {
+          "ruleId": "N8N_EXECUTE_COMMAND",
+          "severity": "CRITICAL",
+          "findingCount": 259,
+          "triggeredWorkflows": 104,
+          "workflowPercent": 0.57
+        }
+      ]
+    },
+    "strict@3.0.0": {
+      "scope": "first-1000",
+      "parityWithStandardOnSubset": true,
+      "parityDiffs": 0,
+      "scannedWorkflows": 1000,
+      "parseOk": 1000,
+      "analysisStatus": {
+        "COMPLETE": 636,
+        "LIMITED": 0,
+        "DEGRADED": 47,
+        "INDETERMINATE": 317
+      },
+      "degradedRatePercent": 4.7,
+      "unmodeledCatalogueWorkflows": 936,
+      "unmodeledCatalogueRatePercent": 93.6,
+      "grades": {
+        "CRITICAL": 213,
+        "HIGH": 121,
+        "MEDIUM": 97,
+        "LOW": 252,
+        "UNKNOWN": 317
+      },
+      "totalFindings": 3981,
+      "workflowsWithFindings": 759,
+      "workflowsWithCriticalOrHigh": 591,
+      "scoreDistribution": {
+        "count": 683,
+        "min": 0,
+        "median": 44,
+        "p90": 100,
+        "max": 100,
+        "mean": 48.58
+      },
+      "findingsBySeverity": {
+        "CRITICAL": 384,
+        "HIGH": 2381,
+        "MEDIUM": 466,
+        "LOW": 750
+      },
+      "findingsByRule": [
+        {
+          "ruleId": "EXPRESSION_ENV_EXPOSURE",
+          "severity": "HIGH",
+          "findingCount": 1959,
+          "triggeredWorkflows": 389,
+          "workflowPercent": 38.9
+        },
+        {
+          "ruleId": "N8N_CODE_NODE",
+          "severity": "LOW",
+          "findingCount": 721,
+          "triggeredWorkflows": 355,
+          "workflowPercent": 35.5
+        },
+        {
+          "ruleId": "UNAUTHENTICATED_TRIGGER_TO_SINK",
+          "severity": "CRITICAL",
+          "findingCount": 369,
+          "triggeredWorkflows": 148,
+          "workflowPercent": 14.8
+        },
+        {
+          "ruleId": "WEBHOOK_EXPOSURE",
+          "severity": "MEDIUM",
+          "findingCount": 174,
+          "triggeredWorkflows": 140,
+          "workflowPercent": 14
+        },
+        {
+          "ruleId": "TAINTED_AI_PROMPT",
+          "severity": "MEDIUM",
+          "findingCount": 156,
+          "triggeredWorkflows": 128,
+          "workflowPercent": 12.8
+        },
+        {
+          "ruleId": "AI_AGENT_UNGATED_TOOL",
+          "severity": "MEDIUM",
+          "findingCount": 109,
+          "triggeredWorkflows": 98,
+          "workflowPercent": 9.8
+        },
+        {
+          "ruleId": "TAINTED_REQUEST_URL",
+          "severity": "HIGH",
+          "findingCount": 202,
+          "triggeredWorkflows": 90,
+          "workflowPercent": 9
+        },
+        {
+          "ruleId": "RAW_AUTH_HEADER",
+          "severity": "HIGH",
+          "findingCount": 91,
+          "triggeredWorkflows": 57,
+          "workflowPercent": 5.7
+        },
+        {
+          "ruleId": "RAW_SECRET_INDICATOR",
+          "severity": "HIGH",
+          "findingCount": 81,
+          "triggeredWorkflows": 49,
+          "workflowPercent": 4.9
+        },
+        {
+          "ruleId": "UNKNOWN_NODE_PACKAGE",
+          "severity": "LOW",
+          "findingCount": 29,
+          "triggeredWorkflows": 27,
+          "workflowPercent": 2.7
+        },
+        {
+          "ruleId": "AGENT_EGRESS_UNRESTRICTED",
+          "severity": "HIGH",
+          "findingCount": 20,
+          "triggeredWorkflows": 19,
+          "workflowPercent": 1.9
+        },
+        {
+          "ruleId": "TAINTED_REQUEST_HEADER",
+          "severity": "MEDIUM",
+          "findingCount": 27,
+          "triggeredWorkflows": 14,
+          "workflowPercent": 1.4
+        },
+        {
+          "ruleId": "N8N_EXECUTE_COMMAND",
+          "severity": "CRITICAL",
+          "findingCount": 13,
+          "triggeredWorkflows": 12,
+          "workflowPercent": 1.2
+        },
+        {
+          "ruleId": "JAVASCRIPT_DYNAMIC_EXECUTION",
+          "severity": "HIGH",
+          "findingCount": 19,
+          "triggeredWorkflows": 8,
+          "workflowPercent": 0.8
+        },
+        {
+          "ruleId": "TAINTED_FILE_PATH",
+          "severity": "HIGH",
+          "findingCount": 5,
+          "triggeredWorkflows": 5,
+          "workflowPercent": 0.5
+        },
+        {
+          "ruleId": "TAINTED_SQL_QUERY",
+          "severity": "HIGH",
+          "findingCount": 4,
+          "triggeredWorkflows": 3,
+          "workflowPercent": 0.3
+        },
+        {
+          "ruleId": "TAINTED_COMMAND",
+          "severity": "CRITICAL",
+          "findingCount": 2,
+          "triggeredWorkflows": 2,
+          "workflowPercent": 0.2
+        }
+      ]
+    }
+  },
+  "comparison": {
+    "baselineProfile": "beta-default@2.0.0",
+    "targetProfile": "standard@3.0.0",
+    "comparedWorkflows": 18320,
+    "degradedWorkflowsBefore": 3,
+    "degradedWorkflowsAfter": 1285,
+    "degradedReductionPercent": -42733.33,
+    "unmodeledCatalogueWorkflowsBefore": 15477,
+    "unmodeledCatalogueDegradedAfter": 0,
+    "unmodeledCatalogueDegradedReductionPercent": 100,
+    "totalFindingsBefore": 30451,
+    "totalFindingsAfter": 63064,
+    "findingsDelta": 32613,
+    "findingsUpliftPercent": 107.1,
+    "workflowsWithFindingsBefore": 11682,
+    "workflowsWithFindingsAfter": 14037,
+    "criticalHighWorkflowsBefore": 1641,
+    "criticalHighWorkflowsAfter": 7210,
+    "criticalHighWorkflowsDelta": 5569,
+    "criticalHighUpliftPercent": 339.37,
+    "criticalHighGradeWorkflowsBefore": 1636,
+    "criticalHighGradeWorkflowsAfter": 6291
+  }
+}

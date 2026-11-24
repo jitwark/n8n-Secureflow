@@ -13,7 +13,7 @@ const CANNOT: string[] = [
 
 export function ScannerLimits() {
   return (
-    <section aria-labelledby="limits-heading" className="rounded-panel border border-hairline bg-panel p-4 sm:p-6">
+    <section aria-labelledby="limits-heading" className="min-w-0 rounded-panel border border-hairline bg-panel p-4 sm:p-6">
       <h2 id="limits-heading" className="font-display text-lg font-semibold text-ink">
         What it cannot tell you
       </h2>
@@ -25,25 +25,27 @@ export function ScannerLimits() {
         {CANNOT.map((item) => (
           <li key={item} className="flex gap-2.5 text-sm text-ink-muted">
             <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-faint" />
-            <span>{item}</span>
+            <span className="min-w-0 break-words">{item}</span>
           </li>
         ))}
       </ul>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-control border border-hairline bg-raised p-3">
+        <div className="min-w-0 rounded-control border border-hairline bg-raised p-3">
           <div className="flex items-center gap-2">
             <Layers className="h-3.5 w-3.5 text-accent-text" aria-hidden />
-            <h3 className="font-display text-xs font-semibold text-ink">Default scan</h3>
+            <h3 className="font-display text-xs font-semibold text-ink">Standard &amp; Strict</h3>
           </div>
           <p className="mt-1.5 text-xs text-ink-muted">
-            The shipped profile reads workflow structure and settings. It does not parse JavaScript
-            or Python, track value flow, or report AI-agent checks: those belong to the hardened
-            profile, which is defined but not admitted.
+            The default <strong className="font-semibold text-ink">Standard</strong> profile runs full
+            v0.3 static analysis in your browser: structural settings, JavaScript AST, Python CST,
+            expression sandbox/env exposure, field taint flow, and AI agent egress checks. Switch to{' '}
+            <strong className="font-semibold text-ink">Strict</strong> for CI enforcement where warnings
+            and unmodelled coverage block.
           </p>
           <p className="mt-1.5 text-xs text-ink-faint">
-            The catalogue covers the node families listed in the rule reference; an unmodelled node
-            is reported as degraded coverage, never silently treated as clean.
+            Unmodelled custom or community nodes are recorded in node coverage diagnostics without
+            failing the scan silently.
           </p>
         </div>
 

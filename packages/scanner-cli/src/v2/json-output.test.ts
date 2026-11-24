@@ -181,6 +181,19 @@ describe('serializeEnvelopeV2', () => {
     );
     expect(projected.envelope.invocation).toMatchObject({ format: 'json', profile: 'beta-default', failOn: 'CRITICAL', requireComplete: false, concurrency: 4 });
     expect(projected.envelope.exitReason).toBe('UNDER_THRESHOLD');
+
+    const standard = scanWorkflowV2({
+      bytes: new TextEncoder().encode('{"nodes":[{"id":"r","name":"Run","type":"n8n-nodes-base.executeCommand","typeVersion":1,"parameters":{"command":"id"}}],"connections":{}}'),
+      profile: { id: 'standard', version: '3.0.0' },
+      limits: DEFAULT_SCANNER_LIMITS_V2,
+    });
+    if (!standard.ok) throw new Error(standard.code);
+    const projectedNone = projectBatchV2(
+      batch([{ label: 'exec.json', status: 'COMPLETED', result: { ok: true, result: standard.result } }]),
+      { ...DEFAULT_PROJECTION_OPTIONS, profile: 'standard', failOn: 'NONE' },
+    );
+    expect(projectedNone.envelope.artifacts.profile).toEqual({ id: 'standard', version: '3.0.0' });
+    expect(projectedNone.envelope.exitReason).toBe('UNDER_THRESHOLD');
   });
   it.each([
     ['a short inventory digest', { schemaVersion: 'supply-chain-request-v2', status: 'EMPTY', inventoryDigest: 'a'.repeat(63), inventoryState: 'DECLARED', evaluation: { status: 'NO_DECLARED_PACKAGES', reason: 'NONE' }, packages: [] }],

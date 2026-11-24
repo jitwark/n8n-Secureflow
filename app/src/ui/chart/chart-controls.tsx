@@ -19,7 +19,7 @@ type ChartControlsProps = {
   onToggleFullscreen: () => void;
 };
 
-const buttonClass = 'inline-flex min-h-11 min-w-11 items-center justify-center rounded-control border border-hairline bg-raised px-3 text-xs font-mono text-ink-muted transition-colors hover:border-hairline-strong hover:text-accent-text active:bg-accent-dim active:text-accent-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border';
+const buttonClass = 'inline-flex min-h-11 min-w-11 shrink-0 whitespace-nowrap items-center justify-center rounded-control border border-hairline bg-raised px-2.5 text-xs font-mono text-ink-muted transition-colors hover:border-hairline-strong hover:text-accent-text active:bg-accent-dim active:text-accent-text disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border';
 const selectedClass = 'border-accent-border bg-accent-dim text-accent-text';
 const iconClass = 'h-4 w-4';
 
@@ -46,9 +46,9 @@ export function ChartControls(props: ChartControlsProps) {
       data-canvas-control
       role="toolbar"
       aria-label="Workflow diagram controls"
-      className="flex w-full flex-wrap items-center gap-2 border-b border-hairline bg-panel p-2"
+      className="flex w-full flex-wrap items-center gap-1.5 border-b border-hairline bg-panel p-2"
     >
-      <span className="mr-auto px-2 text-2xs font-mono text-ink-muted">
+      <span className="mr-auto shrink-0 whitespace-nowrap px-1.5 text-2xs font-mono text-ink-muted">
         {nodeCount} nodes · {edgeCount} {edgeCount === 1 ? 'connection' : 'connections'} · {Math.round(scale * 100)}%
       </span>
       <button type="button" onClick={onZoomOut} title="Zoom out" aria-label="Zoom out" className={buttonClass}>

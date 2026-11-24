@@ -27,31 +27,45 @@ async function tempRoot(): Promise<string> {
 }
 
 describe('pipeline package wrapper', () => {
-  it('keeps the v1 default route and stdin result shape', async () => {
-    const result = await runPipelineCli(['scan', '-', '--format', 'json'], { stdin: workflow('v1-default') });
+  it('routes default scan command to v2 with standard@3.0.0 profile', async () => {
+    const result = await runPipelineCli(['scan', '-', '--format', 'json'], { stdin: workflow('v2-default') });
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe('');
-    expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'scanner-cli-v1' });
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      schemaVersion: 'n8n-scan-v2',
+      artifacts: { profile: { id: 'standard', version: '3.0.0' } },
+    });
   });
 
-  it('preserves v1 table bytes when concurrency changes', async () => {
+  it('preserves table bytes and exit code when concurrency changes', async () => {
     const root = await tempRoot();
     await mkdir(path.join(root, 'nested'));
     await writeFile(path.join(root, 'a.json'), workflow('a'), 'utf8');
     await writeFile(path.join(root, 'nested', 'b.json'), workflow('b'), 'utf8');
     const serial = await runPipelineCli(['scan', '.', '--format', 'table', '--max-concurrency', '1'], { cwd: root });
     const concurrent = await runPipelineCli(['scan', '.', '--format', 'table', '--max-concurrency', '4'], { cwd: root });
-    expect(serial).toEqual(concurrent);
+    expect({ exitCode: serial.exitCode, stdout: serial.stdout, stderr: serial.stderr }).toEqual({
+      exitCode: concurrent.exitCode,
+      stdout: concurrent.stdout,
+      stderr: concurrent.stderr,
+    });
+    expect(serial.stdout).toContain('Input');
   });
 
-  it('preserves v1 fail-on and input-error precedence', async () => {
+  it('preserves v2 usage and item-failure precedence', async () => {
     const root = await tempRoot();
     await writeFile(path.join(root, 'risky.json'), workflow('risky', true), 'utf8');
-    const result = await runPipelineCli(['scan', 'risky.json', 'missing.json', '--format', 'json', '--fail-on', 'HIGH'], { cwd: root });
-    expect(result.exitCode).toBe(3);
-    expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'scanner-cli-v1', summary: { inputErrors: 1, findings: 1 } });
+    await writeFile(path.join(root, 'malformed.json'), '{"nodes":', 'utf8');
+    const missing = await runPipelineCli(['scan', 'risky.json', 'missing.json', '--format', 'json', '--fail-on', 'HIGH'], { cwd: root });
+    expect(missing.exitCode).toBe(2);
+    expect(missing.stdout).toBe('');
+    expect(missing.stderr.length).toBeGreaterThan(0);
+
+    const malformedOnly = await runPipelineCli(['scan', 'malformed.json', '--format', 'json'], { cwd: root });
+    expect(malformedOnly.exitCode).toBe(3);
+    expect(JSON.parse(malformedOnly.stdout)).toMatchObject({ schemaVersion: 'n8n-scan-v2', exitReason: 'ITEM_FAILURE' });
   });
-  it('forwards v1 cancellation without changing its envelope', async () => {
+  it('forwards cancellation without losing v2 envelope structure', async () => {
     const controller = new AbortController();
     controller.abort();
     const result = await runPipelineCli(['scan', '-', '--format', 'json'], {
@@ -60,8 +74,8 @@ describe('pipeline package wrapper', () => {
     });
     expect(result.exitCode).toBe(130);
     expect(JSON.parse(result.stdout)).toMatchObject({
-      schemaVersion: 'scanner-cli-v1',
-      summary: { cancelled: 1 },
+      schemaVersion: 'n8n-scan-v2',
+      exitReason: 'CANCELLED',
     });
   });
 
@@ -81,7 +95,7 @@ describe('pipeline package wrapper', () => {
     const parityFixture = V2_ADAPTER_FIXTURE_MATRIX.find(({ id }) => id === 'safe-workflow')!;
     const sourceBytes = new TextEncoder().encode(parityFixture.json);
     const expected = scanWorkflowV2({ bytes: sourceBytes, profile: V2_ADAPTER_PROFILE });
-    const result = await runPipelineCli(['--schema', 'v2', 'scan', '-', '--format', 'json'], { stdin: sourceBytes });
+    const result = await runPipelineCli(['--schema', 'v2', 'scan', '-', '--profile', 'beta-default', '--format', 'json'], { stdin: sourceBytes });
     expect(result.exitCode).toBe(0);
     const envelope: unknown = JSON.parse(result.stdout);
     if (envelope === null || typeof envelope !== 'object' || !('results' in envelope) || !Array.isArray(envelope.results)) throw new Error('missing results');

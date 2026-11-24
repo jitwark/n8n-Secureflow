@@ -205,13 +205,15 @@ describe('packed scanner CLI', () => {
     expect(readdirSync(packed.consumer).filter((name) => name.startsWith('.') && name.includes('.tmp-'))).toEqual([]);
   }, CASE_TIMEOUT_MS);
 
-  it('emits json, ndjson, table, and sarif for the same findings', () => {
-    const json = scan(['risky.json']);
+  it('emits json, ndjson, table, pretty, markdown, and sarif for the same findings', () => {
+    const json = scan(['risky.json', '--format', 'json']);
     const lines = scan(['risky.json', '--format', 'ndjson']).stdout.trimEnd().split('\n').map((line) => JSON.parse(line) as Readonly<{ schemaVersion: string; type: string }>);
     const table = scan(['risky.json', '--format', 'table']);
+    const pretty = scan(['risky.json', '--format', 'pretty']);
+    const markdown = scan(['risky.json', '--format', 'markdown']);
     const sarif: Readonly<{ version: string; runs: readonly Readonly<{ results?: readonly unknown[] }>[] }> = JSON.parse(scan(['risky.json', '--format', 'sarif']).stdout);
-    expect([json.status, envelope(json).schemaVersion, lines.map(({ schemaVersion, type }) => [schemaVersion, type]), table.stdout.includes('Input'), sarif.version, sarif.runs.length > 0, (sarif.runs[0]?.results?.length ?? 0) > 0])
-      .toEqual([1, 'n8n-scan-v2', [['n8n-scan-v2-ndjson', 'header'], ['n8n-scan-v2-ndjson', 'result'], ['n8n-scan-v2-ndjson', 'summary']], true, '2.1.0', true, true]);
+    expect([json.status, envelope(json).schemaVersion, lines.map(({ schemaVersion, type }) => [schemaVersion, type]), table.stdout.includes('Input'), pretty.stdout.includes('N8N_EXECUTE_COMMAND'), markdown.stdout.includes('N8N_EXECUTE_COMMAND'), sarif.version, sarif.runs.length > 0, (sarif.runs[0]?.results?.length ?? 0) > 0])
+      .toEqual([1, 'n8n-scan-v2', [['n8n-scan-v2-ndjson', 'header'], ['n8n-scan-v2-ndjson', 'result'], ['n8n-scan-v2-ndjson', 'summary']], true, true, true, '2.1.0', true, true]);
   }, CASE_TIMEOUT_MS);
 
   it('applies the documented precedence: usage, then finding threshold, then item failure', () => {
@@ -235,12 +237,20 @@ describe('packed sfscanner-mcp stdio handshake', () => {
       '{"jsonrpc":"2.0","id":1,"method":"initialize"}',
       '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
       '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"n8n_scan","arguments":{"inputs":["clean.json"]}}}',
+      '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"n8n_scan","arguments":{"inputs":["clean.json"],"format":"json"}}}',
     ], true);
-    const [initialised, listed, scanned] = messages(session);
-    const call = scanned?.result as ToolCall | undefined;
+    const [initialised, listed, scannedPretty, scannedJson] = messages(session);
+    const callPretty = scannedPretty?.result as (ToolCall & { structuredContent: { profile?: { id: string; version: string }; grade?: string; score?: number; findings?: unknown[] } }) | undefined;
+    const callJson = scannedJson?.result as ToolCall | undefined;
     expect([/OFFLINE VIOLATION/u.test(session.stderr), initialised, listed]).toEqual([false, { jsonrpc: '2.0', id: 1, result: expect.objectContaining({ protocolVersion: '2025-06-18' }) }, { jsonrpc: '2.0', id: 2, result: { tools: [expect.objectContaining({ name: 'n8n_scan' })] } }]);
-    expect([call?.isError, call?.structuredContent.exitCode, call?.content[0]?.type]).toEqual([false, 0, 'text']);
-    // The scan ran in the install against the fixture already there, never a private body.
-    expect(JSON.parse(call?.content[0]?.text ?? '')).toMatchObject({ schemaVersion: 'n8n-scan-v2', exitReason: 'UNDER_THRESHOLD', results: [{ input: 'clean.json' }] });
+    expect(callPretty).toMatchObject({
+      isError: false,
+      structuredContent: { exitCode: 0, profile: { id: 'standard', version: '3.0.0' }, grade: 'LOW', score: 0, findings: [] },
+      content: [{ type: 'text' }],
+    });
+    expect(callPretty?.content[0]?.text).toContain('clean.json');
+    expect(callPretty?.content[0]?.text).not.toContain('\u001b[');
+    expect([callJson?.isError, callJson?.structuredContent.exitCode, callJson?.content[0]?.type]).toEqual([false, 0, 'text']);
+    expect(JSON.parse(callJson?.content[0]?.text ?? '')).toMatchObject({ schemaVersion: 'n8n-scan-v2', exitReason: 'UNDER_THRESHOLD', results: [{ input: 'clean.json' }] });
   }, CASE_TIMEOUT_MS);
 });

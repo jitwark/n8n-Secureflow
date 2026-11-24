@@ -72,4 +72,12 @@ describe('workflow insight helpers', () => {
       'Äpple',
     ]);
   });
+
+  it('maps textSplitterTokenSplitter to a non-secret integration label', () => {
+    const integrations = summarizeIntegrations([
+      node('@n8n/n8n-nodes-langchain.textSplitterTokenSplitter'),
+    ]);
+    expect(integrations).toHaveLength(1);
+    expect(integrations[0]?.service).not.toMatch(/\btoken\b/i);
+  });
 });

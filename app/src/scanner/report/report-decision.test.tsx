@@ -161,4 +161,31 @@ describe('ReportDecision', () => {
     expect(screen.getByText('Analysis incomplete. Assessment unavailable because required analysis did not finish; no risk decision is shown.')).toBeTruthy();
     expect(screen.getByText(/no risk decision is shown/i)).toBeTruthy();
   });
+
+  it('styles the outcome card monotonically by grade and never uses green accent fill for CRITICAL, HIGH, MEDIUM, or incomplete', () => {
+    const grades = [
+      { grade: 'CRITICAL', expected: 'border-sev-critical', unexpected: 'bg-accent-dim' },
+      { grade: 'HIGH', expected: 'border-sev-high', unexpected: 'bg-accent-dim' },
+      { grade: 'MEDIUM', expected: 'border-sev-medium', unexpected: 'bg-accent-dim' },
+      { grade: 'LOW', expected: 'bg-accent-dim', unexpected: 'border-sev-critical' },
+    ] as const;
+
+    for (const { grade, expected, unexpected } of grades) {
+      const scan: ScanWorkflowResult = {
+        ...result('COMPLETE'),
+        riskAssessment: { grade, score: grade === 'CRITICAL' ? 90 : grade === 'HIGH' ? 65 : grade === 'MEDIUM' ? 35 : 0, topRisks: [], dataExposure: 'Unknown', complexityDrivers: [] },
+        summary: { critical: grade === 'CRITICAL' ? 1 : 0, high: grade === 'HIGH' ? 1 : 0, medium: grade === 'MEDIUM' ? 1 : 0, low: 0, info: 0 },
+      };
+      const { container, unmount } = render(<ReportDecision scan={scan} />);
+      const section = container.querySelector('section[aria-labelledby="scanner-decision-heading"]')!;
+      expect(section.className).toContain(expected);
+      expect(section.className).not.toContain(unexpected);
+      unmount();
+    }
+
+    const { container } = render(<ReportDecision scan={result('INDETERMINATE')} />);
+    const indeterminateSection = container.querySelector('section[aria-labelledby="scanner-decision-heading"]')!;
+    expect(indeterminateSection.className).not.toContain('bg-accent-dim');
+    expect(indeterminateSection.className).toContain('border-hairline-strong');
+  });
 });

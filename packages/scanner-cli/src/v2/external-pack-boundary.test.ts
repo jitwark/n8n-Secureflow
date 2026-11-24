@@ -30,9 +30,13 @@ const directory = mkdtempSync(join(tmpdir(), 'scanner-external-pack-'));
 let scans = 0;
 
 /** Real scanner behind a counter, so a completed run carries genuine artifact identities. */
-const countingScan: BatchScanV2 = (bytes): ScanWorkflowV2Result => {
+const countingScan: BatchScanV2 = (bytes, _item, options): ScanWorkflowV2Result => {
   scans += 1;
-  return scanWorkflowV2({ bytes, profile: { id: 'beta-default', version: '2.0.0' }, limits: DEFAULT_SCANNER_LIMITS_V2 });
+  return scanWorkflowV2({
+    bytes,
+    profile: options?.profile ?? { id: 'standard', version: '3.0.0' },
+    limits: options?.limits ?? DEFAULT_SCANNER_LIMITS_V2,
+  });
 };
 
 function writeConfig(name: string, config: Record<string, unknown>): string {

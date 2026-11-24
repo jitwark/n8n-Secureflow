@@ -44,7 +44,7 @@ describe('buildExportReport', () => {
     const report = JSON.parse(buildExportReport(scan)).report;
 
     expect(report.schemaVersion).toBe('scanner-result-v2');
-    expect(report.analysis.status).toBe('DEGRADED');
+    expect(report.analysis.status).toBe('COMPLETE');
     expect(report.assessment.grade).toBe(scan.assessment!.grade);
     expect(report.findings.map((finding: { ruleId: string }) => finding.ruleId)).toContain('RAW_SECRET_INDICATOR');
     expect(JSON.stringify(report)).not.toContain(RAW_SECRET);

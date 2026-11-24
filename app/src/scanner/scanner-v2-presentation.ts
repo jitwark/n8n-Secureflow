@@ -2,6 +2,7 @@ import type { ScannerResultV2 } from '@hub/contracts/scanner-v2-result';
 import { projectResultV2ToV1, type ProjectionResultV1, type V1ProjectionOptions } from '@hub/scanner-core/compat/v1-projector';
 import { redactScanPresentation } from '@hub/scanner-core/presentation-redaction';
 import type { ScanWorkflowResult } from './engine';
+import { projectV3ToReportShape } from './v3-report-projection';
 
 export type ScannerReportModelV2 = ScanWorkflowResult & Readonly<{
   v2: ScannerResultV2;
@@ -43,7 +44,10 @@ function projectionFallback(result: ScannerResultV2): ProjectionResultV1 {
 }
 
 export function toScannerReportModelV2(result: ScannerResultV2, options: V1ProjectionOptions = {}): ScannerReportModelV2 {
-  const projection = projectResultV2ToV1(result, options);
+  const isLegacyV2Profile = result.profile?.id === 'beta-default' && result.profile?.version === '2.0.0';
+  const projection = isLegacyV2Profile
+    ? projectResultV2ToV1(result, options)
+    : projectV3ToReportShape(result, options);
   const legacy = projection.ok ? projection.result : projectionFallback(result);
   const report = {
     ...legacy,

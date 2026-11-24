@@ -120,4 +120,42 @@ describe('Python security capability', () => {
     });
     for (const observation of observations) expect(observation).toEqual(observations[0]);
   });
+
+  it('detects os.environ, os.getenv, and aliased from-os imports as ENVIRONMENT_ACCESS once each', () => {
+    const cases: Array<[string, string[]]> = [
+      ["import os\nx = os.environ['SECRET']", ['environ']],
+      ["import os\nv = os.environ.get('SECRET')", ['environ']],
+      ["import os\ny = os.getenv('API_KEY')", ['getenv']],
+      ["from os import getenv\ngetenv('API_KEY')", ['getenv']],
+      ["from os import getenv as g\ndef f():\n  return g('API_KEY')", ['getenv']],
+      ["from os import environ\nv = environ.get('SECRET')\nw = environ['TOKEN']", ['environ', 'environ']],
+      ["from os import environ as e\nv = e.get('SECRET')\nw = e['TOKEN']", ['environ', 'environ']],
+      ['from os import environ\ndata = dict(environ)', ['environ']],
+    ];
+    for (const [code, expectedMembers] of cases) {
+      const { node, context } = nodeFor(code);
+      const result = evaluatePythonSecurity(node, context);
+      const envFacts = result.facts.filter((fact) => fact.properties.indicator === 'ENVIRONMENT_ACCESS');
+      expect(envFacts.map((fact) => fact.properties.member), code).toEqual(expectedMembers);
+    }
+  });
+
+  it('does not false-positive on shadowed getenv/environ, kwargs, or string literals', () => {
+    const safeCases = [
+      "def getenv(k):\n  return k\ngetenv('API_KEY')",
+      "environ = {}\nenviron['SECRET']\nenviron.get('SECRET')",
+      'from os import environ\nfoo(environ=123)',
+      "from os import environ\ndef f(environ):\n  return environ['SECRET']\nfn = lambda environ: environ.get('SECRET')",
+      "from other import getenv, environ\ngetenv('API_KEY')\nenviron['SECRET']\nenviron.get('SECRET')",
+      "'os.environ'\n\"os.getenv('API_KEY')\"\n# os.environ['SECRET']",
+      "from os import path\npath.get('x')\npath.system('ls')",
+      "from os import environ\nfor environ in items:\n  environ.get('SECRET')",
+    ];
+    for (const code of safeCases) {
+      const { node, context } = nodeFor(code);
+      const result = evaluatePythonSecurity(node, context);
+      expect(result.facts, code).toEqual([]);
+      expect(result.findings, code).toEqual([]);
+    }
+  });
 });

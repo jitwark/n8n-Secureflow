@@ -101,7 +101,10 @@ export function SearchBox({
       role="search"
       className="relative w-full"
       onSubmit={(e) => {
-        if (!isHomepage && onSubmit) {
+        if (activeIndex >= 0 && onSelectHighlight) {
+          e.preventDefault();
+          onSelectHighlight();
+        } else if (onSubmit) {
           e.preventDefault();
           onSubmit(value);
         }

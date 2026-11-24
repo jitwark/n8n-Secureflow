@@ -20,6 +20,7 @@ const serviceLabels: Record<string, string> = {
   manualTrigger: 'Manual Trigger',
   scheduleTrigger: 'Schedule Trigger',
   slack: 'Slack',
+  textSplitterTokenSplitter: 'Text Chunk Splitter',
   webhook: 'Webhook',
 };
 

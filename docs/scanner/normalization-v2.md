@@ -3,7 +3,7 @@
 > Status: admitted-core normalization contract; external conformance and release remain gated
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer
-> Source of truth: [`packages/scanner-core/src/source/source-parser.ts`](../../packages/scanner-core/src/source/source-parser.ts), [`packages/scanner-core/src/workflow-v2/normalize-security-workflow.ts`](../../packages/scanner-core/src/workflow-v2/normalize-security-workflow.ts), [`packages/scanner-core/src/workflow-v2/security-workflow.ts`](../../packages/scanner-core/src/workflow-v2/security-workflow.ts), and [`openspec/changes/world-class-scanner-cli/specs/scanner-trust-boundary/spec.md`](../../openspec/changes/world-class-scanner-cli/specs/scanner-trust-boundary/spec.md)
+> Source of truth: [`packages/scanner-core/src/source/source-parser.ts`](../../packages/scanner-core/src/source/source-parser.ts), [`packages/scanner-core/src/workflow-v2/normalize-security-workflow.ts`](../../packages/scanner-core/src/workflow-v2/normalize-security-workflow.ts), and [`packages/scanner-core/src/workflow-v2/security-workflow.ts`](../../packages/scanner-core/src/workflow-v2/security-workflow.ts)
 
 Normalization is the boundary between untrusted workflow bytes and v2 security analysis. It keeps a
 bounded source representation, a separate semantic workflow, and explicit ambiguity rather than
@@ -158,9 +158,8 @@ Normalization reports explicit uncertainty instead of treating absence as safety
 `COMPLETE` is reserved for a result with no non-`NONE` diagnostic and no omitted required work.
 `DEGRADED` means safe optional/report-only loss. `INDETERMINATE` means required evidence may be
 missing or contradictory; its result has `assessment: null` and no reassuring summary. See
-[`analysis-completeness.ts`](../../packages/scanner-core/src/result/analysis-completeness.ts),
-[contracts-v2.md](contracts-v2.md), and the
-[v2 result contract](../../openspec/changes/world-class-scanner-cli/result-v2-contract.md).
+[`analysis-completeness.ts`](../../packages/scanner-core/src/result/analysis-completeness.ts) and
+[contracts-v2.md](contracts-v2.md).
 
 ## Non-claims
 

@@ -1,12 +1,13 @@
 import type { ScanWorkflowResult } from './engine';
+import type { ScanProfile } from './scan-profiles';
 import type { ScanWorkerRequest, ScanWorkerResponse } from './scan.worker';
 import { SCANNER_RESULT_SCHEMA_VERSION } from '@hub/contracts';
 
-export function createMockScanResult(profile: 'beta-default' | 'beta-hardened'): ScanWorkflowResult {
+export function createMockScanResult(profile: ScanProfile): ScanWorkflowResult {
   return {
     schemaVersion: SCANNER_RESULT_SCHEMA_VERSION,
     scannerVersion: 'scanner-beta-1',
-    policyProfile: profile,
+    policyProfile: profile as ScanWorkflowResult['policyProfile'],
     analysisStatus: 'COMPLETE',
     analysisDiagnostics: [],
     workflow: {

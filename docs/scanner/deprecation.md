@@ -3,7 +3,7 @@
 > Status: documented compatibility policy; no public deprecation promise
 > Last verified: 2026-10-17
 > Owner: Scanner maintainer; release and compatibility owners for promotions
-> Source of truth: [`semver.ts`](../../packages/scanner-core/src/semantics/semver.ts), [`v1-projector.ts`](../../packages/scanner-core/src/compat/v1-projector.ts), [`v1-registry.ts`](../../packages/scanner-core/src/compat/v1-registry.ts), the [v1/v2 migration boundary](migration-v1-v2.md), and the [release-resolution contract](../../openspec/changes/world-class-scanner-cli/release-resolution.md)
+> Source of truth: [`semver.ts`](../../packages/scanner-core/src/semantics/semver.ts), [`v1-projector.ts`](../../packages/scanner-core/src/compat/v1-projector.ts), [`v1-registry.ts`](../../packages/scanner-core/src/compat/v1-registry.ts), and the [v1/v2 migration boundary](migration-v1-v2.md)
 
 This policy keeps scanner identities, rules, diagnostics, and adapters truthful while capabilities are
 added or retired. It is a repository policy for a prepared/private product, not a completed public

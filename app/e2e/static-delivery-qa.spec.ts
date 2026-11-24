@@ -23,13 +23,13 @@ async function resolveRangeArtifact(request: APIRequestContext): Promise<Manifes
   const artifact = manifest.artifacts?.find(
     (candidate): candidate is ManifestArtifact =>
       typeof candidate.path === 'string' &&
-      /^(charts|previews)\/[^/]+\.jsonl?$/.test(candidate.path) &&
+      /^(?:charts|details)\/pack-\d+\.jsonl\.gzbin$/.test(candidate.path) &&
       typeof candidate.byteSize === 'number' &&
       candidate.byteSize >= 32,
   );
 
-  expect(artifact, 'manifest must expose a range-testable chart or preview artifact').toBeDefined();
-  if (!artifact) throw new Error('No range-testable chart or preview artifact found in manifest');
+  expect(artifact, 'manifest must expose a range-testable packed .gzbin artifact').toBeDefined();
+  if (!artifact) throw new Error('No range-testable packed .gzbin artifact found in manifest');
   return artifact;
 }
 
@@ -45,10 +45,14 @@ test('local harness serves project routes without inventing origin cache policy'
   expect(manifestResponse.headers()['cache-control']).toBeUndefined();
 });
 
-test('local routing serves exported directory pages and returns the exported 404 for missing paths', async ({ request }) => {
+test('local routing serves exported directory pages including /w/view/ and returns 404 for missing paths', async ({ request }) => {
   const scannerResponse = await request.get(sitePath('/scanner/'));
   expect(scannerResponse.status()).toBe(200);
   expect(scannerResponse.headers()['content-type']).toBe('text/html; charset=utf-8');
+
+  const viewResponse = await request.get(sitePath('/w/view/'));
+  expect(viewResponse.status()).toBe(200);
+  expect(viewResponse.headers()['content-type']).toBe('text/html; charset=utf-8');
 
   const missingResponse = await request.get(sitePath('/phase-3-4-missing-route/'));
   expect(missingResponse.status()).toBe(404);
@@ -57,7 +61,7 @@ test('local routing serves exported directory pages and returns the exported 404
   if (basePath) expect((await request.get('/scanner/')).status()).toBe(404);
 });
 
-test('local range harness serves the requested bytes from a committed chart or preview artifact', async ({ request }) => {
+test('local range harness serves requested bytes from a packed .gzbin artifact', async ({ request }) => {
   const artifact = await resolveRangeArtifact(request);
   const end = 31;
   const response = await request.get(sitePath(`/data/${artifact.path}`), {
@@ -79,7 +83,7 @@ test('local range harness serves the requested bytes from a committed chart or p
   expect((await response.body()).byteLength).toBe(end + 1);
 });
 
-test('local range harness rejects a byte range beyond the artifact', async ({ request }) => {
+test('local range harness rejects a byte range beyond the packed artifact', async ({ request }) => {
   const artifact = await resolveRangeArtifact(request);
   const response = await request.get(sitePath(`/data/${artifact.path}`), {
     headers: { Range: `bytes=${artifact.byteSize}-${artifact.byteSize}` },

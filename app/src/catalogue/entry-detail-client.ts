@@ -5,35 +5,38 @@ import {
   type ByteRangeIndex,
   type ByteRangeIndexEntry,
 } from '@hub/contracts/byte-range-index';
-import { loadManifest } from './manifest';
+import { loadManifest, type Manifest } from './manifest';
+import {
+  clearPackedDetailCache,
+  hasPackedDetails,
+  loadPackedEntryDetail,
+} from './packed-detail-client';
 import { sitePath } from '../ui/site-url.mjs';
 
 type DetailIndexEntry = ByteRangeIndexEntry;
 type DetailIndex = ByteRangeIndex;
 const ARTIFACT_ID = /^[a-f0-9]{16}$/;
+const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,511}$/;
+const FORBIDDEN_KEYS = new Set(['constructor', '__proto__', 'prototype', 'toString', 'valueOf']);
 
 const detailIndexCache = new Map<string, Promise<DetailIndex>>();
 
-/** Test-only reset, mirroring `shard-client.ts`'s `clearShardCache`. */
+/** Test-only reset, clearing both legacy detail index and packed detail caches. */
 export function clearDetailIndexCache(): void {
   detailIndexCache.clear();
+  clearPackedDetailCache();
 }
 
-/**
- * Fetches and caches the per-shard offset/length/hash index (P1.7). This is a
- * few hundred KB, fetched at most once per shard per session — not the
- * 12–35 MB shard itself.
- */
-function detailIndexArtifact(manifest: Awaited<ReturnType<typeof loadManifest>>, shard: number) {
+function detailIndexArtifact(manifest: Manifest, shard: number) {
   return manifest.artifacts.find((item) => item.path === `details/detail-index-${shard}.json`);
 }
 
-function detailIndexCacheKey(manifest: Awaited<ReturnType<typeof loadManifest>>, shard: number): string | null {
+function detailIndexCacheKey(manifest: Manifest, shard: number): string | null {
   const artifact = detailIndexArtifact(manifest, shard);
   return artifact ? `${manifest.schemaVersion}:${manifest.generatedAt}:${artifact.sha256}:${shard}` : null;
 }
 
-function fetchDetailIndex(shard: number, manifest: Awaited<ReturnType<typeof loadManifest>>): Promise<DetailIndex> {
+function fetchDetailIndex(shard: number, manifest: Manifest): Promise<DetailIndex> {
   const key = detailIndexCacheKey(manifest, shard);
   const artifact = detailIndexArtifact(manifest, shard);
   const cached = key ? detailIndexCache.get(key) : undefined;
@@ -51,9 +54,6 @@ function fetchDetailIndex(shard: number, manifest: Awaited<ReturnType<typeof loa
   })();
 
   if (key) detailIndexCache.set(key, promise);
-  // Same SW-3 rule as `shard-client.ts`'s `shardCache`: a rejection must not be
-  // cached with the same lifetime as a success, or one dropped connection
-  // makes the whole shard's entries unreachable until reload.
   if (key) promise.catch(() => { if (detailIndexCache.get(key) === promise) detailIndexCache.delete(key); });
   return promise;
 }
@@ -96,7 +96,6 @@ async function attemptRangeRead(path: string, ref: DetailIndexEntry, signal?: Ab
   return { kind: 'success', bytes };
 }
 
-/** One bounded retry on a transient failure — never an unbounded fallback to the whole shard. */
 async function readEntryBytes(path: string, ref: DetailIndexEntry, signal?: AbortSignal): Promise<RangeAttempt> {
   const first = await attemptRangeRead(path, ref, signal);
   return first.kind === 'transient' ? attemptRangeRead(path, ref, signal) : first;
@@ -114,15 +113,29 @@ export type EntryDetailReason =
 export type EntryDetailResult = { ok: true; entry: Entry } | { ok: false; reason: EntryDetailReason };
 
 /**
- * Bounded, byte-addressed replacement for reading a whole 12–35 MB catalogue
- * shard to find one entry (P1.7). Fetches the manifest (existing cost), then
- * at most a few hundred KB (the per-shard index, cached) plus the entry's own
- * few KB — never the shard.
+ * Loads one workflow entry by hex ID or slug. Uses packed FNV-1a `.gzbin`
+ * buckets when published in the manifest, falling back to legacy byte-range
+ * detail shards for tests or unpacked exports.
  */
-export async function loadEntryDetail(id: string, signal?: AbortSignal): Promise<EntryDetailResult> {
-  if (!ARTIFACT_ID.test(id)) return { ok: false, reason: 'not-found' };
-  const manifest = await loadManifest();
-  const shard = Object.hasOwn(manifest.catalogueShards, id) ? manifest.catalogueShards[id] : undefined;
+export async function loadEntryDetail(idOrSlug: string, signal?: AbortSignal): Promise<EntryDetailResult> {
+  if (!SAFE_KEY.test(idOrSlug) || FORBIDDEN_KEYS.has(idOrSlug)) {
+    return { ok: false, reason: 'not-found' };
+  }
+
+  let manifest: Manifest;
+  try {
+    manifest = await loadManifest();
+  } catch (cause) {
+    return isAbortError(cause) ? { ok: false, reason: 'aborted' } : { ok: false, reason: 'network' };
+  }
+
+  const isArtifactId = ARTIFACT_ID.test(idOrSlug);
+  if (hasPackedDetails(manifest)) {
+    return loadPackedEntryDetail(idOrSlug, isArtifactId, manifest, signal);
+  }
+  if (!isArtifactId) return { ok: false, reason: 'not-found' };
+
+  const shard = Object.hasOwn(manifest.catalogueShards, idOrSlug) ? manifest.catalogueShards[idOrSlug] : undefined;
   if (shard === undefined) return { ok: false, reason: 'not-found' };
 
   let index: DetailIndex;
@@ -131,7 +144,7 @@ export async function loadEntryDetail(id: string, signal?: AbortSignal): Promise
   } catch (cause) {
     return isAbortError(cause) ? { ok: false, reason: 'aborted' } : { ok: false, reason: 'network' };
   }
-  const ref = Object.hasOwn(index, id) ? index[id] : undefined;
+  const ref = Object.hasOwn(index, idOrSlug) ? index[idOrSlug] : undefined;
   if (!ref) return { ok: false, reason: 'not-found' };
   const detailArtifact = manifest.artifacts.find((artifact) => artifact.path === `details/detail-${shard}.jsonl`);
   if (detailArtifact && (!Number.isSafeInteger(detailArtifact.byteSize) || ref.offset + ref.length > detailArtifact.byteSize)) {
@@ -149,10 +162,7 @@ export async function loadEntryDetail(id: string, signal?: AbortSignal): Promise
 
   try {
     const parsed = parseEntryJson(new TextDecoder().decode(attempt.bytes));
-    if (parsed.id !== id) {
-      return { ok: false, reason: 'malformed' };
-    }
-    return { ok: true, entry: parsed };
+    return parsed.id === idOrSlug ? { ok: true, entry: parsed } : { ok: false, reason: 'malformed' };
   } catch {
     return { ok: false, reason: 'malformed' };
   }
@@ -167,12 +177,8 @@ const ENTRY_DETAIL_ERROR_MESSAGES: Record<Exclude<EntryDetailReason, 'not-found'
   aborted: 'Unable to load workflow: the request was cancelled.',
 };
 
-/**
- * Same signature as the whole-shard `fetchEntryById` it replaces, so
- * `view-client.tsx`'s null-or-thrown-message contract is unchanged.
- */
-export async function fetchEntryById(id: string, signal?: AbortSignal): Promise<Entry | null> {
-  const result = await loadEntryDetail(id, signal);
+export async function fetchEntryById(idOrSlug: string, signal?: AbortSignal): Promise<Entry | null> {
+  const result = await loadEntryDetail(idOrSlug, signal);
   if (result.ok) return result.entry;
   if (result.reason === 'not-found') return null;
   throw new Error(ENTRY_DETAIL_ERROR_MESSAGES[result.reason]);

@@ -27,17 +27,15 @@ function flowEvidence(value: unknown) {
   };
 }
 
-function expectApplicableUnknown(value: unknown): void {
+function expectUnmodeledComplete(value: unknown): void {
   const { result, facts, coverage, traces } = flowEvidence(value);
   expect(facts).toEqual([]);
-  expect(coverage).toEqual([]);
+  expect(coverage).toHaveLength(1);
+  expect(coverage[0]?.properties).toMatchObject({ capabilityId: 'taint-integrity', coverageStatus: 'COMPLETE',
+    fieldsExamined: 0, emittedFlows: 0, taintChannels: [] });
   expect(traces).toEqual([]);
-  expect(result.analysis.status).toBe('DEGRADED');
-  const diagnostics = result.analysis.diagnostics.filter((diagnostic) => diagnostic.code === 'GRAPH_ANALYSIS_DEGRADED'
-    && diagnostic.capabilityId === 'structural-policies');
-  expect(diagnostics).toHaveLength(1);
-  expect(diagnostics[0]).toMatchObject({ aggregateEffect: 'DEGRADED', assessmentEligible: true, observed: 1, omitted: 0 });
-  expect(diagnostics[0]).not.toHaveProperty('maximum');
+  expect(result.analysis.status).toBe('COMPLETE');
+  expect(result.analysis.diagnostics.some((diagnostic) => diagnostic.code === 'GRAPH_ANALYSIS_DEGRADED')).toBe(false);
   const owner = result.analysis.capabilities.find((capability) => capability.id === 'structural-policies');
   expect(owner).toMatchObject({ required: true, omitted: 0 });
   expect(result.stats.omittedFindings).toBe(0);
@@ -119,8 +117,8 @@ describe('public reviewed field witness', () => {
       { ...positive.nodes[0], typeVersion: undefined }, { ...positive.nodes[1], typeVersion: undefined },
     ] }],
     ['disabled source', { ...positive, nodes: [{ ...positive.nodes[0], disabled: true }, positive.nodes[1]] }],
-  ])('%s is an applicable UNKNOWN published as DEGRADED', (_name, workflow) => {
-    expectApplicableUnknown(workflow);
+  ])('%s is unmodeled in field-flow and stays COMPLETE without GRAPH_ANALYSIS_DEGRADED', (_name, workflow) => {
+    expectUnmodeledComplete(workflow);
   });
 
   it.each([
@@ -140,6 +138,6 @@ describe('public reviewed field witness', () => {
       connections: { Source: positive.connections.Source,
         Sink: { main: [[{ node: 'After', type: 'main', index: 0 }]] } },
     };
-    expectApplicableUnknown(downstream);
+    expectUnmodeledComplete(downstream);
   });
 });

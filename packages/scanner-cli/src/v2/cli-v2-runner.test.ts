@@ -49,10 +49,10 @@ const fixturePath = (name: string): string => `${fixtureDirectory}/${name}`;
 const fixture = async (name: string): Promise<Uint8Array> => new TextEncoder().encode(await readFile(fixturePath(name), 'utf8'));
 const fixtureText = async (name: string): Promise<string> => readFile(fixturePath(name), 'utf8');
 
-function scanBytes(bytes: Uint8Array, _item?: unknown, options?: { target?: unknown; advisoryRequest?: unknown }): ScanWorkflowV2Result {
+function scanBytes(bytes: Uint8Array, _item?: unknown, options?: { profile?: Readonly<{ id: string; version: string }>; target?: unknown; advisoryRequest?: unknown }): ScanWorkflowV2Result {
   return scanWorkflowV2({
     bytes,
-    profile: { id: 'beta-default', version: '2.0.0' },
+    profile: options?.profile ?? { id: 'standard', version: '3.0.0' },
     limits: DEFAULT_SCANNER_LIMITS_V2,
     ...(options?.target === undefined ? {} : { target: options.target }),
     ...(options?.advisoryRequest === undefined ? {} : { advisoryRequest: options.advisoryRequest }),
@@ -60,10 +60,10 @@ function scanBytes(bytes: Uint8Array, _item?: unknown, options?: { target?: unkn
 }
 
 /** The real runner forwards the CLI target document to the scan, so the result carries the declared n8n version. */
-function scanBytesWithTarget(bytes: Uint8Array, _item: unknown, options?: { target?: unknown }): ScanWorkflowV2Result {
+function scanBytesWithTarget(bytes: Uint8Array, _item: unknown, options?: { profile?: Readonly<{ id: string; version: string }>; target?: unknown }): ScanWorkflowV2Result {
   return scanWorkflowV2({
     bytes,
-    profile: { id: 'beta-default', version: '2.0.0' },
+    profile: options?.profile ?? { id: 'standard', version: '3.0.0' },
     limits: DEFAULT_SCANNER_LIMITS_V2,
     ...(options?.target === undefined ? {} : { target: options.target }),
   });
@@ -153,7 +153,7 @@ describe('runCliV2', () => {
     expect(header).toMatchObject({ type: 'header', supplyChain: { status: 'READY', packages: [{ state: 'KNOWN', name: 'pkg', version: '1.2.3' }] } });
   });
 
-  it.each(['json', 'ndjson', 'sarif', 'table'] as const)('selects the existing %s serializer', async (format) => {
+  it.each(['json', 'ndjson', 'sarif', 'table', 'pretty', 'markdown'] as const)('selects the %s serializer', async (format) => {
     const result = await runCliV2(scanCommand(cleanInput, '--format', format), {
       read: async () => fixture('clean-workflow.json'),
       scan: scanBytes,
@@ -171,6 +171,8 @@ describe('runCliV2', () => {
     }
     if (format === 'sarif') expect(JSON.parse(result.stdout)).toMatchObject({ version: '2.1.0', runs: expect.any(Array) });
     if (format === 'table') expect(result.stdout).toContain('Input');
+    if (format === 'pretty') expect(result.stdout).toContain('LOW');
+    if (format === 'markdown') expect(result.stdout).toContain('## SecureFlow Security Scan');
   });
   it('omits readiness by default and reports it under the explicit opt-in', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'sf-cli-readiness-'));
@@ -356,12 +358,12 @@ describe('runCliV2', () => {
     const sourceBytes = new TextEncoder().encode(parityFixture.json);
     const expected = scanWorkflowV2({ bytes: sourceBytes, profile: V2_ADAPTER_PROFILE, limits: DEFAULT_SCANNER_LIMITS_V2 });
     const captured: ScanWorkflowV2Result[] = [];
-    const result = await runCliV2(scanCommand('-', '--format', 'json', '--fail-on', 'CRITICAL'), {
+    const result = await runCliV2(scanCommand('-', '--profile', 'beta-default', '--format', 'json', '--fail-on', 'CRITICAL'), {
       stdin: sourceBytes,
-      scan: (bytes) => {
-        const raw = scanBytes(bytes);
-        captured.push(raw);
-        return raw;
+      scan: (bytes, _item, options) => {
+        const scanned = scanBytes(bytes, _item, options);
+        captured.push(scanned);
+        return scanned;
       },
     });
     expect(result.exitCode).toBe(0);
@@ -506,5 +508,37 @@ describe('runCliV2', () => {
     expect(result.stdout).toBe('');
     expect(readCalled).toBe(false);
     expect(after).toEqual(before);
+  });
+
+  it('applies --min-severity, --min-confidence, --baseline suppression, and --fail-on NONE', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'sf-cli-filter-'));
+    try {
+      await writeFile(join(dir, 'wf.json'), JSON.stringify({
+        nodes: [
+          { id: 'exec', name: 'Exec', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, parameters: { command: 'id' } },
+          { id: 'code', name: 'Code', type: 'n8n-nodes-base.code', typeVersion: 2, parameters: { jsCode: 'return items;' } },
+        ],
+        connections: {},
+      }));
+      const initial = await runCliV2(scanCommand('wf.json', '--format', 'json', '--fail-on', 'NONE'), { cwd: dir, scan: scanBytes });
+      expect(initial.exitCode).toBe(0);
+      const initialEnv = envelope(initial.stdout);
+      expect(initialEnv.results[0]?.result?.findings.map((f) => f.ruleId)).toEqual(['N8N_EXECUTE_COMMAND', 'N8N_CODE_NODE']);
+
+      const highOnly = await runCliV2(scanCommand('wf.json', '--format', 'json', '--min-severity', 'HIGH'), { cwd: dir, scan: scanBytes });
+      expect(highOnly.exitCode).toBe(1);
+      expect(envelope(highOnly.stdout).results[0]?.result?.findings.map((f) => f.ruleId)).toEqual(['N8N_EXECUTE_COMMAND']);
+
+      await writeFile(join(dir, 'baseline.json'), initial.stdout);
+      const suppressed = await runCliV2(scanCommand('wf.json', '--format', 'pretty', '--baseline', 'baseline.json'), { cwd: dir, scan: scanBytes });
+      expect(suppressed.exitCode).toBe(0);
+      expect(suppressed.stdout).toContain('Baseline suppressed: 2');
+
+      const missingBase = await runCliV2(scanCommand('wf.json', '--baseline', 'nope.json'), { cwd: dir, scan: scanBytes });
+      expect(missingBase.exitCode).toBe(2);
+      expect(missingBase.stdout).toBe('');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
