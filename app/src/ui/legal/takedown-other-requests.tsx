@@ -20,15 +20,15 @@ export function TakedownOtherRequests() {
           licence file cannot license a workflow somebody else authored.
         </p>
         <p>
-          If a repository of yours carries a licence that does not cover some of its files, tell
-          us which ones. The usual outcome is not deletion: the affected entries become
-          link-only, so they stay findable and their JSON stops being served here.
+          Every entry in this catalogue is already link-only — no workflow JSON bodies are hosted or redistributed
+          here. If an entry&rsquo;s recorded licence metadata or attribution is inaccurate, tell us which entries are
+          affected so we can correct the metadata or exclude them from the index.
         </p>
         <RequestChecklist
           items={[
             'The source repository, and the paths or entry IDs affected.',
-            'What the correct rights position is, and why the repository licence does not cover them.',
-            'Whether you want the entries link-only or removed entirely.',
+            'What the correct licence or attribution should be.',
+            'Whether you want the metadata corrected or the entries removed from the catalogue.',
           ]}
         />
       </LegalSection>
@@ -82,16 +82,15 @@ export function TakedownOtherRequests() {
 
       <LegalSection id="what-happens" heading="What happens to a request">
         <p>
-          A maintainer checks it against the provenance recorded on the entry — the source, the
-          commit, the path. A confirmed source removal marks that source excluded; a confirmed
-          entry removal records its stable ID in the exclusion list. The corpus is then rebuilt,
-          and the removal is verified: the entry must be absent from the catalogue shards, the
-          search index and the pre-rendered pages before the site is redeployed.
+          A maintainer checks the request against the provenance recorded on the entry — the source,
+          the commit, and the upstream path. A confirmed source removal marks that source excluded; a confirmed
+          entry removal records its stable ID in the pipeline exclusion list. The catalogue is then rebuilt and
+          verified so the entry is absent from all packed detail buckets, search indexes, and static pages before
+          redeployment.
         </p>
         <p>
-          Unrelated pages and permitted downloads are re-checked afterwards, so a removal does not
-          quietly take something else with it. Requests are acknowledged within three business
-          days.
+          Unrelated entries are re-checked afterwards so a removal never affects anything else. Requests are
+          acknowledged within three business days.
         </p>
         <p>
           Please do not include credentials, workflow secrets, or customer data in any request on

@@ -10,8 +10,12 @@
  * allowed. `siteOrigin()` deliberately rejects query and fragment because it is
  * a canonical origin, so it is the wrong tool here.
  */
-function httpsLink(raw: string | undefined): string | null {
-  const value = (raw ?? '').trim();
+export const DEFAULT_PRODUCT_REPOSITORY_URL = 'https://github.com/jitwark/sfscanner';
+export const DEFAULT_RULE_REFERENCE_URL = 'https://github.com/jitwark/sfscanner/blob/main/docs/scanner/generated/rules.md';
+export const NPM_PACKAGE_URL = 'https://www.npmjs.com/package/sfscanner';
+
+function httpsLink(raw: string | undefined, fallback?: string): string | null {
+  const value = (raw === undefined ? (fallback ?? '') : raw).trim();
   if (!value) return null;
   try {
     const url = new URL(value);
@@ -21,5 +25,5 @@ function httpsLink(raw: string | undefined): string | null {
   }
 }
 
-export const productRepositoryUrl = () => httpsLink(process.env.NEXT_PUBLIC_PRODUCT_REPOSITORY_URL);
-export const scannerRuleReferenceUrl = () => httpsLink(process.env.NEXT_PUBLIC_RULE_REFERENCE_URL);
+export const productRepositoryUrl = () => httpsLink(process.env.NEXT_PUBLIC_PRODUCT_REPOSITORY_URL, DEFAULT_PRODUCT_REPOSITORY_URL);
+export const scannerRuleReferenceUrl = () => httpsLink(process.env.NEXT_PUBLIC_RULE_REFERENCE_URL, DEFAULT_RULE_REFERENCE_URL);

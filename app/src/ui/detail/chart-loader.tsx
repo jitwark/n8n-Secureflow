@@ -17,6 +17,8 @@ type ChartLoaderProps = {
   loadPreview?: boolean;
   /** True when packed `charts/pack-*.jsonl.gzbin` buckets are published and `slimEntry` omitted `chartRef`. */
   packedChartAvailable?: boolean;
+  /** Automatically load the interactive workflow canvas on mount when packed charts are available. */
+  autoLoadInteractive?: boolean;
   /** Test seam for the finite timeout; production defaults to 15 seconds. */
   interactiveTimeoutMs?: number;
   /** Test seam for the local dynamic chunk; production uses the real module. */
@@ -54,7 +56,7 @@ function SourceLink({ entry }: { entry: Entry }) {
  * Shows a zero-network structure summary by default and fetches the packed
  * interactive chart + canvas module only when the user clicks "Load interactive canvas".
  */
-export function ChartLoader({ entry, preview, loadPreview = false, packedChartAvailable = false, interactiveTimeoutMs = INTERACTIVE_TIMEOUT_MS, loadCanvasModule = loadWorkflowChart }: ChartLoaderProps) {
+export function ChartLoader({ entry, preview, loadPreview = false, packedChartAvailable = false, autoLoadInteractive = packedChartAvailable && !preview && !loadPreview, interactiveTimeoutMs = INTERACTIVE_TIMEOUT_MS, loadCanvasModule = loadWorkflowChart }: ChartLoaderProps) {
   const canLoadInteractive = Boolean(entry.chartRef) || packedChartAvailable;
   const [previewState, setPreviewState] = useState<PreviewResult | null>(null);
   const [previewAttempt, setPreviewAttempt] = useState(0);
@@ -64,6 +66,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, packedChartAv
   const controllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<number | undefined>(undefined);
   const requestGenerationRef = useRef(0);
+  const autoLoadedEntryRef = useRef<string | null>(null);
 
   const invalidateInteractive = useCallback(() => {
     requestGenerationRef.current += 1;
@@ -97,7 +100,7 @@ export function ChartLoader({ entry, preview, loadPreview = false, packedChartAv
     displayedIdentityRef.current = next;
     if (previous.id !== next.id || previous.shard !== next.shard || previous.offset !== next.offset || previous.length !== next.length) cancelInteractive();
   }, [cancelInteractive, entry.id, entry.chartRef?.shard, entry.chartRef?.offset, entry.chartRef?.length]);
-  useEffect(() => () => invalidateInteractive(), [invalidateInteractive]);
+  useEffect(() => () => { autoLoadedEntryRef.current = null; invalidateInteractive(); }, [invalidateInteractive]);
 
   const retryPreview = useCallback(() => {
     setPreviewState(null);
@@ -149,6 +152,13 @@ export function ChartLoader({ entry, preview, loadPreview = false, packedChartAv
       if (controllerRef.current === controller) controllerRef.current = null;
     }
   }, [canLoadInteractive, entry.chartRef, entry.id, interactiveState, interactiveTimeoutMs, loadCanvasModule]);
+
+  useEffect(() => {
+    if (!autoLoadInteractive || !canLoadInteractive || interactiveState !== 'idle') return;
+    if (autoLoadedEntryRef.current === entry.id) return;
+    autoLoadedEntryRef.current = entry.id;
+    void exploreInteractive();
+  }, [autoLoadInteractive, canLoadInteractive, entry.id, exploreInteractive, interactiveState]);
 
   const previewArtifact = preview ?? (previewState?.ok ? previewState.preview : null);
   const previewFailure = preview === undefined && previewState && !previewState.ok ? previewState.reason : null;

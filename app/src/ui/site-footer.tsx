@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { NPM_PACKAGE_URL, productRepositoryUrl } from './product-links';
 
 type FooterLink = {
   href: '/library/' | '/scanner/' | '/analytics/' | '/about/' | '/sources/' | '/privacy/' | '/terms/' | '/takedown/';
@@ -14,6 +15,7 @@ const EXPLORE: FooterLink[] = [
 const PROJECT: FooterLink[] = [
   { href: '/about/', label: 'About' },
   { href: '/sources/', label: 'Sources' },
+  { href: '/takedown/', label: 'Removal requests' },
   { href: '/privacy/', label: 'Privacy' },
   { href: '/terms/', label: 'Terms' },
 ];
@@ -42,6 +44,7 @@ function Column({ title, links }: { title: string; links: FooterLink[] }) {
 }
 
 export function SiteFooter() {
+  const repositoryUrl = productRepositoryUrl();
   return (
     <footer className="mt-20 border-t border-hairline bg-panel text-ink">
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 min-w-0 gap-8 px-4 py-16 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
@@ -53,9 +56,29 @@ export function SiteFooter() {
             </p>
           </div>
           <p className="mt-3 max-w-md text-sm leading-6 text-ink-muted">
-            An engineering-grade, privacy-first community workflow catalogue and local scanner.
+            Deterministic, offline n8n security scanner (CLI, MCP &amp; browser) and link-only community workflow catalogue.
             All static. Zero tracking. Zero uploads.
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-mono">
+            {repositoryUrl ? (
+              <a
+                href={repositoryUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-text underline underline-offset-2 hover:text-ink"
+              >
+                GitHub ↗
+              </a>
+            ) : null}
+            <a
+              href={NPM_PACKAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-text underline underline-offset-2 hover:text-ink"
+            >
+              npm: sfscanner ↗
+            </a>
+          </div>
           <p className="mt-4 font-mono text-2xs uppercase tracking-wider text-ink-faint">
             Independent community project · Not affiliated with n8n.io
           </p>

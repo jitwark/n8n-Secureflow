@@ -31,7 +31,7 @@ export type EntrySecurity = {
   /** Extra findings surfaced only by the hardened profile. */
   hardenedExtra: number;
   scannerVersion: string;
-  profile: 'beta-default' | 'beta-hardened';
+  profile: 'standard' | 'strict' | 'beta-default' | 'beta-hardened';
   /** Absent pre-existing; INDETERMINATE forces grade UNKNOWN. Codes only, never locations/evidence. */
   analysisStatus?: 'COMPLETE' | 'DEGRADED' | 'INDETERMINATE';
   analysisDiagnosticCodes?: string[];

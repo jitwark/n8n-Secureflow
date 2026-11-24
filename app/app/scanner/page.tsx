@@ -1,5 +1,6 @@
 import { ScannerClient } from '@/src/scanner/scanner-client';
 import { ScannerGuide } from '@/src/ui/scanner-guide';
+import { ScannerOfflineStrip } from '@/src/ui/scanner-offline-strip';
 import { JsonLdScript, scannerJsonLd } from '../../src/seo/json-ld';
 import { canonicalAlternates } from '../../src/seo/page-meta';
 import { isPreviewBuild } from '../../src/seo/robots';
@@ -35,6 +36,8 @@ export default function ScannerPage() {
         </header>
 
         <ScannerClient />
+
+        <ScannerOfflineStrip />
 
         <section aria-labelledby="scanner-purpose" className="border-t border-hairline pt-6">
           <h2 id="scanner-purpose" className="font-sans text-xl font-bold text-ink">What this review gives you</h2>

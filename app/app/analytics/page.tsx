@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { readAnalyticsSync, readReleaseSnapshotSync } from '../../src/catalogue/analytics-node';
+import { NPM_PACKAGE_URL, productRepositoryUrl } from '../../src/ui/product-links';
 import { BarList, type BarRow } from '../../src/ui/analytics/bar-list';
 import { FindingsSummary } from '../../src/ui/analytics/findings-summary';
 import { Histogram } from '../../src/ui/analytics/histogram';
@@ -49,15 +51,32 @@ export default function AnalyticsPage() {
       />
 
       <header className="border-b border-hairline pb-5">
-        <p className="font-mono text-2xs uppercase tracking-[0.16em] text-ink-faint">Corpus analytics</p>
+        <p className="font-mono text-2xs font-bold uppercase tracking-[0.16em] text-accent-text">
+          Corpus analytics · sfscanner v0.3 (standard@3.0.0)
+        </p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink md:text-4xl">
           What is actually in the catalogue
         </h1>
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs text-ink-faint">
-          <span>{total.toLocaleString('en-US')} workflows</span>
-          <span>
-            snapshot <time dateTime={release.generatedAt}>{SNAPSHOT_DATE.format(new Date(release.generatedAt))}</time>
-          </span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs text-ink-faint">
+            <span>{total.toLocaleString('en-US')} workflows</span>
+            <span>
+              snapshot <time dateTime={release.generatedAt}>{SNAPSHOT_DATE.format(new Date(release.generatedAt))}</time>
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+            <Link href="/scanner/" prefetch={false} className="text-accent-text underline underline-offset-2 hover:text-ink">
+              Scan your workflow →
+            </Link>
+            {productRepositoryUrl() ? (
+              <a href={productRepositoryUrl()!} target="_blank" rel="noopener noreferrer" className="text-ink-muted underline underline-offset-2 hover:text-ink">
+                GitHub ↗
+              </a>
+            ) : null}
+            <a href={NPM_PACKAGE_URL} target="_blank" rel="noopener noreferrer" className="text-ink-muted underline underline-offset-2 hover:text-ink">
+              npm ↗
+            </a>
+          </div>
         </div>
       </header>
 

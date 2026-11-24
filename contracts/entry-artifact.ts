@@ -14,7 +14,7 @@ const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const;
 const COMPLEXITIES = ['simple', 'medium', 'complex'] as const;
 const DESCRIPTION_SOURCES = ['upstream', 'generated', 'fallback'] as const;
 const PROVENANCE_SOURCES = ['gemini', 'upstream', 'fallback', 'unknown'] as const;
-const PROFILES = ['beta-default', 'beta-hardened'] as const;
+const PROFILES = ['standard', 'strict', 'beta-default', 'beta-hardened'] as const;
 const ANALYSIS_STATUSES = ['COMPLETE', 'DEGRADED', 'INDETERMINATE'] as const;
 /** Why a `not-scanned` stamp was written; closed vocabulary, like every other marker here. */
 const STAMP_REASONS = ['source_unavailable'] as const;

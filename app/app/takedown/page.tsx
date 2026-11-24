@@ -6,15 +6,25 @@ import { TakedownOtherRequests } from '../../src/ui/legal/takedown-other-request
 import { lastUpdated } from '../../src/ui/legal/legal-contacts';
 import { canonicalAlternates } from '../../src/seo/page-meta';
 import { isPreviewBuild } from '../../src/seo/robots';
+import { productRepositoryUrl } from '../../src/ui/product-links';
 
 export const metadata: Metadata = {
   title: 'Removal requests · n8n-secureflow',
   description:
-    'How to ask for a workflow, a source, or your personal details to be removed: copyright, licence corrections, personal data, and security reports.',
+    'Request correction or removal of a workflow entry, source, or personal data: copyright, licence metadata, privacy, and security reports.',
   ...(isPreviewBuild() ? {} : { alternates: canonicalAlternates('/takedown/') }),
 };
 
+const REQUEST_CARDS = [
+  { href: '#copyright', tag: 'DMCA', label: 'Copyright removal', detail: 'Remove a workflow or repository from the index.' },
+  { href: '#licence', tag: 'Metadata', label: 'Licence correction', detail: 'Fix recorded licence or attribution on link-only entries.' },
+  { href: '#personal-data', tag: 'Privacy', label: 'Personal data', detail: 'Erase or correct author names and usernames privately.' },
+  { href: '#security', tag: 'Disclosure', label: 'Security report', detail: 'Report a scanner bug or exposed credential privately.' },
+] as const;
+
 export default function TakedownPage() {
+  const repositoryUrl = productRepositoryUrl();
+
   return (
     <>
       <JsonLdScript
@@ -31,36 +41,48 @@ export default function TakedownPage() {
         intro={
           <>
             <p>
-              This catalogue indexes workflows other people published, and records who wrote them.
-              If something here is yours and you want it changed or gone, this page is how to say
-              so. Requests are read and acted on; you do not need an account anywhere to make one.
+              This catalogue is strictly <strong className="font-semibold text-ink">link-only</strong> — no workflow
+              JSON bodies are hosted or redistributed here. Every entry stores derived structural/security metadata,
+              author attribution from the upstream source, and a link back to the original location.
             </p>
             <p className="mt-3">
-              There are four kinds of request and they work differently. Pick the one that matches
-              what you are asking for — it decides what evidence is needed and how fast the answer
-              comes.
+              If something here is yours and you want it corrected or removed, pick the request type below. You do not
+              need an account anywhere, and confirmed removals are recorded in our pipeline exclusion list so they never
+              reappear on future rebuilds.
             </p>
+            {repositoryUrl ? (
+              <p className="mt-3 text-xs text-ink-muted">
+                Non-personal documentation or licence metadata fixes can also be tracked on{' '}
+                <a
+                  href={`${repositoryUrl}/issues`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-accent-text underline underline-offset-2 hover:text-ink"
+                >
+                  GitHub Issues ↗
+                </a>
+                . Keep copyright, personal-data, and security reports private via email.
+              </p>
+            ) : null}
           </>
         }
       >
-        <nav aria-label="Request types" className="rounded-panel border border-hairline bg-panel p-4">
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {[
-              { href: '#copyright', label: 'Copyright removal (DMCA)' },
-              { href: '#licence', label: 'Licence correction' },
-              { href: '#personal-data', label: 'Personal data' },
-              { href: '#security', label: 'Security disclosure' },
-            ].map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="flex min-h-11 items-center rounded-control px-2 font-mono text-xs text-accent-text transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent-border"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <nav aria-label="Request types" className="grid gap-3 sm:grid-cols-2">
+          {REQUEST_CARDS.map((card) => (
+            <a
+              key={card.href}
+              href={card.href}
+              className="group flex flex-col gap-1 rounded-panel border border-hairline bg-panel p-4 transition-colors hover:border-hairline-strong hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent-border"
+            >
+              <span className="font-mono text-2xs font-bold uppercase tracking-wider text-accent-text">
+                {card.tag}
+              </span>
+              <span className="font-sans text-sm font-bold text-ink group-hover:text-accent-text">
+                {card.label} →
+              </span>
+              <span className="text-xs leading-5 text-ink-muted">{card.detail}</span>
+            </a>
+          ))}
         </nav>
 
         <TakedownCopyright />

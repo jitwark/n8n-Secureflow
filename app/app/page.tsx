@@ -143,9 +143,9 @@ export default function HomePage() {
 
       {/* Body Content Chapters: Flat paper-white canvas */}
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-14">
-        <HomeSecurityInsights />
-
         <HomeTools />
+
+        <HomeSecurityInsights />
 
         <HomeFacts
           facts={[

@@ -235,7 +235,7 @@ describe('ChartLoader', () => {
     await waitFor(() => expect(loadChartMock).toHaveBeenCalledWith(entry.chartRef, expect.any(AbortSignal), undefined, entry.id));
   });
 
-  it('loads interactive canvas from packed charts when chartRef is omitted and packedChartAvailable is true', async () => {
+  it('auto-loads interactive canvas from packed charts when chartRef is omitted and packedChartAvailable is true', async () => {
     const entry = { ...entryWithoutChart(), id: '26006871febf2139' } as Entry;
     loadChartMock.mockResolvedValue({
       ok: true,
@@ -244,7 +244,6 @@ describe('ChartLoader', () => {
     const loadCanvasModule = async () => ({ WorkflowChartComponent: () => createElement('div', { 'data-testid': 'workflow-chart' }) });
 
     render(createElement(ChartLoader, { entry, packedChartAvailable: true, loadCanvasModule }));
-    explore();
 
     await waitFor(() => expect(loadChartMock).toHaveBeenCalledWith(undefined, expect.any(AbortSignal), undefined, entry.id));
     await waitFor(() => expect(screen.getByTestId('workflow-chart')).toBeDefined());
