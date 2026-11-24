@@ -6,6 +6,7 @@ import { bucketForId, bucketTag } from './pack-bucket';
 import { sitePath } from '../ui/site-url.mjs';
 
 const MAX_CHART_BYTES = 512_000;
+const MAX_CACHED_CHART_BUCKETS = 8;
 const chartPackCache = new Map<string, Promise<Map<string, string>>>();
 
 export function clearChartPackCache(): void {
@@ -46,7 +47,9 @@ async function fetchChartBucketMap(
   const key = `${manifest.schemaVersion}:${manifest.generatedAt}:${sha256}:${packPath}`;
   let pending = chartPackCache.get(key);
   if (!pending) {
-    pending = fetchTextMaybeGzip(sitePath(`/data/${packPath}`), { expectedSha256: sha256, signal }).then((text) => {
+    // Do not bind a single caller's AbortSignal to the shared bucket fetch;
+    // otherwise StrictMode/unmount aborts can poison a concurrent live caller.
+    pending = fetchTextMaybeGzip(sitePath(`/data/${packPath}`), { expectedSha256: sha256 }).then((text) => {
       const map = new Map<string, string>();
       for (const line of text.split('\n')) {
         if (!line) continue;
@@ -55,10 +58,23 @@ async function fetchChartBucketMap(
       }
       return map;
     });
+    if (chartPackCache.size >= MAX_CACHED_CHART_BUCKETS) {
+      const oldest = chartPackCache.keys().next().value;
+      if (oldest !== undefined) chartPackCache.delete(oldest);
+    }
     chartPackCache.set(key, pending);
     pending.catch(() => { if (chartPackCache.get(key) === pending) chartPackCache.delete(key); });
   }
-  return pending;
+  if (!signal) return pending;
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  return new Promise<Map<string, string>>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    pending!.then(
+      (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
+      (error) => { signal.removeEventListener('abort', onAbort); reject(error); },
+    );
+  });
 }
 
 async function loadPackedChart(entryId: string, manifest: Manifest, signal?: AbortSignal): Promise<ChartResult> {

@@ -62,7 +62,7 @@ export function TakedownCopyright() {
               </p>
               <p className="text-sm leading-6 text-ink-muted">
                 For a routine request with no personal, credential, or security details, <PublicRequestLink />.
-                Do not put personal data, credentials, or security details in email.
+                Do not put another person&rsquo;s personal data, credentials, or live secrets in email.
               </p>
             </div>
           )}

@@ -155,7 +155,7 @@ export default function HomePage() {
               value: compact(analytics.searchable),
               detail: `${((analytics.searchable / Math.max(1, analytics.total)) * 100).toFixed(0)}% of the catalogue`,
             },
-            { label: 'Findings', value: compact(analytics.findings.totalOccurrences), detail: `${analytics.findings.policies.length} rules` },
+            { label: 'Findings', value: compact(analytics.findings.totalOccurrences), detail: `${analytics.findings.policies.length} rules matched` },
             { label: 'Sources', value: compact(sourceCount(entries)), detail: `rebuilt ${buildDate(manifest.generatedAt)}` },
           ]}
         />

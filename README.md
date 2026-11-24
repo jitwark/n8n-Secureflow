@@ -129,9 +129,9 @@ Measured from `app/src/catalogue/v03-corpus-metrics.json` (`standard@3.0.0` acro
 | `COMPLETE` analysis | 15,220 (83.08%) |
 | `DEGRADED` analysis | 1,285 (7.01%) |
 | `INDETERMINATE` analysis | 1,798 (9.81%) |
-| Degraded *solely* for an unmodeled trigger | **0** (down from 15,477) |
+| Degraded *solely* for an unmodeled node | **0** (down from 15,477) |
 | Total findings raised | 63,064 across 14,037 templates |
-| Templates graded High or Critical | 7,210 (39.36%) |
+| Templates with High or Critical findings | 7,210 (39.36%; 6,291 graded High/Critical) |
 
 ### 🎯 Top Rules Triggered
 

@@ -3,8 +3,8 @@ import { NPM_PACKAGE_URL, productRepositoryUrl } from './product-links';
 const MCP_SNIPPET = `{
   "mcpServers": {
     "sfscanner": {
-      "command": "node",
-      "args": ["<npm-root>/sfscanner/dist/mcp.js"]
+      "command": "npx",
+      "args": ["-y", "-p", "sfscanner", "sfscanner-mcp"]
     }
   }
 }`;
